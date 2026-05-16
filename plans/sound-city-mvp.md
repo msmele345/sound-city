@@ -65,12 +65,12 @@ Build the latest events feed as a complete discovery path from database to API t
 
 ### Acceptance Criteria
 
-- [ ] Upcoming Chicago events are loaded from the API.
-- [ ] Event cards show date, time, venue, neighborhood, artists, styles, and source information.
-- [ ] Events can be filtered or grouped by useful discovery dimensions such as date, style, or neighborhood.
-- [ ] Empty, loading, and error states are handled.
-- [ ] Event source links are visible and usable.
-- [ ] The feed remains readable on mobile and desktop.
+- [x] Upcoming Chicago events are loaded from the API.
+- [x] Event cards show date, time, venue, neighborhood, artists, styles, and source information.
+- [x] Events can be filtered or grouped by useful discovery dimensions such as date, style, or neighborhood.
+- [x] Empty, loading, and error states are handled.
+- [x] Event source links are visible and usable.
+- [x] The feed remains readable on mobile and desktop.
 
 ---
 

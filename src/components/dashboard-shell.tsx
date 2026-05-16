@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
 const manifest = [
   { value: "24", label: "Verified" },
   { value: "09", label: "Neighborhoods" },
@@ -23,12 +27,6 @@ const recommendedEvents = [
   },
 ];
 
-const latestEvents = [
-  { title: "Smartbar resident night", area: "Wrigleyville" },
-  { title: "Warehouse fundraiser", area: "Pilsen" },
-  { title: "After-hours selector series", area: "Logan Square" },
-];
-
 const venueSignals = [
   { label: "Sound", value: "Warm stacks" },
   { label: "Crowd", value: "Heads-down" },
@@ -36,7 +34,52 @@ const venueSignals = [
   { label: "Door", value: "Low-key" },
 ];
 
-const nav = ["Dashboard", "Events", "Artists", "Venues", "Admin"];
+const nav = [
+  { label: "Dashboard", href: "#dashboard" },
+  { label: "Events", href: "#events" },
+  { label: "Artists", href: "#artists" },
+  { label: "Venues", href: "#venues" },
+  { label: "Admin" },
+];
+
+type CatalogEvent = {
+  id: string;
+  title: string;
+  startsAt: string;
+  venue: {
+    name: string;
+    neighborhood: string;
+  };
+  artists: { name: string }[];
+  styles: string[];
+  source: {
+    title: string;
+    url: string;
+    lastVerifiedAt: string;
+  };
+};
+
+type EventFeedState =
+  | { status: "loading"; events: CatalogEvent[] }
+  | { status: "ready"; events: CatalogEvent[] }
+  | { status: "error"; events: CatalogEvent[] };
+
+function formatEventDate(startsAt: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "America/Chicago",
+  }).format(new Date(startsAt));
+}
+
+function formatEventTime(startsAt: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Chicago",
+  }).format(new Date(startsAt));
+}
 
 function MatchMeter({ score }: { score: number }) {
   const filled = Math.round(score * 10);
@@ -52,6 +95,162 @@ function MatchMeter({ score }: { score: number }) {
       </span>
       <span className="sr-only">Match {pct} percent</span>
     </span>
+  );
+}
+
+function EventDiscoveryFeed() {
+  const [feed, setFeed] = useState<EventFeedState>({
+    status: "loading",
+    events: [],
+  });
+  const [activeStyle, setActiveStyle] = useState("all");
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadEvents() {
+      try {
+        const response = await fetch("/api/catalog/events?city=chicago");
+        if (!response.ok) {
+          throw new Error("Event feed unavailable");
+        }
+        const body = (await response.json()) as { events: CatalogEvent[] };
+        if (active) {
+          setFeed({ status: "ready", events: body.events });
+        }
+      } catch {
+        if (active) {
+          setFeed({ status: "error", events: [] });
+        }
+      }
+    }
+
+    void loadEvents();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const events = useMemo(
+    () =>
+      feed.events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
+    [feed.events],
+  );
+  const styles = useMemo(
+    () => [...new Set(events.flatMap((event) => event.styles))].toSorted(),
+    [events],
+  );
+  const visibleEvents = useMemo(
+    () =>
+      activeStyle === "all"
+        ? events
+        : events.filter((event) => event.styles.includes(activeStyle)),
+    [activeStyle, events],
+  );
+
+  if (feed.status === "loading") {
+    return (
+      <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+        Loading Chicago event feed
+      </p>
+    );
+  }
+
+  if (feed.status === "error") {
+    return (
+      <p role="alert" className="border-b border-rule py-5 text-sm text-ink-dim">
+        Event feed is unavailable. Source-verified listings will return here.
+      </p>
+    );
+  }
+
+  if (events.length === 0) {
+    return (
+      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        No upcoming Chicago events are verified yet.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <div
+        aria-label="Filter events by style"
+        className="mt-4 flex flex-wrap border-y border-rule font-mono text-[0.7rem] uppercase tracking-[0.16em]"
+      >
+        {["all", ...styles].map((style) => (
+          <button
+            key={style}
+            type="button"
+            aria-pressed={activeStyle === style}
+            onClick={() => setActiveStyle(style)}
+            className={`border-r border-rule px-3 py-2 transition-colors duration-150 hover:bg-panel hover:text-signal ${
+              activeStyle === style ? "bg-panel text-signal" : "text-ink-dim"
+            }`}
+          >
+            {style}
+          </button>
+        ))}
+      </div>
+      {visibleEvents.length === 0 ? (
+        <p className="border-b border-rule py-5 text-sm text-ink-dim">
+          No verified events match that style.
+        </p>
+      ) : (
+        <ol className="mt-1">
+          {visibleEvents.map((event, i) => (
+            <li
+              key={event.id}
+              className="grid gap-4 border-b border-rule py-5 sm:grid-cols-[5.5rem_1fr] sm:gap-6"
+            >
+              <div className="font-mono uppercase text-ink-faint">
+                <p className="text-xs tracking-[0.18em]">
+                  {formatEventDate(event.startsAt)}
+                </p>
+                <p className="mt-1 text-sm tracking-[0.08em] text-ink">
+                  {formatEventTime(event.startsAt)}
+                </p>
+              </div>
+              <div>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <h3 className="font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink">
+                    {event.title}
+                  </h3>
+                  <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                </div>
+                <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-ink-dim">
+                  {event.venue.name}
+                  <span className="text-ink-faint"> / </span>
+                  {event.venue.neighborhood}
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-ink-dim">
+                  {event.artists.map((artist) => artist.name).join(", ")}
+                </p>
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.14em]">
+                  <span className="text-ink-faint">
+                    {event.styles.join(" / ")}
+                  </span>
+                  <span className="text-ink-faint">
+                    Verified {event.source.lastVerifiedAt}
+                  </span>
+                  <a
+                    href={event.source.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
+                  >
+                    {event.source.title}
+                  </a>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </>
   );
 }
 
@@ -84,7 +283,7 @@ function SectionMark({
 export function DashboardShell() {
   return (
     <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
-      <header className="rise border-b-2 border-rule-strong pb-7">
+      <header id="dashboard" className="rise scroll-mt-6 border-b-2 border-rule-strong pb-7">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.34em] text-signal">
@@ -130,17 +329,20 @@ export function DashboardShell() {
       >
         {nav.map((item, i) => (
           <a
-            key={item}
-            href={`#${item.toLowerCase()}`}
+            key={item.label}
+            href={item.href}
+            aria-disabled={item.href ? undefined : "true"}
             aria-current={i === 0 ? "page" : undefined}
             className={`border-r border-rule px-4 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal ${
               i === 0
                 ? "bg-panel text-signal"
-                : "text-ink-dim"
+                : item.href
+                  ? "text-ink-dim"
+                  : "cursor-not-allowed text-ink-faint"
             }`}
           >
             <span className="text-ink-faint">{String(i + 1).padStart(2, "0")}</span>{" "}
-            {item}
+            {item.label}
           </a>
         ))}
       </nav>
@@ -186,39 +388,18 @@ export function DashboardShell() {
             </ol>
           </section>
 
-          <section aria-labelledby="latest-heading">
+          <section id="events" aria-labelledby="latest-heading" className="scroll-mt-6">
             <SectionMark
               id="latest-heading"
               title="Latest Events"
               index="Source verified / 03"
             />
-            <ul className="mt-1">
-              {latestEvents.map((event, i) => (
-                <li
-                  key={event.title}
-                  className="flex items-baseline gap-3 border-b border-rule py-4 font-mono text-sm"
-                >
-                  <span className="text-ink-faint">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  <span className="uppercase tracking-[0.06em] text-ink">
-                    {event.title}
-                  </span>
-                  <span
-                    aria-hidden
-                    className="mx-1 mb-1 flex-1 self-end border-b border-dotted border-rule-strong"
-                  />
-                  <span className="uppercase tracking-[0.1em] text-ink-dim">
-                    {event.area}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <EventDiscoveryFeed />
           </section>
         </div>
 
         <aside className="flex flex-col gap-12 lg:border-l-2 lg:border-rule-strong lg:pl-12">
-          <section aria-labelledby="showcase-heading">
+          <section id="artists" aria-labelledby="showcase-heading" className="scroll-mt-6">
             <SectionMark
               id="showcase-heading"
               title="Artist Showcase"
@@ -254,7 +435,7 @@ export function DashboardShell() {
             </div>
           </section>
 
-          <section aria-labelledby="venue-heading">
+          <section id="venues" aria-labelledby="venue-heading" className="scroll-mt-6">
             <SectionMark
               id="venue-heading"
               title="Venue Signals"
