@@ -8,7 +8,14 @@
 
 # Project Overview and Plan:
 See @PRD.md to review project goals
-See @plans/sound-city-mvp.md 
+See @plans/sound-city-mvp.md
+
+## UI / Design language
+The dashboard UI was redesigned (industrial-warehouse system) **after** the MVP
+plan — it is not described in the plan. Before editing any UI code
+(`src/components/`, `src/app/globals.css`, `src/app/layout.tsx`) or adding new
+components, read @docs/ux-redesign.md for the design invariants, the
+"do-not-reintroduce" list, and optional next steps.
 
 # Run Commands:
 - npm run dev

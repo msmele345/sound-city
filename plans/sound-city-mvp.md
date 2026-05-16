@@ -45,13 +45,13 @@ Add the persistent catalog foundation for cities, venues, artists, events, artis
 
 ### Acceptance Criteria
 
-- [ ] Neon Postgres connection is configured for local and Vercel environments.
-- [ ] Drizzle schema and migrations are added.
-- [ ] Seed data includes Chicago events, venues, artists, listening links, and source metadata.
-- [ ] Real records include source URLs and last verified timestamps where applicable.
-- [ ] Next.js route handlers can return city-scoped events, venues, artists, and showcase data.
-- [ ] Server-side create, update, and delete operations are available for core catalog records.
-- [ ] A manual data refresh process is documented.
+- [x] Neon Postgres connection is configured for local and Vercel environments.
+- [x] Drizzle schema and migrations are added.
+- [x] Seed data includes Chicago events, venues, artists, listening links, and source metadata.
+- [x] Real records include source URLs and last verified timestamps where applicable.
+- [x] Next.js route handlers can return city-scoped events, venues, artists, and showcase data.
+- [x] Server-side create, update, and delete operations are available for core catalog records.
+- [x] A manual data refresh process is documented.
 
 ---
 

@@ -1,0 +1,287 @@
+import type { CatalogReader } from "./catalog-store";
+import type {
+  ArtistLinkRecord,
+  ArtistRecord,
+  CityRecord,
+  EventRecord,
+  SourceRecord,
+  VenueRecord,
+  VenueSignalRecord,
+} from "./types";
+
+type FindManyTable<Row> = {
+  findMany(): Promise<Row[]>;
+};
+
+type CityRow = CityRecord;
+type SourceRow = {
+  id: string;
+  title: string;
+  url: string;
+  lastVerifiedAt: string | Date;
+};
+type VenueRow = {
+  id: string;
+  cityId: string;
+  sourceId: string;
+  name: string;
+  slug: string;
+  neighborhood: string;
+  address: string;
+  capacity: number | null;
+};
+type ArtistRow = {
+  id: string;
+  cityId: string;
+  sourceId: string;
+  name: string;
+  slug: string;
+  bio: string;
+  styles: string[];
+  showcase: boolean;
+};
+type ArtistLinkRow = {
+  id: string;
+  artistId: string;
+  sourceId: string;
+  kind: string;
+  label: string;
+  url: string;
+};
+type EventRow = {
+  id: string;
+  cityId: string;
+  venueId: string;
+  sourceId: string;
+  title: string;
+  slug: string;
+  startsAt: string | Date;
+  styles: string[];
+};
+type EventArtistRow = {
+  eventId: string;
+  artistId: string;
+};
+type VenueSignalRow = {
+  id: string;
+  venueId: string;
+  sourceId: string;
+  category: string;
+  value: string;
+};
+
+export type CatalogDbReader = {
+  query: {
+    cities: FindManyTable<CityRow>;
+    sources: FindManyTable<SourceRow>;
+    venues: FindManyTable<VenueRow>;
+    artists: FindManyTable<ArtistRow>;
+    artistLinks: FindManyTable<ArtistLinkRow>;
+    events: FindManyTable<EventRow>;
+    eventArtists: FindManyTable<EventArtistRow>;
+    venueSignals: FindManyTable<VenueSignalRow>;
+  };
+};
+
+function normalizeDate(value: string | Date) {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return value;
+}
+
+function requireRecord<T>(record: T | undefined, label: string): T {
+  if (!record) {
+    throw new Error(`${label} not found`);
+  }
+  return record;
+}
+
+const artistLinkKinds = new Set<string>([
+  "official",
+  "soundcloud",
+  "bandcamp",
+  "youtube",
+  "resident-advisor",
+]);
+
+function artistLinkKind(value: string): ArtistLinkRecord["kind"] {
+  if (!artistLinkKinds.has(value)) {
+    throw new Error(`Unknown artist link kind: ${value}`);
+  }
+  return value as ArtistLinkRecord["kind"];
+}
+
+const venueSignalCategories = new Set<string>([
+  "sound",
+  "crowd",
+  "room",
+  "door",
+  "layout",
+]);
+
+function venueSignalCategory(value: string): VenueSignalRecord["category"] {
+  if (!venueSignalCategories.has(value)) {
+    throw new Error(`Unknown venue signal category: ${value}`);
+  }
+  return value as VenueSignalRecord["category"];
+}
+
+export function createDrizzleCatalogStore(db: CatalogDbReader): CatalogReader {
+  async function readCatalog() {
+    const [
+      cities,
+      sourceRows,
+      venueRows,
+      artistRows,
+      artistLinkRows,
+      eventRows,
+      eventArtistRows,
+      venueSignalRows,
+    ] = await Promise.all([
+      db.query.cities.findMany(),
+      db.query.sources.findMany(),
+      db.query.venues.findMany(),
+      db.query.artists.findMany(),
+      db.query.artistLinks.findMany(),
+      db.query.events.findMany(),
+      db.query.eventArtists.findMany(),
+      db.query.venueSignals.findMany(),
+    ]);
+
+    const sources = new Map<string, SourceRecord>(
+      sourceRows.map((source) => [
+        source.id,
+        {
+          ...source,
+          lastVerifiedAt: normalizeDate(source.lastVerifiedAt),
+        },
+      ]),
+    );
+    const citiesById = new Map(cities.map((city) => [city.id, city]));
+
+    const signalsByVenueId = new Map<string, VenueSignalRecord[]>();
+    for (const signal of venueSignalRows) {
+      const venueSignals = signalsByVenueId.get(signal.venueId) ?? [];
+      venueSignals.push({
+        id: signal.id,
+        venueSlug: "",
+        category: venueSignalCategory(signal.category),
+        value: signal.value,
+        source: requireRecord(sources.get(signal.sourceId), "Signal source"),
+      });
+      signalsByVenueId.set(signal.venueId, venueSignals);
+    }
+
+    const venues = venueRows.map<VenueRecord>((venue) => {
+      const city = requireRecord(citiesById.get(venue.cityId), "Venue city");
+      const record: VenueRecord = {
+        id: venue.id,
+        citySlug: city.slug,
+        name: venue.name,
+        slug: venue.slug,
+        neighborhood: venue.neighborhood,
+        address: venue.address,
+        capacity: venue.capacity,
+        source: requireRecord(sources.get(venue.sourceId), "Venue source"),
+        signals: signalsByVenueId.get(venue.id) ?? [],
+      };
+      record.signals = record.signals.map((signal) => ({
+        ...signal,
+        venueSlug: record.slug,
+      }));
+      return record;
+    });
+    const venuesById = new Map(venues.map((venue) => [venue.id, venue]));
+
+    const linksByArtistId = new Map<string, ArtistLinkRecord[]>();
+    for (const link of artistLinkRows) {
+      const artistLinks = linksByArtistId.get(link.artistId) ?? [];
+      artistLinks.push({
+        id: link.id,
+        artistSlug: "",
+        kind: artistLinkKind(link.kind),
+        label: link.label,
+        url: link.url,
+        source: requireRecord(sources.get(link.sourceId), "Artist link source"),
+      });
+      linksByArtistId.set(link.artistId, artistLinks);
+    }
+
+    const artists = artistRows.map<ArtistRecord>((artist) => {
+      const city = requireRecord(citiesById.get(artist.cityId), "Artist city");
+      const record: ArtistRecord = {
+        id: artist.id,
+        citySlug: city.slug,
+        name: artist.name,
+        slug: artist.slug,
+        bio: artist.bio,
+        styles: artist.styles,
+        showcase: artist.showcase,
+        source: requireRecord(sources.get(artist.sourceId), "Artist source"),
+        links: linksByArtistId.get(artist.id) ?? [],
+      };
+      record.links = record.links.map((link) => ({
+        ...link,
+        artistSlug: record.slug,
+      }));
+      return record;
+    });
+    const artistsById = new Map(artists.map((artist) => [artist.id, artist]));
+
+    const artistIdsByEventId = new Map<string, string[]>();
+    for (const join of eventArtistRows) {
+      const artistIds = artistIdsByEventId.get(join.eventId) ?? [];
+      artistIds.push(join.artistId);
+      artistIdsByEventId.set(join.eventId, artistIds);
+    }
+
+    const events = eventRows
+      .map<EventRecord>((event) => {
+        const city = requireRecord(citiesById.get(event.cityId), "Event city");
+        return {
+          id: event.id,
+          citySlug: city.slug,
+          title: event.title,
+          slug: event.slug,
+          startsAt: normalizeDate(event.startsAt),
+          venue: requireRecord(venuesById.get(event.venueId), "Event venue"),
+          artists: (artistIdsByEventId.get(event.id) ?? []).map((artistId) =>
+            requireRecord(artistsById.get(artistId), "Event artist"),
+          ),
+          styles: event.styles,
+          source: requireRecord(sources.get(event.sourceId), "Event source"),
+        };
+      })
+      .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt));
+
+    return { cities, venues, artists, events };
+  }
+
+  return {
+    async listCities() {
+      const catalog = await readCatalog();
+      return catalog.cities;
+    },
+    async listEvents(citySlug) {
+      const catalog = await readCatalog();
+      return catalog.events.filter((event) => event.citySlug === citySlug);
+    },
+    async listVenues(citySlug) {
+      const catalog = await readCatalog();
+      return catalog.venues.filter((venue) => venue.citySlug === citySlug);
+    },
+    async listArtists(citySlug) {
+      const catalog = await readCatalog();
+      return catalog.artists.filter((artist) => artist.citySlug === citySlug);
+    },
+    async getShowcase(citySlug) {
+      const catalog = await readCatalog();
+      return (
+        catalog.artists.find(
+          (artist) => artist.citySlug === citySlug && artist.showcase,
+        ) ?? null
+      );
+    },
+  };
+}
