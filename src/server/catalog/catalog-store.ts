@@ -1,4 +1,6 @@
 import { launchCatalogData } from "./launch-data";
+import { createDrizzleCatalogStore } from "./drizzle-catalog-store";
+import { createDb } from "../db/client";
 import type {
   ArtistRecord,
   CatalogSnapshot,
@@ -7,12 +9,15 @@ import type {
   VenueRecord,
 } from "./types";
 
-export type CatalogStore = {
+export type CatalogReader = {
   listCities(): Promise<CityRecord[]>;
   listEvents(citySlug: string): Promise<EventRecord[]>;
   listVenues(citySlug: string): Promise<VenueRecord[]>;
   listArtists(citySlug: string): Promise<ArtistRecord[]>;
   getShowcase(citySlug: string): Promise<ArtistRecord | null>;
+};
+
+export type CatalogStore = CatalogReader & {
   createVenue(venue: VenueRecord): Promise<VenueRecord>;
   updateVenue(id: string, venue: VenueRecord): Promise<VenueRecord>;
   deleteVenue(id: string): Promise<void>;
@@ -125,8 +130,14 @@ export function createSeedCatalogStore(
 }
 
 let fallbackStore: CatalogStore | null = null;
+let databaseStore: CatalogReader | null = null;
 
 export function getCatalogStore() {
+  if (process.env.DATABASE_URL) {
+    databaseStore ??= createDrizzleCatalogStore(createDb());
+    return databaseStore;
+  }
+
   fallbackStore ??= createSeedCatalogStore();
   return fallbackStore;
 }
