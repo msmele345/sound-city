@@ -37,7 +37,7 @@ Confirm this in Vercel:
 must pass:
 
 ```bash
-npm test
+NODE_ENV=test npm test
 npm run lint
 npm run build
 npm run typecheck
@@ -45,6 +45,11 @@ npm run typecheck
 
 This mirrors the local verification cadence and prevents previews from building
 when tests, TypeScript, linting, or the Next.js build fail.
+
+Vercel runs custom build commands in a production deployment environment, so the
+test step explicitly sets `NODE_ENV=test`. React Testing Library needs React's
+test environment support for `act`, while `next build` should continue to run in
+production mode.
 
 ## Environment Variables
 
