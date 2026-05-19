@@ -1,0 +1,4 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "NODE_ENV=test npm test && npm run lint && npm run build && npm run typecheck"
+}

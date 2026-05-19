@@ -94,6 +94,27 @@ Build the core recommendation experience. Users can tune their taste profile, sa
 
 ---
 
+## Phase 4.5: Vercel Preview CI/CD Baseline
+
+**User stories**: 20, 21, 25, 26
+
+### What to Build
+
+Set up Vercel preview continuous deployment now, before the remaining catalog
+surfaces and Admin CRUD work. Feature branches and pull requests should produce
+preview deployments that run the same verification commands used locally.
+
+### Acceptance Criteria
+
+- [x] The local checkout is linked to a Vercel project.
+- [ ] The Vercel project is connected to the GitHub repository.
+- [ ] Feature branches and pull requests create Vercel preview deployments.
+- [x] Preview deployment builds run tests, typecheck, lint, and Next.js build.
+- [x] Preview and production Neon environment variables are documented.
+- [ ] A first preview deployment URL is captured and validated.
+
+---
+
 ## Phase 5: Artist Showcase And Venue Directory
 
 **User stories**: 11, 12, 13, 14, 15, 16, 17, 18
@@ -147,6 +168,6 @@ Prepare the Next.js app for a Vercel preview deployment. Tighten visual polish, 
 - [ ] Core flows are verified on mobile and desktop.
 - [ ] Keyboard navigation and accessible labels are checked for primary controls.
 - [ ] Loading, empty, and error states are polished.
-- [ ] Vercel deployment configuration is documented.
-- [ ] Environment variables required for Neon are documented.
+- [x] Vercel deployment configuration is documented.
+- [x] Environment variables required for Neon are documented.
 - [ ] Manual data refresh instructions are complete enough for another maintainer to follow.
