@@ -8,6 +8,7 @@ const fetchMock = vi.fn();
 beforeEach(() => {
   fetchMock.mockReset();
   global.fetch = fetchMock;
+  window.localStorage.clear();
 });
 
 describe("DashboardShell", () => {
@@ -91,9 +92,12 @@ describe("DashboardShell", () => {
     render(<DashboardShell />);
 
     expect(fetchMock).toHaveBeenCalledWith("/api/catalog/events?city=chicago");
-    const eventHeading = await screen.findByRole("heading", {
-        name: /family matters feat\. posthuman/i,
-      });
+    const latestEvents = screen.getByRole("region", {
+      name: /latest events/i,
+    });
+    const eventHeading = await within(latestEvents).findByRole("heading", {
+      name: /family matters feat\. posthuman/i,
+    });
     const eventRow = eventHeading.closest("li");
     expect(eventRow).not.toBeNull();
     expect(within(eventRow!).getByText(/smartbar/i)).toBeInTheDocument();
@@ -144,20 +148,25 @@ describe("DashboardShell", () => {
 
     render(<DashboardShell />);
 
+    const latestEvents = screen.getByRole("region", {
+      name: /latest events/i,
+    });
     expect(
-      await screen.findByRole("heading", { name: /house night/i }),
+      await within(latestEvents).findByRole("heading", { name: /house night/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /techno night/i }),
+      within(latestEvents).getByRole("heading", { name: /techno night/i }),
     ).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /techno/i }));
+    await user.click(
+      within(latestEvents).getByRole("button", { name: /techno/i }),
+    );
 
     expect(
-      screen.queryByRole("heading", { name: /house night/i }),
+      within(latestEvents).queryByRole("heading", { name: /house night/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /techno night/i }),
+      within(latestEvents).getByRole("heading", { name: /techno night/i }),
     ).toBeInTheDocument();
   });
 
@@ -189,5 +198,101 @@ describe("DashboardShell", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /event feed is unavailable/i,
     );
+  });
+
+  it("persists local taste preferences and recommendation actions", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: [
+          {
+            id: "event_acid_room",
+            title: "Acid Room",
+            startsAt: "2026-05-23T03:00:00.000Z",
+            venue: {
+              name: "Podlasie Club",
+              neighborhood: "Avondale",
+              capacity: 220,
+            },
+            artists: [{ name: "Local Acid Selector" }],
+            styles: ["acid", "techno"],
+            source: {
+              title: "Acid listing",
+              url: "https://example.com/acid",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+          {
+            id: "event_house_room",
+            title: "House Room",
+            startsAt: "2026-05-24T02:00:00.000Z",
+            venue: {
+              name: "Large Room",
+              neighborhood: "River North",
+              capacity: 900,
+            },
+            artists: [{ name: "Main Room DJ" }],
+            styles: ["house"],
+            source: {
+              title: "House listing",
+              url: "https://example.com/house",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    const { unmount } = render(<DashboardShell />);
+
+    await user.click(await screen.findByRole("checkbox", { name: /acid/i }));
+
+    const recommended = screen.getByRole("region", {
+      name: /recommended tonight/i,
+    });
+    const acidRow = within(recommended)
+      .getByRole("heading", { name: /acid room/i })
+      .closest("li");
+    expect(acidRow).not.toBeNull();
+
+    await user.click(within(acidRow!).getByRole("button", { name: /save/i }));
+
+    const houseRow = within(recommended)
+      .getByRole("heading", { name: /house room/i })
+      .closest("li");
+    expect(houseRow).not.toBeNull();
+
+    await user.click(
+      within(houseRow!).getByRole("button", { name: /dismiss/i }),
+    );
+
+    expect(
+      within(recommended).queryByRole("heading", { name: /house room/i }),
+    ).not.toBeInTheDocument();
+
+    const stored = JSON.parse(
+      window.localStorage.getItem("sound-city.local-profile.v1") ?? "{}",
+    );
+    expect(stored.profile.styles).toContain("acid");
+    expect(stored.actions.savedEventIds).toContain("event_acid_room");
+    expect(stored.actions.dismissedEventIds).toContain("event_house_room");
+
+    unmount();
+    render(<DashboardShell />);
+
+    expect(await screen.findByRole("checkbox", { name: /acid/i })).toBeChecked();
+    const restoredRecommendations = screen.getByRole("region", {
+      name: /recommended tonight/i,
+    });
+    expect(
+      within(restoredRecommendations).queryByRole("heading", {
+        name: /house room/i,
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(restoredRecommendations).getByRole("button", { name: /saved/i }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 });
