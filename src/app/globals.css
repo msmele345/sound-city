@@ -53,10 +53,6 @@ body {
   
 }
 
-.text-signal {
-color: aqua;
-}
-
 /* Printed-concrete grain — tactile, kept under 4% so it never costs legibility. */
 body::before {
   content: "";
