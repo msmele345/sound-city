@@ -21,13 +21,6 @@ const manifest = [
   { value: "07", label: "Underground" },
 ];
 
-const venueSignals = [
-  { label: "Sound", value: "Warm stacks" },
-  { label: "Crowd", value: "Heads-down" },
-  { label: "Room", value: "Compact" },
-  { label: "Door", value: "Low-key" },
-];
-
 const nav = [
   { label: "Dashboard", href: "#dashboard" },
   { label: "Events", href: "#events" },
@@ -73,6 +66,7 @@ type CatalogEvent = RecommendationEvent & {
   startsAt: string;
   venue: {
     name: string;
+    slug?: string;
     neighborhood: string;
     capacity: number | null;
   };
@@ -89,6 +83,61 @@ type EventFeedState =
   | { status: "loading"; events: CatalogEvent[] }
   | { status: "ready"; events: CatalogEvent[] }
   | { status: "error"; events: CatalogEvent[] };
+
+type CatalogSource = {
+  title: string;
+  url: string;
+  lastVerifiedAt: string;
+};
+
+type CatalogArtistLink = {
+  id: string;
+  kind: string;
+  label: string;
+  url: string;
+  source: CatalogSource;
+};
+
+type ShowcaseArtist = {
+  id: string;
+  citySlug: string;
+  name: string;
+  slug: string;
+  bio: string;
+  styles: string[];
+  showcase: boolean;
+  source: CatalogSource;
+  links: CatalogArtistLink[];
+};
+
+type ShowcaseState =
+  | { status: "loading"; artist: null }
+  | { status: "ready"; artist: ShowcaseArtist | null }
+  | { status: "error"; artist: null };
+
+type CatalogVenueSignal = {
+  id: string;
+  category: "sound" | "crowd" | "room" | "door" | "layout";
+  value: string;
+  source: CatalogSource;
+};
+
+type CatalogVenue = {
+  id: string;
+  citySlug: string;
+  name: string;
+  slug: string;
+  neighborhood: string;
+  address: string;
+  capacity: number | null;
+  source: CatalogSource;
+  signals: CatalogVenueSignal[];
+};
+
+type VenueDirectoryState =
+  | { status: "loading"; venues: CatalogVenue[] }
+  | { status: "ready"; venues: CatalogVenue[] }
+  | { status: "error"; venues: CatalogVenue[] };
 
 type LocalPersonalization = {
   profile: TasteProfile;
@@ -155,6 +204,10 @@ function formatEventTime(startsAt: string) {
     minute: "2-digit",
     timeZone: "America/Chicago",
   }).format(new Date(startsAt));
+}
+
+function formatSignalCategory(category: CatalogVenueSignal["category"]) {
+  return category.replace("-", " ");
 }
 
 function MatchMeter({ score }: { score: number }) {
@@ -565,6 +618,253 @@ function RecommendedEvents({
   );
 }
 
+function ArtistShowcase({
+  showcase,
+  feed,
+}: {
+  showcase: ShowcaseState;
+  feed: EventFeedState;
+}) {
+  if (showcase.status === "loading") {
+    return (
+      <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+        Loading weekly artist showcase
+      </p>
+    );
+  }
+
+  if (showcase.status === "error") {
+    return (
+      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        Artist showcase is unavailable. Curated listening links will return
+        here.
+      </p>
+    );
+  }
+
+  if (!showcase.artist) {
+    return (
+      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        No weekly artist showcase is selected yet.
+      </p>
+    );
+  }
+
+  const artist = showcase.artist;
+  const upcomingEvents =
+    feed.status === "ready"
+      ? feed.events.filter((event) =>
+          event.artists.some(
+            (eventArtist) =>
+              eventArtist.slug === artist.slug || eventArtist.name === artist.name,
+          ),
+        )
+      : [];
+
+  return (
+    <div className="mt-5">
+      <div
+        aria-hidden
+        className="h-1.5 border-b border-rule"
+        style={{
+          background:
+            "repeating-linear-gradient(135deg, var(--color-signal) 0 10px, transparent 10px 20px)",
+        }}
+      />
+      <div className="border-b border-rule py-5">
+        <p className="font-mono text-[0.65rem] uppercase tracking-[0.22em] text-signal">
+          Weekly feature
+        </p>
+        <h3 className="mt-3 font-display text-5xl uppercase leading-[0.85] text-ink">
+          {artist.name}
+        </h3>
+        <p className="mt-4 font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
+          {artist.styles.join(" / ")}
+        </p>
+        <p className="mt-5 text-sm leading-relaxed text-ink-dim">
+          {artist.bio}
+        </p>
+        {artist.links.length > 0 ? (
+          <div className="mt-5 flex flex-wrap gap-2">
+            {artist.links.map((link) => (
+              <a
+                key={link.id}
+                href={link.url}
+                target="_blank"
+                rel="noreferrer"
+                className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-signal transition-colors duration-150 hover:bg-panel hover:text-ink"
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="border-b border-rule py-5">
+        <h4 className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">
+          Upcoming shows
+        </h4>
+        {feed.status === "loading" ? (
+          <p className="mt-3 text-sm text-ink-dim">
+            Waiting on verified event feed.
+          </p>
+        ) : upcomingEvents.length === 0 ? (
+          <p className="mt-3 text-sm text-ink-dim">
+            No upcoming Chicago dates are attached to this artist yet.
+          </p>
+        ) : (
+          <ol className="mt-2">
+            {upcomingEvents.map((event) => (
+              <li key={event.id} className="border-t border-rule py-3">
+                <h5 className="font-display text-xl uppercase leading-none text-ink">
+                  {event.title}
+                </h5>
+                <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
+                  {formatEventDate(event.startsAt)}
+                  <span className="text-ink-faint"> / </span>
+                  {formatEventTime(event.startsAt)}
+                  <span className="text-ink-faint"> / </span>
+                  {event.venue.name}
+                </p>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VenueDirectory({
+  directory,
+  feed,
+}: {
+  directory: VenueDirectoryState;
+  feed: EventFeedState;
+}) {
+  if (directory.status === "loading") {
+    return (
+      <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+        Loading venue directory
+      </p>
+    );
+  }
+
+  if (directory.status === "error") {
+    return (
+      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        Venue signals are unavailable. Curated room context will return here.
+      </p>
+    );
+  }
+
+  if (directory.venues.length === 0) {
+    return (
+      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        No Chicago venues are verified yet.
+      </p>
+    );
+  }
+
+  return (
+    <ol className="mt-1">
+      {directory.venues.map((venue, i) => {
+        const upcomingEvents =
+          feed.status === "ready"
+            ? feed.events.filter(
+                (event) =>
+                  event.venue.slug === venue.slug ||
+                  event.venue.name === venue.name,
+              )
+            : [];
+
+        return (
+          <li key={venue.id} className="border-b border-rule py-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <h3 className="font-display text-3xl uppercase leading-none text-ink">
+                {venue.name}
+              </h3>
+              <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+            </div>
+            <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
+              {venue.neighborhood}
+              {venue.capacity ? (
+                <>
+                  <span className="text-ink-faint"> / </span>
+                  {venue.capacity} cap
+                </>
+              ) : null}
+            </p>
+            <p className="mt-3 text-sm leading-relaxed text-ink-dim">
+              {venue.address}
+            </p>
+
+            {venue.signals.length > 0 ? (
+              <dl className="mt-4">
+                {venue.signals.map((signal) => (
+                  <div
+                    key={signal.id}
+                    className="grid gap-2 border-t border-rule py-3 font-mono text-xs sm:grid-cols-[5rem_1fr]"
+                  >
+                    <dt className="uppercase tracking-[0.16em] text-ink-faint">
+                      {formatSignalCategory(signal.category)}
+                    </dt>
+                    <dd className="uppercase tracking-[0.05em] text-ink-dim">
+                      {signal.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            ) : null}
+
+            <div className="mt-4 border-t border-rule pt-4">
+              <h4 className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">
+                Upcoming events
+              </h4>
+              {feed.status === "loading" ? (
+                <p className="mt-3 text-sm text-ink-dim">
+                  Waiting on verified event feed.
+                </p>
+              ) : upcomingEvents.length === 0 ? (
+                <p className="mt-3 text-sm text-ink-dim">
+                  No upcoming events are attached to this venue yet.
+                </p>
+              ) : (
+                <ol className="mt-2">
+                  {upcomingEvents.map((event) => (
+                    <li key={event.id} className="border-t border-rule py-3">
+                      <h4 className="font-display text-xl uppercase leading-none text-ink">
+                        {event.title}
+                      </h4>
+                      <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
+                        {formatEventDate(event.startsAt)}
+                        <span className="text-ink-faint"> / </span>
+                        {formatEventTime(event.startsAt)}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
+            <a
+              href={venue.source.url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex font-mono text-[0.68rem] uppercase tracking-[0.14em] text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
+            >
+              {venue.source.title}
+            </a>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 // Spec-sheet section marker: heading + a mono index tag sharing one strong rule.
 // The tag is metadata (queue / index), not a restatement of the heading.
 function SectionMark({
@@ -596,6 +896,14 @@ export function DashboardShell() {
     status: "loading",
     events: [],
   });
+  const [showcase, setShowcase] = useState<ShowcaseState>({
+    status: "loading",
+    artist: null,
+  });
+  const [venueDirectory, setVenueDirectory] = useState<VenueDirectoryState>({
+    status: "loading",
+    venues: [],
+  });
   const [personalization, setPersonalization] = useState<LocalPersonalization>(
     () => readLocalPersonalization(),
   );
@@ -620,7 +928,48 @@ export function DashboardShell() {
       }
     }
 
+    async function loadShowcase() {
+      try {
+        const response = await fetch("/api/catalog/showcase?city=chicago");
+        if (!response.ok) {
+          throw new Error("Showcase unavailable");
+        }
+        const body = (await response.json()) as {
+          artist?: ShowcaseArtist | null;
+        };
+        if (active) {
+          setShowcase({ status: "ready", artist: body.artist ?? null });
+        }
+      } catch {
+        if (active) {
+          setShowcase({ status: "error", artist: null });
+        }
+      }
+    }
+
+    async function loadVenues() {
+      try {
+        const response = await fetch("/api/catalog/venues?city=chicago");
+        if (!response.ok) {
+          throw new Error("Venue directory unavailable");
+        }
+        const body = (await response.json()) as { venues?: CatalogVenue[] };
+        if (active) {
+          setVenueDirectory({
+            status: "ready",
+            venues: Array.isArray(body.venues) ? body.venues : [],
+          });
+        }
+      } catch {
+        if (active) {
+          setVenueDirectory({ status: "error", venues: [] });
+        }
+      }
+    }
+
     void loadEvents();
+    void loadShowcase();
+    void loadVenues();
 
     return () => {
       active = false;
@@ -739,34 +1088,7 @@ export function DashboardShell() {
               title="Artist Showcase"
               index="Feature / 04"
             />
-            <div className="mt-5 border border-rule-strong bg-panel">
-              <div
-                aria-hidden
-                className="h-1.5"
-                style={{
-                  background:
-                    "repeating-linear-gradient(135deg, var(--color-signal) 0 10px, transparent 10px 20px)",
-                }}
-              />
-              <div className="p-5">
-                <p className="font-mono text-[0.65rem] uppercase tracking-[0.22em] text-signal">
-                  Archive week
-                </p>
-                <p className="mt-3 font-display text-5xl uppercase leading-[0.85] text-ink">
-                  DJ
-                  <br />
-                  Heather
-                </p>
-                <p className="mt-5 text-sm leading-relaxed text-ink-dim">
-                  Weekly deep-dive into one Chicago-rooted selector — archive
-                  sets, where to listen, upcoming dates.
-                </p>
-                <p className="mt-5 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-signal">
-                  Listening links
-                  <span aria-hidden>&rarr;</span>
-                </p>
-              </div>
-            </div>
+            <ArtistShowcase showcase={showcase} feed={feed} />
           </section>
 
           <section id="venues" aria-labelledby="venue-heading" className="scroll-mt-6">
@@ -775,25 +1097,7 @@ export function DashboardShell() {
               title="Venue Signals"
               index="Room context / 05"
             />
-            <dl className="mt-1">
-              {venueSignals.map((signal) => (
-                <div
-                  key={signal.label}
-                  className="flex items-baseline gap-2 border-b border-rule py-3.5 font-mono text-sm"
-                >
-                  <dt className="uppercase tracking-[0.16em] text-ink-faint">
-                    {signal.label}
-                  </dt>
-                  <span
-                    aria-hidden
-                    className="mb-1 flex-1 self-end border-b border-dotted border-rule-strong"
-                  />
-                  <dd className="uppercase tracking-[0.06em] text-ink">
-                    {signal.value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+            <VenueDirectory directory={venueDirectory} feed={feed} />
           </section>
         </aside>
       </main>

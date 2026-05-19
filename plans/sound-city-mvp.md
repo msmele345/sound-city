@@ -125,12 +125,12 @@ Add the weekly artist showcase and venue directory. The artist showcase should h
 
 ### Acceptance Criteria
 
-- [ ] The weekly artist showcase loads from the API.
-- [ ] Showcase content includes artist context, listening links, and upcoming events when available.
-- [ ] Artist links open to curated external destinations.
-- [ ] The venue directory lists Chicago venues that host house and techno events.
-- [ ] Venue details include neighborhood, location context, upcoming events, and curated scene signals.
-- [ ] Venue and artist sections work in responsive layouts.
+- [x] The weekly artist showcase loads from the API.
+- [x] Showcase content includes artist context, listening links, and upcoming events when available.
+- [x] Artist links open to curated external destinations.
+- [x] The venue directory lists Chicago venues that host house and techno events.
+- [x] Venue details include neighborhood, location context, upcoming events, and curated scene signals.
+- [x] Venue and artist sections work in responsive layouts.
 
 ---
 

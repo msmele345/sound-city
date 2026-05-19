@@ -295,4 +295,142 @@ describe("DashboardShell", () => {
       within(restoredRecommendations).getByRole("button", { name: /saved/i }),
     ).toHaveAttribute("aria-pressed", "true");
   });
+
+  it("loads the artist showcase and venue directory from catalog APIs", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/catalog/events?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            city: { slug: "chicago" },
+            events: [
+              {
+                id: "event_posthuman",
+                title: "Family Matters feat. Posthuman",
+                startsAt: "2026-05-22T02:00:00.000Z",
+                venue: {
+                  name: "smartbar",
+                  slug: "smartbar",
+                  neighborhood: "Wrigleyville",
+                  capacity: 400,
+                },
+                artists: [{ name: "Posthuman", slug: "posthuman" }],
+                styles: ["techno", "acid"],
+                source: {
+                  title: "Family Matters listing",
+                  url: "https://example.com/event",
+                  lastVerifiedAt: "2026-05-15",
+                },
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url === "/api/catalog/showcase?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            artist: {
+              id: "artist_posthuman",
+              citySlug: "chicago",
+              name: "Posthuman",
+              slug: "posthuman",
+              bio: "Acid and techno act included in smartbar's May 2026 listing.",
+              styles: ["techno", "acid"],
+              showcase: true,
+              source: {
+                title: "Artist source",
+                url: "https://example.com/artist",
+                lastVerifiedAt: "2026-05-15",
+              },
+              links: [
+                {
+                  id: "link_posthuman_ra",
+                  artistSlug: "posthuman",
+                  kind: "resident-advisor",
+                  label: "Resident Advisor profile",
+                  url: "https://example.com/posthuman",
+                  source: {
+                    title: "Artist source",
+                    url: "https://example.com/artist",
+                    lastVerifiedAt: "2026-05-15",
+                  },
+                },
+              ],
+            },
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          venues: [
+            {
+              id: "venue_smartbar",
+              citySlug: "chicago",
+              name: "smartbar",
+              slug: "smartbar",
+              neighborhood: "Wrigleyville",
+              address: "3730 N Clark St, Chicago, IL 60613",
+              capacity: 400,
+              source: {
+                title: "smartbar venue page",
+                url: "https://example.com/smartbar",
+                lastVerifiedAt: "2026-05-15",
+              },
+              signals: [
+                {
+                  id: "signal_smartbar_sound",
+                  venueSlug: "smartbar",
+                  category: "sound",
+                  value: "Basement room with house and techno-focused programming.",
+                  source: {
+                    title: "smartbar venue page",
+                    url: "https://example.com/smartbar",
+                    lastVerifiedAt: "2026-05-15",
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      });
+    });
+
+    render(<DashboardShell />);
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/showcase?city=chicago");
+    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/venues?city=chicago");
+
+    const showcase = screen.getByRole("region", {
+      name: /artist showcase/i,
+    });
+    expect(
+      await within(showcase).findByRole("heading", { name: /^posthuman$/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(showcase).getByRole("link", { name: /resident advisor profile/i }),
+    ).toHaveAttribute("href", "https://example.com/posthuman");
+    expect(
+      within(showcase).getByRole("heading", {
+        name: /family matters feat\. posthuman/i,
+      }),
+    ).toBeInTheDocument();
+
+    const venues = screen.getByRole("region", { name: /venue signals/i });
+    expect(
+      await within(venues).findByRole("heading", { name: /smartbar/i }),
+    ).toBeInTheDocument();
+    expect(within(venues).getByText(/wrigleyville/i)).toBeInTheDocument();
+    expect(
+      within(venues).getByText(/basement room with house/i),
+    ).toBeInTheDocument();
+    expect(
+      within(venues).getByRole("heading", {
+        name: /family matters feat\. posthuman/i,
+      }),
+    ).toBeInTheDocument();
+  });
 });
