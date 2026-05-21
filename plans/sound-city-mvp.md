@@ -140,17 +140,17 @@ Add the weekly artist showcase and venue directory. The artist showcase should h
 
 ### What to Build
 
-Add lightweight Admin CRUD screens for maintaining the curated catalog. Admin screens should support city-aware management of venues, artists, events, artist links, venue signals, and source provenance. Because v1 has no authentication, these screens are intended for controlled maintainer use during MVP development and preview deployment, not public self-service contribution.
+Add lightweight Admin CRUD screens for maintaining the curated catalog. Admin screens should support city-aware management of venues, artists, events, artist links, venue signals, and source provenance. Because v1 has no authentication, these screens are intended for controlled maintainer use during MVP development and preview deployment, not public self-service contribution. Before any public production launch, Admin routes must sit behind a protection layer such as Vercel Deployment Protection, an app-level admin secret gate, or proper authentication.
 
 ### Acceptance Criteria
 
-- [ ] Admin navigation is available for catalog maintenance workflows.
-- [ ] Admin users can create, edit, and delete venues, artists, events, artist links, venue signals, and source metadata.
-- [ ] Forms validate required fields, relationships, source URLs, and last verified dates.
-- [ ] Admin lists support quick scanning and editing of Chicago launch data.
-- [ ] Mutations update Neon Postgres through typed Drizzle operations.
-- [ ] Destructive actions require confirmation.
-- [ ] Admin CRUD workflows have focused test coverage.
+- [x] Admin navigation is available for catalog maintenance workflows.
+- [x] Admin users can create, edit, and delete venues, artists, events, artist links, venue signals, and source metadata.
+- [x] Forms validate required fields, relationships, source URLs, and last verified dates.
+- [x] Admin lists support quick scanning and editing of Chicago launch data.
+- [x] Mutations update Neon Postgres through typed Drizzle operations.
+- [x] Destructive actions require confirmation.
+- [x] Admin CRUD workflows have focused test coverage.
 
 ---
 
@@ -170,4 +170,5 @@ Prepare the Next.js app for a Vercel preview deployment. Tighten visual polish, 
 - [ ] Loading, empty, and error states are polished.
 - [x] Vercel deployment configuration is documented.
 - [x] Environment variables required for Neon are documented.
+- [ ] Admin UI and Admin API routes are protected before any public production launch.
 - [ ] Manual data refresh instructions are complete enough for another maintainer to follow.

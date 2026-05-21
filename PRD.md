@@ -52,6 +52,7 @@ The app will launch with real, manually verified Chicago data from public source
 - Do not include authentication in v1.
 - Store personalization data in browser local storage.
 - Include lightweight Admin CRUD screens in v1 for maintaining curated launch data.
+- Before any public production launch, protect Admin CRUD surfaces with at least one access-control layer, such as Vercel Deployment Protection, an app-level admin secret gate, or full authentication. Preview deployments may rely on Vercel deployment protection while the MVP remains maintainer-only.
 - Use explicit user actions as recommendation signals: save, dismiss, and attended.
 - Make the recommendation system discovery-first, prioritizing lesser-known events, smaller venues, unfamiliar artists, and strong taste matches.
 - Use curated artist listening links rather than third-party embeds or generated search links.

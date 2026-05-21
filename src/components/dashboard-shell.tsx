@@ -26,7 +26,7 @@ const nav = [
   { label: "Events", href: "#events" },
   { label: "Artists", href: "#artists" },
   { label: "Venues", href: "#venues" },
-  { label: "Admin" },
+  { label: "Admin", href: "/admin" },
 ];
 
 const storageKey = "sound-city.local-profile.v1";
