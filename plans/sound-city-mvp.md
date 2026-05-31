@@ -107,11 +107,11 @@ preview deployments that run the same verification commands used locally.
 ### Acceptance Criteria
 
 - [x] The local checkout is linked to a Vercel project.
-- [ ] The Vercel project is connected to the GitHub repository.
-- [ ] Feature branches and pull requests create Vercel preview deployments.
+- [x] The Vercel project is connected to the GitHub repository.
+- [x] Feature branches and pull requests create Vercel preview deployments.
 - [x] Preview deployment builds run tests, typecheck, lint, and Next.js build.
 - [x] Preview and production Neon environment variables are documented.
-- [ ] A first preview deployment URL is captured and validated.
+- [x] A first preview deployment URL is captured and validated.
 
 ---
 

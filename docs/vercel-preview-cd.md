@@ -75,3 +75,30 @@ After a feature branch is pushed or a pull request is opened:
 5. Check `/api/catalog/artists?city=chicago`.
 6. Check `/api/catalog/showcase?city=chicago`.
 7. Confirm event data comes from Neon, not the local seed fallback.
+
+## First Validated Preview
+
+The first captured preview deployment is:
+
+```text
+https://sound-city-n1worcnm0-mitchmele-5636s-projects.vercel.app
+```
+
+Validation date: 2026-05-30
+
+Vercel inspection:
+
+- Deployment ID: `dpl_8mWgTXZVMzRnrocRcJghD4AeZjEo`
+- Target: `preview`
+- Status: `READY`
+- Created: 2026-05-29 16:01:45 CDT
+- Build command: `NODE_ENV=test npm test && npm run lint && npm run build && npm run typecheck`
+- Deployment Protection: enabled. Direct unauthenticated `curl` returns `HTTP/2 401`; use `npx vercel curl` for maintainer validation.
+
+Validated through `npx vercel curl`:
+
+- `/` renders the Sound City dashboard HTML with `Sound City`, `Recommended Tonight`, `Latest Events`, `Artist Showcase`, and `Venue Signals`.
+- `/api/catalog/events?city=chicago` returns the Chicago catalog and events including `Family Matters feat. Posthuman`, `Lemtom at Spybar`, and `Jeremy Olander Open-to-Close`.
+- `/api/catalog/venues?city=chicago` returns `smartbar`, `Spybar`, and `Podlasie Club`.
+- `/api/catalog/artists?city=chicago` returns `Posthuman`, `Lemtom`, and `Jeremy Olander`.
+- `/api/catalog/showcase?city=chicago` returns `Posthuman` as the showcase artist.
