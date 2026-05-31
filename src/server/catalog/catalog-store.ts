@@ -2,11 +2,13 @@ import { launchCatalogData } from "./launch-data";
 import { createDrizzleCatalogStore } from "./drizzle-catalog-store";
 import { createDb } from "../db/client";
 import type {
+  ArtistLinkRecord,
   ArtistRecord,
   CatalogSnapshot,
   CityRecord,
   EventRecord,
   VenueRecord,
+  VenueSignalRecord,
 } from "./types";
 
 export type CatalogReader = {
@@ -24,9 +26,18 @@ export type CatalogStore = CatalogReader & {
   createArtist(artist: ArtistRecord): Promise<ArtistRecord>;
   updateArtist(id: string, artist: ArtistRecord): Promise<ArtistRecord>;
   deleteArtist(id: string): Promise<void>;
+  createArtistLink(link: ArtistLinkRecord): Promise<ArtistLinkRecord>;
+  updateArtistLink(id: string, link: ArtistLinkRecord): Promise<ArtistLinkRecord>;
+  deleteArtistLink(id: string): Promise<void>;
   createEvent(event: EventRecord): Promise<EventRecord>;
   updateEvent(id: string, event: EventRecord): Promise<EventRecord>;
   deleteEvent(id: string): Promise<void>;
+  createVenueSignal(signal: VenueSignalRecord): Promise<VenueSignalRecord>;
+  updateVenueSignal(
+    id: string,
+    signal: VenueSignalRecord,
+  ): Promise<VenueSignalRecord>;
+  deleteVenueSignal(id: string): Promise<void>;
 };
 
 function cloneSnapshot(snapshot: CatalogSnapshot): CatalogSnapshot {
@@ -107,6 +118,36 @@ export function createSeedCatalogStore(
       }
       snapshot.artists.splice(index, 1);
     },
+    async createArtistLink(link) {
+      const artist = snapshot.artists.find(
+        (current) => current.slug === link.artistSlug,
+      );
+      if (!artist) {
+        throw new Error("Artist not found");
+      }
+      artist.links.push(link);
+      return link;
+    },
+    async updateArtistLink(id, link) {
+      for (const artist of snapshot.artists) {
+        const index = artist.links.findIndex((current) => current.id === id);
+        if (index !== -1) {
+          artist.links[index] = link;
+          return link;
+        }
+      }
+      throw new Error("Artist link not found");
+    },
+    async deleteArtistLink(id) {
+      for (const artist of snapshot.artists) {
+        const index = artist.links.findIndex((link) => link.id === id);
+        if (index !== -1) {
+          artist.links.splice(index, 1);
+          return;
+        }
+      }
+      throw new Error("Artist link not found");
+    },
     async createEvent(event) {
       snapshot.events.push(event);
       return event;
@@ -126,11 +167,50 @@ export function createSeedCatalogStore(
       }
       snapshot.events.splice(index, 1);
     },
+    async createVenueSignal(signal) {
+      const venue = snapshot.venues.find(
+        (current) => current.slug === signal.venueSlug,
+      );
+      if (!venue) {
+        throw new Error("Venue not found");
+      }
+      venue.signals.push(signal);
+      snapshot.events = snapshot.events.map((event) =>
+        event.venue.slug === venue.slug ? { ...event, venue } : event,
+      );
+      return signal;
+    },
+    async updateVenueSignal(id, signal) {
+      for (const venue of snapshot.venues) {
+        const index = venue.signals.findIndex((current) => current.id === id);
+        if (index !== -1) {
+          venue.signals[index] = signal;
+          snapshot.events = snapshot.events.map((event) =>
+            event.venue.slug === venue.slug ? { ...event, venue } : event,
+          );
+          return signal;
+        }
+      }
+      throw new Error("Venue signal not found");
+    },
+    async deleteVenueSignal(id) {
+      for (const venue of snapshot.venues) {
+        const index = venue.signals.findIndex((signal) => signal.id === id);
+        if (index !== -1) {
+          venue.signals.splice(index, 1);
+          snapshot.events = snapshot.events.map((event) =>
+            event.venue.slug === venue.slug ? { ...event, venue } : event,
+          );
+          return;
+        }
+      }
+      throw new Error("Venue signal not found");
+    },
   };
 }
 
 let fallbackStore: CatalogStore | null = null;
-let databaseStore: CatalogReader | null = null;
+let databaseStore: CatalogStore | null = null;
 
 export function getCatalogStore() {
   if (process.env.DATABASE_URL) {

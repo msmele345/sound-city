@@ -53,13 +53,14 @@ describe("DashboardShell", () => {
 
     for (const link of enabledLinks) {
       const href = link.getAttribute("href");
-      expect(href).toMatch(/^#/);
-      expect(document.querySelector(href!)).not.toBeNull();
+      if (href?.startsWith("#")) {
+        expect(document.querySelector(href)).not.toBeNull();
+      }
     }
 
     expect(within(nav).getByText(/admin/i).closest("a")).toHaveAttribute(
-      "aria-disabled",
-      "true",
+      "href",
+      "/admin",
     );
   });
 

@@ -83,7 +83,9 @@ export type CreateVenueInput = Omit<
 
 export type UpdateVenueInput = Partial<
   Pick<VenueRecord, "name" | "neighborhood" | "address" | "capacity">
->;
+> & {
+  source?: SourceInput;
+};
 
 export type CreateArtistInput = Omit<
   ArtistRecord,
@@ -96,7 +98,9 @@ export type CreateArtistInput = Omit<
 
 export type UpdateArtistInput = Partial<
   Pick<ArtistRecord, "name" | "bio" | "styles" | "showcase">
->;
+> & {
+  source?: SourceInput;
+};
 
 export type CreateEventInput = {
   citySlug: string;
@@ -114,4 +118,31 @@ export type UpdateEventInput = Partial<
 > & {
   venueSlug?: string;
   artistSlugs?: string[];
+  source?: SourceInput;
+};
+
+export type CreateArtistLinkInput = Omit<
+  ArtistLinkRecord,
+  "id" | "source"
+> & {
+  source: SourceInput;
+};
+
+export type UpdateArtistLinkInput = Partial<
+  Pick<ArtistLinkRecord, "kind" | "label" | "url">
+> & {
+  source?: SourceInput;
+};
+
+export type CreateVenueSignalInput = Omit<
+  VenueSignalRecord,
+  "id" | "source"
+> & {
+  source: SourceInput;
+};
+
+export type UpdateVenueSignalInput = Partial<
+  Pick<VenueSignalRecord, "category" | "value">
+> & {
+  source?: SourceInput;
 };

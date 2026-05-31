@@ -1,16 +1,22 @@
 import type {
+  ArtistLinkRecord,
   ArtistRecord,
   CatalogSnapshot,
+  CreateArtistLinkInput,
   CreateArtistInput,
   CreateEventInput,
   CreateVenueInput,
+  CreateVenueSignalInput,
   EventRecord,
   SourceInput,
   SourceRecord,
+  UpdateArtistLinkInput,
   UpdateArtistInput,
   UpdateEventInput,
   UpdateVenueInput,
+  UpdateVenueSignalInput,
   VenueRecord,
+  VenueSignalRecord,
 } from "./types";
 
 import type { CatalogStore } from "./catalog-store";
@@ -19,6 +25,14 @@ function assertPresent(value: string, field: string) {
   if (!value.trim()) {
     throw new Error(`${field} is required`);
   }
+}
+
+function slugFromText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
 }
 
 function assertSource(source: SourceInput) {
@@ -43,6 +57,34 @@ function sourceFromInput(prefix: string, slug: string, source: SourceInput): Sou
 
 function recordId(prefix: string, slug: string) {
   return `${prefix}_${slug.replaceAll("-", "_")}`;
+}
+
+const artistLinkKinds = new Set<ArtistLinkRecord["kind"]>([
+  "official",
+  "soundcloud",
+  "bandcamp",
+  "youtube",
+  "resident-advisor",
+]);
+
+function assertArtistLinkKind(kind: ArtistLinkRecord["kind"]) {
+  if (!artistLinkKinds.has(kind)) {
+    throw new Error("artist link kind is invalid");
+  }
+}
+
+const venueSignalCategories = new Set<VenueSignalRecord["category"]>([
+  "sound",
+  "crowd",
+  "room",
+  "door",
+  "layout",
+]);
+
+function assertVenueSignalCategory(category: VenueSignalRecord["category"]) {
+  if (!venueSignalCategories.has(category)) {
+    throw new Error("venue signal category is invalid");
+  }
 }
 
 export async function createVenue(
@@ -79,6 +121,9 @@ export async function updateVenue(
   return store.updateVenue(id, {
     ...existing,
     ...input,
+    source: input.source
+      ? sourceFromInput("venue", existing.slug, input.source)
+      : existing.source,
   });
 }
 
@@ -120,11 +165,75 @@ export async function updateArtist(
   return store.updateArtist(id, {
     ...existing,
     ...input,
+    source: input.source
+      ? sourceFromInput("artist", existing.slug, input.source)
+      : existing.source,
   });
 }
 
 export async function deleteArtist(store: CatalogStore, id: string) {
   await store.deleteArtist(id);
+}
+
+export async function createArtistLink(
+  store: CatalogStore,
+  input: CreateArtistLinkInput,
+): Promise<ArtistLinkRecord> {
+  assertPresent(input.artistSlug, "artist slug");
+  assertPresent(input.label, "artist link label");
+  assertPresent(input.url, "artist link URL");
+  assertArtistLinkKind(input.kind);
+
+  try {
+    new URL(input.url);
+  } catch {
+    throw new Error("artist link URL must be a valid URL");
+  }
+
+  const linkSlug = `${input.artistSlug}-${input.kind}-${slugFromText(
+    input.label,
+  )}`;
+  const link: ArtistLinkRecord = {
+    ...input,
+    id: recordId("link", linkSlug),
+    source: sourceFromInput("artist_link", linkSlug, input.source),
+  };
+
+  return store.createArtistLink(link);
+}
+
+export async function updateArtistLink(
+  store: CatalogStore,
+  id: string,
+  input: UpdateArtistLinkInput,
+): Promise<ArtistLinkRecord> {
+  const artists = await store.listArtists("chicago");
+  const existing = artists.flatMap((artist) => artist.links).find((link) => link.id === id);
+  if (!existing) {
+    throw new Error("Artist link not found");
+  }
+  if (input.kind) {
+    assertArtistLinkKind(input.kind);
+  }
+  if (input.url) {
+    try {
+      new URL(input.url);
+    } catch {
+      throw new Error("artist link URL must be a valid URL");
+    }
+  }
+
+  return store.updateArtistLink(id, {
+    ...existing,
+    ...input,
+    source: input.source
+      ? sourceFromInput("artist_link", id.replace(/^link_/, ""), input.source)
+      : existing.source,
+  });
+}
+
+export async function deleteArtistLink(store: CatalogStore, id: string) {
+  await store.deleteArtistLink(id);
 }
 
 export async function createEvent(
@@ -205,11 +314,63 @@ export async function updateEvent(
     ...input,
     venue,
     artists: eventArtists,
+    source: input.source
+      ? sourceFromInput("event", existing.slug, input.source)
+      : existing.source,
   });
 }
 
 export async function deleteEvent(store: CatalogStore, id: string) {
   await store.deleteEvent(id);
+}
+
+export async function createVenueSignal(
+  store: CatalogStore,
+  input: CreateVenueSignalInput,
+): Promise<VenueSignalRecord> {
+  assertPresent(input.venueSlug, "venue slug");
+  assertPresent(input.value, "venue signal value");
+  assertVenueSignalCategory(input.category);
+
+  const signalSlug = `${input.venueSlug}-${input.category}-${slugFromText(
+    input.value,
+  )}`;
+  const signal: VenueSignalRecord = {
+    ...input,
+    id: recordId("signal", signalSlug),
+    source: sourceFromInput("venue_signal", signalSlug, input.source),
+  };
+
+  return store.createVenueSignal(signal);
+}
+
+export async function updateVenueSignal(
+  store: CatalogStore,
+  id: string,
+  input: UpdateVenueSignalInput,
+): Promise<VenueSignalRecord> {
+  const venues = await store.listVenues("chicago");
+  const existing = venues
+    .flatMap((venue) => venue.signals)
+    .find((signal) => signal.id === id);
+  if (!existing) {
+    throw new Error("Venue signal not found");
+  }
+  if (input.category) {
+    assertVenueSignalCategory(input.category);
+  }
+
+  return store.updateVenueSignal(id, {
+    ...existing,
+    ...input,
+    source: input.source
+      ? sourceFromInput("venue_signal", id.replace(/^signal_/, ""), input.source)
+      : existing.source,
+  });
+}
+
+export async function deleteVenueSignal(store: CatalogStore, id: string) {
+  await store.deleteVenueSignal(id);
 }
 
 export function collectSources(snapshot: CatalogSnapshot) {

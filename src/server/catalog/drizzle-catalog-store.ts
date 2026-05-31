@@ -1,4 +1,6 @@
-import type { CatalogReader } from "./catalog-store";
+import { eq } from "drizzle-orm";
+
+import type { CatalogStore } from "./catalog-store";
 import type {
   ArtistLinkRecord,
   ArtistRecord,
@@ -8,6 +10,8 @@ import type {
   VenueRecord,
   VenueSignalRecord,
 } from "./types";
+import type { createDb } from "../db/client";
+import * as schema from "../db/schema";
 
 type FindManyTable<Row> = {
   findMany(): Promise<Row[]>;
@@ -83,6 +87,10 @@ export type CatalogDbReader = {
   };
 };
 
+type CatalogDbWriter = Pick<ReturnType<typeof createDb>, "delete" | "insert" | "update">;
+
+type CatalogDb = CatalogDbReader & Partial<CatalogDbWriter>;
+
 function normalizeDate(value: string | Date) {
   if (value instanceof Date) {
     return value.toISOString();
@@ -127,7 +135,14 @@ function venueSignalCategory(value: string): VenueSignalRecord["category"] {
   return value as VenueSignalRecord["category"];
 }
 
-export function createDrizzleCatalogStore(db: CatalogDbReader): CatalogReader {
+function requireWriter(db: CatalogDb): CatalogDbWriter {
+  if (!db.delete || !db.insert || !db.update) {
+    throw new Error("Catalog write operations require a Drizzle database");
+  }
+  return db as CatalogDbWriter;
+}
+
+export function createDrizzleCatalogStore(db: CatalogDb): CatalogStore {
   async function readCatalog() {
     const [
       cities,
@@ -258,6 +273,44 @@ export function createDrizzleCatalogStore(db: CatalogDbReader): CatalogReader {
     return { cities, venues, artists, events };
   }
 
+  async function cityIdFromSlug(citySlug: string) {
+    const cities = await db.query.cities.findMany();
+    return requireRecord(
+      cities.find((city) => city.slug === citySlug)?.id,
+      "City",
+    );
+  }
+
+  async function venueIdFromSlug(slug: string) {
+    const venues = await db.query.venues.findMany();
+    return requireRecord(
+      venues.find((venue) => venue.slug === slug)?.id,
+      "Venue",
+    );
+  }
+
+  async function artistIdFromSlug(slug: string) {
+    const artists = await db.query.artists.findMany();
+    return requireRecord(
+      artists.find((artist) => artist.slug === slug)?.id,
+      "Artist",
+    );
+  }
+
+  async function upsertSource(writer: CatalogDbWriter, source: SourceRecord) {
+    await writer
+      .insert(schema.sources)
+      .values(source)
+      .onConflictDoUpdate({
+        target: schema.sources.id,
+        set: {
+          title: source.title,
+          url: source.url,
+          lastVerifiedAt: source.lastVerifiedAt,
+        },
+      });
+  }
+
   return {
     async listCities() {
       const catalog = await readCatalog();
@@ -282,6 +335,194 @@ export function createDrizzleCatalogStore(db: CatalogDbReader): CatalogReader {
           (artist) => artist.citySlug === citySlug && artist.showcase,
         ) ?? null
       );
+    },
+    async createVenue(venue) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, venue.source);
+      await writer.insert(schema.venues).values({
+        id: venue.id,
+        cityId: await cityIdFromSlug(venue.citySlug),
+        sourceId: venue.source.id,
+        name: venue.name,
+        slug: venue.slug,
+        neighborhood: venue.neighborhood,
+        address: venue.address,
+        capacity: venue.capacity,
+      });
+      return venue;
+    },
+    async updateVenue(id, venue) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, venue.source);
+      await writer
+        .update(schema.venues)
+        .set({
+          sourceId: venue.source.id,
+          name: venue.name,
+          neighborhood: venue.neighborhood,
+          address: venue.address,
+          capacity: venue.capacity,
+        })
+        .where(eq(schema.venues.id, id));
+      return venue;
+    },
+    async deleteVenue(id) {
+      const writer = requireWriter(db);
+      await writer.delete(schema.venues).where(eq(schema.venues.id, id));
+    },
+    async createArtist(artist) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, artist.source);
+      await writer.insert(schema.artists).values({
+        id: artist.id,
+        cityId: await cityIdFromSlug(artist.citySlug),
+        sourceId: artist.source.id,
+        name: artist.name,
+        slug: artist.slug,
+        bio: artist.bio,
+        styles: artist.styles,
+        showcase: artist.showcase,
+      });
+      return artist;
+    },
+    async updateArtist(id, artist) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, artist.source);
+      await writer
+        .update(schema.artists)
+        .set({
+          sourceId: artist.source.id,
+          name: artist.name,
+          bio: artist.bio,
+          styles: artist.styles,
+          showcase: artist.showcase,
+        })
+        .where(eq(schema.artists.id, id));
+      return artist;
+    },
+    async deleteArtist(id) {
+      const writer = requireWriter(db);
+      await writer
+        .delete(schema.artistLinks)
+        .where(eq(schema.artistLinks.artistId, id));
+      await writer
+        .delete(schema.eventArtists)
+        .where(eq(schema.eventArtists.artistId, id));
+      await writer.delete(schema.artists).where(eq(schema.artists.id, id));
+    },
+    async createArtistLink(link) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, link.source);
+      await writer.insert(schema.artistLinks).values({
+        id: link.id,
+        artistId: await artistIdFromSlug(link.artistSlug),
+        sourceId: link.source.id,
+        kind: link.kind,
+        label: link.label,
+        url: link.url,
+      });
+      return link;
+    },
+    async updateArtistLink(id, link) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, link.source);
+      await writer
+        .update(schema.artistLinks)
+        .set({
+          sourceId: link.source.id,
+          kind: link.kind,
+          label: link.label,
+          url: link.url,
+        })
+        .where(eq(schema.artistLinks.id, id));
+      return link;
+    },
+    async deleteArtistLink(id) {
+      const writer = requireWriter(db);
+      await writer.delete(schema.artistLinks).where(eq(schema.artistLinks.id, id));
+    },
+    async createEvent(event) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, event.source);
+      await writer.insert(schema.events).values({
+        id: event.id,
+        cityId: await cityIdFromSlug(event.citySlug),
+        venueId: await venueIdFromSlug(event.venue.slug),
+        sourceId: event.source.id,
+        title: event.title,
+        slug: event.slug,
+        startsAt: event.startsAt,
+        styles: event.styles,
+      });
+      for (const artist of event.artists) {
+        await writer.insert(schema.eventArtists).values({
+          eventId: event.id,
+          artistId: await artistIdFromSlug(artist.slug),
+        });
+      }
+      return event;
+    },
+    async updateEvent(id, event) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, event.source);
+      await writer
+        .update(schema.events)
+        .set({
+          venueId: await venueIdFromSlug(event.venue.slug),
+          sourceId: event.source.id,
+          title: event.title,
+          startsAt: event.startsAt,
+          styles: event.styles,
+        })
+        .where(eq(schema.events.id, id));
+      await writer
+        .delete(schema.eventArtists)
+        .where(eq(schema.eventArtists.eventId, id));
+      for (const artist of event.artists) {
+        await writer.insert(schema.eventArtists).values({
+          eventId: event.id,
+          artistId: await artistIdFromSlug(artist.slug),
+        });
+      }
+      return event;
+    },
+    async deleteEvent(id) {
+      const writer = requireWriter(db);
+      await writer
+        .delete(schema.eventArtists)
+        .where(eq(schema.eventArtists.eventId, id));
+      await writer.delete(schema.events).where(eq(schema.events.id, id));
+    },
+    async createVenueSignal(signal) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, signal.source);
+      await writer.insert(schema.venueSignals).values({
+        id: signal.id,
+        venueId: await venueIdFromSlug(signal.venueSlug),
+        sourceId: signal.source.id,
+        category: signal.category,
+        value: signal.value,
+      });
+      return signal;
+    },
+    async updateVenueSignal(id, signal) {
+      const writer = requireWriter(db);
+      await upsertSource(writer, signal.source);
+      await writer
+        .update(schema.venueSignals)
+        .set({
+          sourceId: signal.source.id,
+          category: signal.category,
+          value: signal.value,
+        })
+        .where(eq(schema.venueSignals.id, id));
+      return signal;
+    },
+    async deleteVenueSignal(id) {
+      const writer = requireWriter(db);
+      await writer
+        .delete(schema.venueSignals)
+        .where(eq(schema.venueSignals.id, id));
     },
   };
 }
