@@ -7,6 +7,43 @@ function requestFor(path: string, init?: ConstructorParameters<typeof NextReques
 }
 
 describe("admin catalog route handlers", () => {
+  const originalAdminSecret = process.env.ADMIN_SECRET;
+
+  afterEach(() => {
+    if (originalAdminSecret) {
+      process.env.ADMIN_SECRET = originalAdminSecret;
+    } else {
+      delete process.env.ADMIN_SECRET;
+    }
+  });
+
+  it("requires the configured admin secret before serving catalog maintenance routes", async () => {
+    process.env.ADMIN_SECRET = "phase-seven-secret";
+
+    const blockedResponse = await GET(
+      requestFor("/api/admin/catalog?city=chicago"),
+    );
+
+    expect(blockedResponse.status).toBe(401);
+    expect(await blockedResponse.json()).toMatchObject({
+      error: expect.stringMatching(/admin secret/i),
+    });
+
+    const allowedResponse = await GET(
+      requestFor("/api/admin/catalog?city=chicago", {
+        headers: {
+          "x-sound-city-admin-secret": "phase-seven-secret",
+        },
+      }),
+    );
+
+    expect(allowedResponse.status).toBe(200);
+    expect(await allowedResponse.json()).toMatchObject({
+      events: expect.any(Array),
+      sources: expect.any(Array),
+    });
+  });
+
   it("creates, edits, and deletes venue records with source provenance", async () => {
     const createResponse = await POST(
       requestFor("/api/admin/catalog", {

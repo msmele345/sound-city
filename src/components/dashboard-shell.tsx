@@ -214,7 +214,7 @@ function MatchMeter({ score }: { score: number }) {
   const filled = Math.round(score * 10);
   const pct = Math.round(score * 100);
   return (
-    <span className="inline-flex items-center gap-2 font-mono text-sm">
+    <span className="inline-flex shrink-0 items-center gap-2 font-mono text-sm">
       <span aria-hidden className="tracking-[0.05em]">
         <span className="text-signal">{"█".repeat(filled)}</span>
         <span className="text-rule-strong">{"░".repeat(10 - filled)}</span>
@@ -275,7 +275,7 @@ function EventDiscoveryFeed({ feed }: { feed: EventFeedState }) {
     <>
       <div
         aria-label="Filter events by style"
-        className="mt-4 flex flex-wrap border-y border-rule font-mono text-[0.7rem] uppercase tracking-[0.16em]"
+        className="mt-4 flex flex-col items-start border-y border-rule font-mono text-[0.7rem] uppercase tracking-[0.16em] sm:flex-row sm:flex-wrap"
       >
         {["all", ...styles].map((style) => (
           <button
@@ -283,7 +283,7 @@ function EventDiscoveryFeed({ feed }: { feed: EventFeedState }) {
             type="button"
             aria-pressed={activeStyle === style}
             onClick={() => setActiveStyle(style)}
-            className={`border-r border-rule px-3 py-2 transition-colors duration-150 hover:bg-panel hover:text-signal ${
+            className={`shrink-0 border-r border-rule px-3 py-2 transition-colors duration-150 hover:bg-panel hover:text-signal ${
               activeStyle === style ? "bg-panel text-signal" : "text-ink-dim"
             }`}
           >
@@ -312,7 +312,7 @@ function EventDiscoveryFeed({ feed }: { feed: EventFeedState }) {
               </div>
               <div>
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <h3 className="font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink">
+                  <h3 className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink">
                     {event.title}
                   </h3>
                   <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
@@ -370,16 +370,16 @@ function TasteProfileControls({
   }
 
   return (
-    <div className="mt-5 border-y border-rule py-4">
+    <div className="mt-5 min-w-0 max-w-[calc(100vw-2.5rem)] border-y border-rule py-4 sm:max-w-none">
       <fieldset>
         <legend className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint">
           Styles
         </legend>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
           {styleOptions.map((style) => (
             <label
               key={style}
-              className={`inline-flex cursor-pointer items-center gap-2 border border-rule px-3 py-2 font-mono text-[0.7rem] uppercase tracking-[0.14em] transition-colors duration-150 ${
+              className={`inline-flex max-w-full shrink-0 cursor-pointer items-center gap-2 border border-rule px-3 py-2 text-left font-mono text-[0.7rem] uppercase tracking-[0.14em] transition-colors duration-150 ${
                 profile.styles.includes(style)
                   ? "bg-panel text-signal"
                   : "text-ink-dim hover:bg-panel"
@@ -398,7 +398,7 @@ function TasteProfileControls({
       </fieldset>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
+        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
           Vibe
           <select
             value={profile.vibe}
@@ -418,7 +418,7 @@ function TasteProfileControls({
           </select>
         </label>
 
-        <label className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
+        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
           Venue size
           <select
             value={profile.venueSize}
@@ -438,7 +438,7 @@ function TasteProfileControls({
           </select>
         </label>
 
-        <label className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
+        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
           Start time
           <select
             value={profile.startTime}
@@ -472,7 +472,7 @@ function TasteProfileControls({
               discoveryLevel: Number(event.target.value),
             })
           }
-          className="mt-2 w-full accent-signal"
+          className="mt-2 w-full min-w-0 accent-signal"
         />
       </label>
     </div>
@@ -559,15 +559,15 @@ function RecommendedEvents({
           {recommendations.map((item, i) => (
             <li
               key={item.event.id}
-              className="rise group grid grid-cols-[auto_1fr] gap-x-5 border-b border-rule py-6 transition-colors duration-150 hover:bg-panel/60 sm:gap-x-8"
+              className="rise group grid grid-cols-1 gap-y-3 border-b border-rule py-6 transition-colors duration-150 hover:bg-panel/60 sm:grid-cols-[auto_1fr] sm:gap-x-8"
               style={{ animationDelay: `${120 + i * 70}ms` }}
             >
               <span className="font-display text-4xl leading-none text-ink-faint transition-colors duration-150 group-hover:text-signal sm:text-5xl">
                 {String(i + 1).padStart(2, "0")}
               </span>
-              <div>
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <h3 className="font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink sm:text-3xl">
+                  <h3 className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink sm:text-3xl">
                     {item.event.title}
                   </h3>
                   <p className="font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
@@ -584,27 +584,27 @@ function RecommendedEvents({
                 <p className="mt-3 max-w-xl text-[0.95rem] leading-relaxed text-ink-dim">
                   {item.reason}
                 </p>
-                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
                   <MatchMeter score={item.score} />
                   <button
                     type="button"
                     aria-pressed={item.saved}
                     onClick={() => saveEvent(item.event.id)}
-                    className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
+                    className="shrink-0 border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
                   >
                     {item.saved ? "Saved" : "Save"}
                   </button>
                   <button
                     type="button"
                     onClick={() => dismissEvent(item.event.id)}
-                    className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
+                    className="shrink-0 border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
                   >
                     Dismiss
                   </button>
                   <button
                     type="button"
                     onClick={() => attendEvent(item.event.id)}
-                    className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
+                    className="shrink-0 border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
                   >
                     Mark attended
                   </button>
@@ -877,14 +877,14 @@ function SectionMark({
   index: string;
 }) {
   return (
-    <div className="flex items-end justify-between gap-4 border-b-2 border-rule-strong pb-2">
+    <div className="flex w-full min-w-0 flex-col items-start gap-2 border-b-2 border-rule-strong pb-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
       <h2
         id={id}
         className="font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink sm:text-3xl"
       >
         {title}
       </h2>
-      <span className="shrink-0 font-mono text-[0.7rem] uppercase tracking-[0.18em] text-ink-faint">
+      <span className="max-w-full shrink-0 font-mono text-[0.7rem] uppercase tracking-[0.18em] text-ink-faint">
         {index}
       </span>
     </div>
@@ -1023,7 +1023,7 @@ export function DashboardShell() {
 
       <nav
         aria-label="Primary navigation"
-        className="rise mt-6 flex flex-wrap items-stretch border-b border-rule font-mono text-xs uppercase tracking-[0.2em]"
+        className="rise mt-6 grid grid-cols-2 border-b border-rule font-mono text-xs uppercase tracking-[0.2em] sm:flex sm:flex-wrap sm:items-stretch"
         style={{ animationDelay: "70ms" }}
       >
         {nav.map((item, i) => (
@@ -1032,7 +1032,7 @@ export function DashboardShell() {
             href={item.href}
             aria-disabled={item.href ? undefined : "true"}
             aria-current={i === 0 ? "page" : undefined}
-            className={`border-r border-rule px-4 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal ${
+            className={`min-w-0 border-r border-rule px-3 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal sm:px-4 ${
               i === 0
                 ? "bg-panel text-signal"
                 : item.href
@@ -1046,12 +1046,12 @@ export function DashboardShell() {
         ))}
       </nav>
 
-      <main className="mt-10 grid gap-x-12 gap-y-12 lg:grid-cols-[1.65fr_0.7fr]">
-        <div className="flex flex-col gap-12">
+      <main className="mt-10 grid min-w-0 gap-x-12 gap-y-12 lg:grid-cols-[1.65fr_0.7fr]">
+        <div className="flex min-w-0 flex-col gap-12">
           <section
             id="recommendations"
             aria-labelledby="recommended-heading"
-            className="scroll-mt-6"
+            className="min-w-0 scroll-mt-6"
           >
             <SectionMark
               id="recommended-heading"
@@ -1071,7 +1071,7 @@ export function DashboardShell() {
             />
           </section>
 
-          <section id="events" aria-labelledby="latest-heading" className="scroll-mt-6">
+          <section id="events" aria-labelledby="latest-heading" className="min-w-0 scroll-mt-6">
             <SectionMark
               id="latest-heading"
               title="Latest Events"
@@ -1081,8 +1081,8 @@ export function DashboardShell() {
           </section>
         </div>
 
-        <aside className="flex flex-col gap-12 lg:border-l-2 lg:border-rule-strong lg:pl-12">
-          <section id="artists" aria-labelledby="showcase-heading" className="scroll-mt-6">
+        <aside className="flex min-w-0 flex-col gap-12 lg:border-l-2 lg:border-rule-strong lg:pl-12">
+          <section id="artists" aria-labelledby="showcase-heading" className="min-w-0 scroll-mt-6">
             <SectionMark
               id="showcase-heading"
               title="Artist Showcase"
@@ -1091,7 +1091,7 @@ export function DashboardShell() {
             <ArtistShowcase showcase={showcase} feed={feed} />
           </section>
 
-          <section id="venues" aria-labelledby="venue-heading" className="scroll-mt-6">
+          <section id="venues" aria-labelledby="venue-heading" className="min-w-0 scroll-mt-6">
             <SectionMark
               id="venue-heading"
               title="Venue Signals"

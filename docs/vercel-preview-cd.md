@@ -57,6 +57,7 @@ Set the following Vercel environment variable for preview and production:
 
 ```text
 DATABASE_URL
+ADMIN_SECRET
 ```
 
 `DATABASE_URL` should point at the Neon Postgres database used by the deployed
@@ -64,17 +65,43 @@ environment. If it is missing, the app falls back to the seed-backed in-memory
 catalog store, which is useful locally but should not be the deployed preview
 baseline.
 
+`ADMIN_SECRET` should be a high-entropy maintainer secret. When it is present,
+`/admin` unlocks only after the maintainer enters the secret, and
+`/api/admin/catalog` requires the `x-sound-city-admin-secret` header or a Bearer
+token with the same value. Keep Vercel Deployment Protection enabled for
+previews as an outer protection layer.
+
 ## Preview Validation
 
 After a feature branch is pushed or a pull request is opened:
 
 1. Open the Vercel preview URL from the pull request or Vercel dashboard.
-2. Check the dashboard first screen on desktop and mobile widths.
+2. Check the dashboard first screen at desktop width, then at a mobile width
+   around 390 px.
 3. Check `/api/catalog/events?city=chicago`.
 4. Check `/api/catalog/venues?city=chicago`.
 5. Check `/api/catalog/artists?city=chicago`.
 6. Check `/api/catalog/showcase?city=chicago`.
 7. Confirm event data comes from Neon, not the local seed fallback.
+8. Open `/admin`, confirm the secret gate appears, unlock with `ADMIN_SECRET`,
+   and verify catalog lists load.
+
+## Responsive And Accessibility QA
+
+For desktop and mobile widths:
+
+1. Confirm the first viewport shows Sound City, primary navigation,
+   Recommended Tonight, Latest Events, Artist Showcase, and Venue Signals
+   without text overlap.
+2. Use only the keyboard to tab through primary navigation, taste controls,
+   event filters, recommendation actions, source links, and the Admin unlock
+   form. Focus rings should be visible and labels should announce the control
+   purpose.
+3. Confirm loading, empty, and error states remain legible for event feed,
+   recommendation queue, artist showcase, venue directory, and Admin catalog
+   requests.
+4. Confirm destructive Admin actions still show a browser confirmation before
+   the delete request is sent.
 
 ## First Validated Preview
 
