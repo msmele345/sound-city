@@ -102,6 +102,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   global.fetch = fetchMock;
   vi.spyOn(window, "confirm").mockReturnValue(true);
+  window.sessionStorage.clear();
 });
 
 afterEach(() => {
@@ -109,10 +110,61 @@ afterEach(() => {
 });
 
 describe("AdminCatalog", () => {
+  it("unlocks protected admin catalog requests with a maintainer secret", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+
+      if (
+        headers.get("x-sound-city-admin-secret") !== "phase-seven-secret"
+      ) {
+        return Promise.resolve({
+          ok: false,
+          status: 401,
+          json: async () => ({ error: "Admin secret required" }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => adminSnapshot,
+      });
+    });
+
+    render(<AdminCatalog />);
+
+    expect(
+      await screen.findByRole("alert", { name: /admin status/i }),
+    ).toHaveTextContent(/admin secret required/i);
+
+    const unlockForm = screen.getByRole("form", {
+      name: /unlock admin catalog/i,
+    });
+    await user.type(
+      within(unlockForm).getByLabelText(/admin secret/i),
+      "phase-seven-secret",
+    );
+    await user.click(
+      within(unlockForm).getByRole("button", { name: /unlock admin/i }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /^venues$/i }),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/catalog?city=chicago",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "x-sound-city-admin-secret": "phase-seven-secret",
+        }),
+      }),
+    );
+  });
+
   it("supports quick scanning, creation, validation feedback, and confirmed deletion", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      if (!init) {
+      if (!init?.method) {
         return Promise.resolve({
           ok: true,
           json: async () => adminSnapshot,

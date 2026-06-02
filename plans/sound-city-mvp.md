@@ -164,11 +164,11 @@ Prepare the Next.js app for a Vercel preview deployment. Tighten visual polish, 
 
 ### Acceptance Criteria
 
-- [ ] Build, typecheck, and test commands pass.
-- [ ] Core flows are verified on mobile and desktop.
-- [ ] Keyboard navigation and accessible labels are checked for primary controls.
-- [ ] Loading, empty, and error states are polished.
+- [x] Build, typecheck, and test commands pass.
+- [x] Core flows are verified on mobile and desktop.
+- [x] Keyboard navigation and accessible labels are checked for primary controls.
+- [x] Loading, empty, and error states are polished.
 - [x] Vercel deployment configuration is documented.
 - [x] Environment variables required for Neon are documented.
-- [ ] Admin UI and Admin API routes are protected before any public production launch.
-- [ ] Manual data refresh instructions are complete enough for another maintainer to follow.
+- [x] Admin UI and Admin API routes are protected before any public production launch.
+- [x] Manual data refresh instructions are complete enough for another maintainer to follow.

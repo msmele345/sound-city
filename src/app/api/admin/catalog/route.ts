@@ -41,6 +41,34 @@ type AdminMutationBody = {
   input?: unknown;
 };
 
+const adminSecretHeader = "x-sound-city-admin-secret";
+
+function adminProtectionResponse(request: NextRequest) {
+  const expectedSecret = process.env.ADMIN_SECRET?.trim();
+  if (!expectedSecret) {
+    return null;
+  }
+
+  const bearerToken = request.headers
+    .get("authorization")
+    ?.replace(/^Bearer\s+/i, "");
+  const providedSecret = request.headers.get(adminSecretHeader) ?? bearerToken;
+
+  if (providedSecret === expectedSecret) {
+    return null;
+  }
+
+  return NextResponse.json(
+    { error: "Admin secret required" },
+    {
+      status: 401,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
+  );
+}
+
 function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Admin request failed";
   return NextResponse.json({ error: message }, { status: 400 });
@@ -84,6 +112,11 @@ function requireInput<T>(input: unknown): T {
 }
 
 export async function GET(request: NextRequest) {
+  const protection = adminProtectionResponse(request);
+  if (protection) {
+    return protection;
+  }
+
   const citySlug = request.nextUrl.searchParams.get("city") ?? "chicago";
   const snapshot = await adminSnapshot(citySlug);
 
@@ -94,6 +127,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const protection = adminProtectionResponse(request);
+  if (protection) {
+    return protection;
+  }
+
   try {
     const body = await requestBody(request);
     const store = getCatalogStore();
@@ -141,6 +179,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const protection = adminProtectionResponse(request);
+  if (protection) {
+    return protection;
+  }
+
   try {
     const body = await requestBody(request);
     const store = getCatalogStore();
@@ -194,6 +237,11 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const protection = adminProtectionResponse(request);
+  if (protection) {
+    return protection;
+  }
+
   try {
     const body = await requestBody(request);
     const store = getCatalogStore();

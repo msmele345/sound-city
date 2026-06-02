@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type SourceRecord = {
   id?: string;
@@ -87,6 +87,22 @@ const signalCategories: VenueSignalRecord["category"][] = [
   "door",
   "layout",
 ];
+
+const adminSecretHeader = "x-sound-city-admin-secret";
+const adminSecretStorageKey = "sound-city.admin-secret.v1";
+
+class AdminCatalogRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+function isUnauthorizedAdminError(error: unknown) {
+  return error instanceof AdminCatalogRequestError && error.status === 401;
+}
 
 function csv(value: string) {
   return value
@@ -226,6 +242,13 @@ function SectionHeading({
 }
 
 export function AdminCatalog() {
+  const [adminSecret, setAdminSecret] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    return window.sessionStorage.getItem(adminSecretStorageKey) ?? "";
+  });
+  const [requiresSecret, setRequiresSecret] = useState(false);
   const [snapshot, setSnapshot] = useState<AdminSnapshot>({
     venues: [],
     artists: [],
@@ -243,33 +266,54 @@ export function AdminCatalog() {
     [snapshot.venues],
   );
 
-  async function loadCatalog() {
-    const body = await readCatalog();
-    setSnapshot(body);
-    setStatus("Admin catalog ready");
-  }
+  const adminHeaders = useCallback((secret = adminSecret): HeadersInit => {
+    return secret ? { [adminSecretHeader]: secret } : {};
+  }, [adminSecret]);
 
-  async function readCatalog() {
-    const response = await fetch("/api/admin/catalog?city=chicago");
-    const body = (await response.json()) as AdminSnapshot;
+  const readCatalog = useCallback(async (secret = adminSecret) => {
+    const response = await fetch("/api/admin/catalog?city=chicago", {
+      headers: adminHeaders(secret),
+    });
+    const body = (await response.json()) as AdminSnapshot & { error?: string };
     if (!response.ok) {
-      throw new Error("Admin catalog unavailable");
+      throw new AdminCatalogRequestError(
+        response.status,
+        body.error ?? "Admin catalog unavailable",
+      );
     }
     return body;
-  }
+  }, [adminHeaders, adminSecret]);
+
+  const loadCatalog = useCallback(async (secret = adminSecret) => {
+    try {
+      const body = await readCatalog(secret);
+      setSnapshot(body);
+      setStatus("Admin catalog ready");
+      setRequiresSecret(false);
+    } catch (error) {
+      if (isUnauthorizedAdminError(error)) {
+        setRequiresSecret(true);
+      }
+      throw error;
+    }
+  }, [adminSecret, readCatalog]);
 
   useEffect(() => {
     let active = true;
 
-    void readCatalog()
+    void readCatalog(adminSecret)
       .then((body) => {
         if (active) {
           setSnapshot(body);
           setStatus("Admin catalog ready");
+          setRequiresSecret(false);
         }
       })
       .catch((error: unknown) => {
         if (active) {
+          if (isUnauthorizedAdminError(error)) {
+            setRequiresSecret(true);
+          }
           setStatus(
             error instanceof Error ? error.message : "Admin catalog failed",
           );
@@ -279,7 +323,7 @@ export function AdminCatalog() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [adminSecret, readCatalog]);
 
   async function mutate(
     method: "DELETE" | "PATCH" | "POST",
@@ -289,11 +333,14 @@ export function AdminCatalog() {
   ) {
     const response = await fetch("/api/admin/catalog", {
       method,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...adminHeaders() },
       body: JSON.stringify({ entity, id, input }),
     });
     const body = (await response.json()) as { error?: string };
     if (!response.ok) {
+      if (response.status === 401) {
+        setRequiresSecret(true);
+      }
       throw new Error(body.error ?? "Admin mutation failed");
     }
     setStatus(`${entity} saved`);
@@ -323,6 +370,22 @@ export function AdminCatalog() {
     }
   }
 
+  async function unlockAdmin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const secret = formValue(form, "adminSecret");
+
+    setAdminSecret(secret);
+    window.sessionStorage.setItem(adminSecretStorageKey, secret);
+    setStatus("Checking admin secret");
+
+    try {
+      await loadCatalog(secret);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Admin secret failed");
+    }
+  }
+
   return (
     <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
       <header className="rise border-b-2 border-rule-strong pb-7">
@@ -349,6 +412,29 @@ export function AdminCatalog() {
         {status}
       </p>
 
+      {requiresSecret ? (
+        <form
+          aria-label="Unlock admin catalog"
+          className="mt-8 max-w-xl border-b border-rule pb-6"
+          onSubmit={unlockAdmin}
+        >
+          <label className="block font-mono text-[0.68rem] uppercase tracking-[0.16em] text-ink-faint">
+            Admin secret
+            <input
+              name="adminSecret"
+              required
+              type="password"
+              autoComplete="current-password"
+              className="mt-2 w-full border border-rule bg-bg px-3 py-2 font-sans text-sm normal-case tracking-normal text-ink"
+            />
+          </label>
+          <div className="mt-4">
+            <SubmitButton>Unlock admin</SubmitButton>
+          </div>
+        </form>
+      ) : null}
+
+      {requiresSecret ? null : (
       <main className="mt-10 grid gap-12 lg:grid-cols-[0.95fr_1.25fr]">
         <section aria-labelledby="create-heading" className="space-y-8">
           <SectionHeading title="Create Records" index="Mutations / 01" />
@@ -968,6 +1054,7 @@ export function AdminCatalog() {
           </section>
         </section>
       </main>
+      )}
     </div>
   );
 }
