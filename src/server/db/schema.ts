@@ -105,3 +105,124 @@ export const venueSignals = pgTable("venue_signals", {
   category: text("category").notNull(),
   value: text("value").notNull(),
 });
+
+// ─── V2 Refresh ──────────────────────────────────────────────────
+
+export const sourceOwners = pgTable("source_owners", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id")
+    .notNull()
+    .references(() => cities.id),
+  name: text("name").notNull(),
+  slug: text("slug").notNull(),
+  kind: text("kind").notNull(),
+  notes: text("notes").notNull().default(""),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull(),
+});
+
+export const sourceTargets = pgTable("source_targets", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id")
+    .notNull()
+    .references(() => sourceOwners.id),
+  cityId: text("city_id")
+    .notNull()
+    .references(() => cities.id),
+  url: text("url").notNull(),
+  sourceType: text("source_type").notNull(),
+  parserStrategy: text("parser_strategy").notNull(),
+  trustLevel: text("trust_level").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  confidenceAdjustment: integer("confidence_adjustment").notNull().default(0),
+  healthStatus: text("health_status").notNull().default("healthy"),
+  refreshCadence: text("refresh_cadence").notNull().default("daily"),
+  lastFetchedAt: timestamp("last_fetched_at", { mode: "string" }),
+  lastSuccessfulRunAt: timestamp("last_successful_run_at", { mode: "string" }),
+  lastFailureAt: timestamp("last_failure_at", { mode: "string" }),
+  lastFailureReason: text("last_failure_reason"),
+  notes: text("notes").notNull().default(""),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull(),
+});
+
+export const refreshRuns = pgTable("refresh_runs", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id")
+    .notNull()
+    .references(() => cities.id),
+  trigger: text("trigger").notNull(),
+  status: text("status").notNull(),
+  triggeredBy: text("triggered_by").notNull(),
+  startedAt: timestamp("started_at", { mode: "string" }),
+  finishedAt: timestamp("finished_at", { mode: "string" }),
+  sourceTargetsChecked: integer("source_targets_checked").notNull().default(0),
+  sourceTargetsFailed: integer("source_targets_failed").notNull().default(0),
+  draftsCreated: integer("drafts_created").notNull().default(0),
+  updatesProposed: integer("updates_proposed").notNull().default(0),
+  duplicatesFlagged: integer("duplicates_flagged").notNull().default(0),
+  staleTasksCreated: integer("stale_tasks_created").notNull().default(0),
+  errorSummary: text("error_summary"),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+});
+
+export const refreshRunLogs = pgTable("refresh_run_logs", {
+  id: text("id").primaryKey(),
+  runId: text("run_id")
+    .notNull()
+    .references(() => refreshRuns.id),
+  sourceTargetId: text("source_target_id"),
+  level: text("level").notNull(),
+  message: text("message").notNull(),
+  metadata: text("metadata"), // JSON string
+  createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+});
+
+export const reviewItems = pgTable("review_items", {
+  id: text("id").primaryKey(),
+  cityId: text("city_id")
+    .notNull()
+    .references(() => cities.id),
+  runId: text("run_id")
+    .notNull()
+    .references(() => refreshRuns.id),
+  sourceTargetId: text("source_target_id")
+    .notNull()
+    .references(() => sourceTargets.id),
+  lane: text("lane").notNull(),
+  status: text("status").notNull(),
+  priority: integer("priority").notNull().default(0),
+  confidence: integer("confidence").notNull().default(0), // stored as 0-100 integer
+  confidenceReasons: text("confidence_reasons").array().notNull(),
+  targetEntityType: text("target_entity_type").notNull(),
+  targetEntityId: text("target_entity_id"),
+  matchFingerprint: text("match_fingerprint").notNull(),
+  normalizedDraft: text("normalized_draft").notNull(), // JSON string
+  fieldDiffs: text("field_diffs"), // JSON string
+  linkedDrafts: text("linked_drafts").notNull().default("[]"), // JSON string
+  conflicts: text("conflicts"), // JSON string
+  evidence: text("evidence").notNull(), // JSON string
+  parserVersion: text("parser_version").notNull(),
+  fetchTimestamp: timestamp("fetch_timestamp", { mode: "string" }).notNull(),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { mode: "string" }),
+  rejectionReason: text("rejection_reason"),
+  reviewNotes: text("review_notes"),
+  publishedEntityId: text("published_entity_id"),
+  publishedSourceId: text("published_source_id"),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "string" }).notNull(),
+});
+
+export const reviewDecisionHistory = pgTable("review_decision_history", {
+  id: text("id").primaryKey(),
+  reviewItemId: text("review_item_id")
+    .notNull()
+    .references(() => reviewItems.id),
+  decision: text("decision").notNull(),
+  fieldName: text("field_name"),
+  reason: text("reason"),
+  notes: text("notes"),
+  reviewedBy: text("reviewed_by"),
+  createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+});
