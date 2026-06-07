@@ -353,6 +353,32 @@ review status, or ingestion errors.
 Recommendation ranking can use source confidence and freshness as soft
 tie-breakers. Taste match and discovery value remain primary.
 
+## Searchable Techno Sub-Genres
+
+Add `melodic`, `groovy`, `hard`, and `trance` as first-class, searchable techno
+sub-genres alongside the existing free-form `styles` values.
+
+- Treat these as canonical style tags on events and artists (the existing
+  `styles: string[]` columns already hold them — no schema change required).
+- Expose them in the public style filter (`src/components/dashboard-shell.tsx`)
+  so users can narrow to a techno sub-genre, and in taste-profile style
+  selection.
+- Parsers and the review queue should normalize incoming style text to these
+  canonical tags (e.g. "melodic techno" → `melodic`) so refreshed events are
+  searchable under the same vocabulary as hand-entered ones.
+- Keep the vocabulary open: these four are seeded canonical tags, not a closed
+  enum. Free-form styles remain allowed; canonical tags just get reliable
+  filtering and consistent labels.
+
+Acceptance criteria:
+
+- [ ] `melodic`, `groovy`, `hard`, and `trance` are selectable in the public
+      style filter.
+- [ ] Events/artists tagged with these styles are returned when filtering by
+      them.
+- [ ] Parser/review normalization maps common variants to the canonical tags.
+- [ ] No catalog schema migration is required (reuses `styles`).
+
 ## Source Health
 
 In v2 MVP, source health is **manual** plus raw counters:

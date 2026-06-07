@@ -389,12 +389,20 @@ export function AdminCatalog() {
   return (
     <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
       <header className="rise border-b-2 border-rule-strong pb-7">
-        <Link
-          href="/"
-          className="font-mono text-xs uppercase tracking-[0.24em] text-signal underline decoration-rule-strong underline-offset-4"
-        >
-          Back to dashboard
-        </Link>
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <Link
+            href="/"
+            className="font-mono text-xs uppercase tracking-[0.24em] text-signal underline decoration-rule-strong underline-offset-4"
+          >
+            Back to dashboard
+          </Link>
+          <Link
+            href="/admin/sources"
+            className="font-mono text-xs uppercase tracking-[0.24em] text-signal underline decoration-rule-strong underline-offset-4"
+          >
+            Source targets
+          </Link>
+        </div>
         <h1 className="mt-4 font-display text-[clamp(3rem,10vw,7rem)] uppercase leading-[0.84] text-ink">
           Admin Catalog
         </h1>
