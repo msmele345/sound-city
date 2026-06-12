@@ -1,3 +1,6 @@
+import { createDb } from "../db/client";
+import { createDrizzleRefreshStore } from "./drizzle-refresh-store";
+import { createSeedRefreshStore } from "./store";
 import type {
   CreateRefreshRunInput,
   CreateReviewItemInput,
@@ -69,3 +72,21 @@ export type RefreshStore = {
     decision: Omit<ReviewDecisionRecord, "id" | "createdAt">,
   ): Promise<ReviewDecisionRecord>;
 };
+
+let fallbackStore: RefreshStore | null = null;
+let databaseStore: RefreshStore | null = null;
+
+/**
+ * Returns the Drizzle-backed refresh store when `DATABASE_URL` is set and an
+ * in-memory seed store otherwise, mirroring `getCatalogStore`. The seed store
+ * keeps refresh admin usable in local dev and tests without a database.
+ */
+export function getRefreshStore(): RefreshStore {
+  if (process.env.DATABASE_URL) {
+    databaseStore ??= createDrizzleRefreshStore(createDb());
+    return databaseStore;
+  }
+
+  fallbackStore ??= createSeedRefreshStore();
+  return fallbackStore;
+}

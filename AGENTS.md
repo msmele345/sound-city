@@ -28,6 +28,20 @@ components, read @docs/ux-redesign.md for the design invariants, the
 1. TDD on any new feature code
 2. Red gren refactor. Reference the /tdd skill and follow it
 
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
 # Git Strategy and Instructions
 - Create feature branches off of develop for each new feature or task. Name branches using the format `feature/short-description` (e.g., `feature/spotify-integration`).
 - Git Strategy is Git Flow with the following branches:
