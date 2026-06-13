@@ -27,6 +27,8 @@ async function createDevSourceTarget() {
     }),
   );
   const ownerBody = await ownerResponse.json();
+  expect(ownerResponse.status, JSON.stringify(ownerBody)).toBe(201);
+  expect(ownerBody.owner, JSON.stringify(ownerBody)).toBeDefined();
 
   const targetResponse = await POSTSourceTargets(
     requestFor("/api/admin/source-targets", {
@@ -55,12 +57,30 @@ async function createDevSourceTarget() {
 
 describe("admin refresh-runs route handlers", () => {
   const originalAdminSecret = process.env.ADMIN_SECRET;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalVercelEnv = process.env.VERCEL_ENV;
+
+  beforeEach(() => {
+    delete process.env.ADMIN_SECRET;
+    delete process.env.DATABASE_URL;
+    delete process.env.VERCEL_ENV;
+  });
 
   afterEach(() => {
     if (originalAdminSecret) {
       process.env.ADMIN_SECRET = originalAdminSecret;
     } else {
       delete process.env.ADMIN_SECRET;
+    }
+    if (originalDatabaseUrl) {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    } else {
+      delete process.env.DATABASE_URL;
+    }
+    if (originalVercelEnv) {
+      process.env.VERCEL_ENV = originalVercelEnv;
+    } else {
+      delete process.env.VERCEL_ENV;
     }
   });
 
