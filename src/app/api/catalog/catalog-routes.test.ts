@@ -10,6 +10,36 @@ function requestFor(path: string) {
 }
 
 describe("catalog route handlers", () => {
+  const originalAdminSecret = process.env.ADMIN_SECRET;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalVercelEnv = process.env.VERCEL_ENV;
+
+  beforeEach(() => {
+    delete process.env.ADMIN_SECRET;
+    delete process.env.DATABASE_URL;
+    delete process.env.VERCEL_ENV;
+  });
+
+  afterEach(() => {
+    if (originalAdminSecret) {
+      process.env.ADMIN_SECRET = originalAdminSecret;
+    } else {
+      delete process.env.ADMIN_SECRET;
+    }
+
+    if (originalDatabaseUrl) {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    } else {
+      delete process.env.DATABASE_URL;
+    }
+
+    if (originalVercelEnv) {
+      process.env.VERCEL_ENV = originalVercelEnv;
+    } else {
+      delete process.env.VERCEL_ENV;
+    }
+  });
+
   it("returns city-scoped Chicago events with source provenance", async () => {
     const response = await getEvents(requestFor("/api/catalog/events?city=chicago"));
     const body = await response.json();

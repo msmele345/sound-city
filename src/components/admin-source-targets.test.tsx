@@ -179,4 +179,104 @@ describe("AdminSourceTargets", () => {
       }),
     );
   });
+
+  it("runs a manual refresh and shows run logs with review lanes", async () => {
+    const user = userEvent.setup();
+    const refreshBody = {
+      runs: [
+        {
+          id: "refresh_run_city_chicago_1",
+          cityId: "city_chicago",
+          trigger: "manual",
+          status: "succeeded",
+          triggeredBy: "admin-secret",
+          startedAt: "2026-06-12T10:00:00.000Z",
+          finishedAt: "2026-06-12T10:00:01.000Z",
+          sourceTargetsChecked: 1,
+          sourceTargetsFailed: 0,
+          draftsCreated: 1,
+          updatesProposed: 1,
+          duplicatesFlagged: 1,
+          staleTasksCreated: 1,
+          errorSummary: null,
+          createdAt: "2026-06-12T10:00:00.000Z",
+        },
+      ],
+      logsByRun: {
+        refresh_run_city_chicago_1: [
+          {
+            id: "log_1",
+            runId: "refresh_run_city_chicago_1",
+            sourceTargetId: "source_target_smartbar_calendar",
+            level: "info",
+            message: "Dev parser created 4 review items",
+            metadata: null,
+            createdAt: "2026-06-12T10:00:01.000Z",
+          },
+        ],
+      },
+      reviewItems: [
+        {
+          id: "review_item_1",
+          runId: "refresh_run_city_chicago_1",
+          lane: "new-event",
+          status: "pending",
+          priority: 80,
+          confidence: 86,
+          normalizedDraft: { title: "Late Shift Control Room" },
+          evidence: { sourceUrls: ["https://fixtures.test"], excerpts: [], contentHashes: [] },
+        },
+        {
+          id: "review_item_2",
+          runId: "refresh_run_city_chicago_1",
+          lane: "proposed-update",
+          status: "pending",
+          priority: 70,
+          confidence: 78,
+          normalizedDraft: { title: "Bunker Signal" },
+          evidence: { sourceUrls: ["https://fixtures.test"], excerpts: [], contentHashes: [] },
+        },
+      ],
+    };
+
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/admin/source-targets?city=chicago") {
+        return Promise.resolve({ ok: true, json: async () => refreshSnapshot });
+      }
+      if (url === "/api/admin/refresh-runs?city=chicago" && !init?.method) {
+        return Promise.resolve({ ok: true, json: async () => refreshBody });
+      }
+      if (
+        url === "/api/admin/refresh-runs?city=chicago" &&
+        init?.method === "POST"
+      ) {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({
+            run: refreshBody.runs[0],
+            logs: refreshBody.logsByRun.refresh_run_city_chicago_1,
+            reviewItems: refreshBody.reviewItems,
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(<AdminSourceTargets allowDevParser />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /run refresh/i }),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/refresh-runs?city=chicago",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(await screen.findByText(/dev parser created 4 review items/i)).toBeInTheDocument();
+    expect(screen.getByText(/new event/i)).toBeInTheDocument();
+    expect(screen.getByText(/late shift control room/i)).toBeInTheDocument();
+    expect(screen.getByText(/proposed update/i)).toBeInTheDocument();
+    expect(screen.getByText(/bunker signal/i)).toBeInTheDocument();
+  });
 });

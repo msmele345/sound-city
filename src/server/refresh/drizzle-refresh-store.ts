@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 
 import type { RefreshStore } from "./refresh-store";
@@ -167,6 +168,10 @@ function requireWriter(db: RefreshDb): RefreshDbWriter {
     throw new Error("Refresh write operations require a Drizzle database");
   }
   return db as RefreshDbWriter;
+}
+
+function uniqueId(prefix: string) {
+  return `${prefix}_${randomUUID()}`;
 }
 
 // ── Record mapping ─────────────────────────────────────────────────
@@ -382,7 +387,7 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
 
     async createRefreshRun(input) {
       const writer = requireWriter(db);
-      const id = `refresh_run_${input.cityId}_${Date.now()}`;
+      const id = uniqueId(`refresh_run_${input.cityId}`);
       const now = new Date().toISOString();
       await writer.insert(schema.refreshRuns).values({
         id,
@@ -438,7 +443,7 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
 
     async createRunLog(input) {
       const writer = requireWriter(db);
-      const id = `run_log_${input.runId}_${Date.now()}`;
+      const id = uniqueId(`run_log_${input.runId}`);
       const now = new Date().toISOString();
       await writer.insert(schema.refreshRunLogs).values({
         id,
@@ -468,7 +473,7 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
 
     async createReviewItem(input) {
       const writer = requireWriter(db);
-      const id = `review_item_${input.runId}_${Date.now()}`;
+      const id = uniqueId(`review_item_${input.runId}`);
       const now = new Date().toISOString();
       await writer.insert(schema.reviewItems).values({
         id,
@@ -545,7 +550,7 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
 
     async createDecisionHistory(input) {
       const writer = requireWriter(db);
-      const id = `decision_${input.reviewItemId}_${Date.now()}`;
+      const id = uniqueId(`decision_${input.reviewItemId}`);
       const now = new Date().toISOString();
       await writer.insert(schema.reviewDecisionHistory).values({
         id,

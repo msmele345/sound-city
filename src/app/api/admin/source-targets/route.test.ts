@@ -25,17 +25,38 @@ async function createOwner(name: string, slug: string) {
       }),
     }),
   );
-  return response;
+  const body = await response.json();
+  expect(response.status, JSON.stringify(body)).toBe(201);
+  expect(body.owner, JSON.stringify(body)).toBeDefined();
+  return body.owner as { id: string; name: string; kind: string };
 }
 
 describe("admin source-targets route handlers", () => {
   const originalAdminSecret = process.env.ADMIN_SECRET;
+  const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalVercelEnv = process.env.VERCEL_ENV;
+
+  beforeEach(() => {
+    delete process.env.ADMIN_SECRET;
+    delete process.env.DATABASE_URL;
+    delete process.env.VERCEL_ENV;
+  });
 
   afterEach(() => {
     if (originalAdminSecret) {
       process.env.ADMIN_SECRET = originalAdminSecret;
     } else {
       delete process.env.ADMIN_SECRET;
+    }
+    if (originalDatabaseUrl) {
+      process.env.DATABASE_URL = originalDatabaseUrl;
+    } else {
+      delete process.env.DATABASE_URL;
+    }
+    if (originalVercelEnv) {
+      process.env.VERCEL_ENV = originalVercelEnv;
+    } else {
+      delete process.env.VERCEL_ENV;
     }
   });
 
@@ -63,10 +84,8 @@ describe("admin source-targets route handlers", () => {
   });
 
   it("creates owners and targets, groups them, toggles, and deletes", async () => {
-    const ownerResponse = await createOwner("smartbar", "smartbar");
-    const ownerBody = await ownerResponse.json();
-    expect(ownerResponse.status).toBe(201);
-    expect(ownerBody.owner).toMatchObject({ name: "smartbar", kind: "venue" });
+    const owner = await createOwner("smartbar", "smartbar");
+    expect(owner).toMatchObject({ name: "smartbar", kind: "venue" });
 
     const targetResponse = await POST(
       requestFor("/api/admin/source-targets", {
@@ -75,7 +94,7 @@ describe("admin source-targets route handlers", () => {
           entity: "sourceTarget",
           input: {
             cityId: "city_chicago",
-            ownerId: ownerBody.owner.id,
+            ownerId: owner.id,
             url: "https://smartbarchicago.com/calendar",
             sourceType: "official-venue-calendar",
             parserStrategy: "venue-calendar",
@@ -92,7 +111,7 @@ describe("admin source-targets route handlers", () => {
     const targetBody = await targetResponse.json();
     expect(targetResponse.status).toBe(201);
     expect(targetBody.target).toMatchObject({
-      ownerId: ownerBody.owner.id,
+      ownerId: owner.id,
       parserStrategy: "venue-calendar",
       enabled: true,
     });
@@ -103,7 +122,7 @@ describe("admin source-targets route handlers", () => {
     const listBody = await listResponse.json();
     expect(listBody.owners).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: ownerBody.owner.id }),
+        expect.objectContaining({ id: owner.id }),
       ]),
     );
     expect(listBody.targets).toEqual(
@@ -142,7 +161,7 @@ describe("admin source-targets route handlers", () => {
         method: "DELETE",
         body: JSON.stringify({
           entity: "sourceOwner",
-          id: ownerBody.owner.id,
+          id: owner.id,
         }),
       }),
     );
@@ -151,8 +170,7 @@ describe("admin source-targets route handlers", () => {
   });
 
   it("rejects a target with an invalid URL", async () => {
-    const ownerResponse = await createOwner("Podlasie Club", "podlasie-club");
-    const ownerBody = await ownerResponse.json();
+    const owner = await createOwner("Podlasie Club", "podlasie-club");
 
     const invalid = await POST(
       requestFor("/api/admin/source-targets", {
@@ -161,7 +179,7 @@ describe("admin source-targets route handlers", () => {
           entity: "sourceTarget",
           input: {
             cityId: "city_chicago",
-            ownerId: ownerBody.owner.id,
+            ownerId: owner.id,
             url: "not-a-url",
             sourceType: "official-venue-calendar",
             parserStrategy: "venue-calendar",
@@ -183,45 +201,34 @@ describe("admin source-targets route handlers", () => {
   });
 
   it("rejects the dev-static parser strategy in production", async () => {
-    const originalVercelEnv = process.env.VERCEL_ENV;
     process.env.VERCEL_ENV = "production";
 
-    try {
-      const ownerResponse = await createOwner("Prod Owner", "prod-owner");
-      const ownerBody = await ownerResponse.json();
-
-      const blocked = await POST(
-        requestFor("/api/admin/source-targets", {
-          method: "POST",
-          body: JSON.stringify({
-            entity: "sourceTarget",
-            input: {
-              cityId: "city_chicago",
-              ownerId: ownerBody.owner.id,
-              url: "https://example.com/fixture",
-              sourceType: "other",
-              parserStrategy: "dev-static",
-              trustLevel: "experimental",
-              enabled: true,
-              confidenceAdjustment: 0,
-              healthStatus: "healthy",
-              refreshCadence: "daily",
-              notes: "",
-            },
-          }),
+    const owner = await createOwner("Prod Owner", "prod-owner");
+    const blocked = await POST(
+      requestFor("/api/admin/source-targets", {
+        method: "POST",
+        body: JSON.stringify({
+          entity: "sourceTarget",
+          input: {
+            cityId: "city_chicago",
+            ownerId: owner.id,
+            url: "https://example.com/fixture",
+            sourceType: "other",
+            parserStrategy: "dev-static",
+            trustLevel: "experimental",
+            enabled: true,
+            confidenceAdjustment: 0,
+            healthStatus: "healthy",
+            refreshCadence: "daily",
+            notes: "",
+          },
         }),
-      );
+      }),
+    );
 
-      expect(blocked.status).toBe(400);
-      expect(await blocked.json()).toMatchObject({
-        error: expect.stringMatching(/dev-static/i),
-      });
-    } finally {
-      if (originalVercelEnv) {
-        process.env.VERCEL_ENV = originalVercelEnv;
-      } else {
-        delete process.env.VERCEL_ENV;
-      }
-    }
+    expect(blocked.status).toBe(400);
+    expect(await blocked.json()).toMatchObject({
+      error: expect.stringMatching(/dev-static/i),
+    });
   });
 });

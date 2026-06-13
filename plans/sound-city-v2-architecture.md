@@ -429,14 +429,14 @@ items from fixture data.
 
 Acceptance criteria:
 
-- [ ] Admins can run refresh manually.
-- [ ] A refresh run record is created with status and metrics.
-- [ ] The engine always reaches a terminal status (try/finally); orphaned
+- [x] Admins can run refresh manually.
+- [x] A refresh run record is created with status and metrics.
+- [x] The engine always reaches a terminal status (try/finally); orphaned
       `running` runs are reconciled on read.
-- [ ] Dev parser creates new event, proposed update, possible duplicate, and
+- [x] Dev parser creates new event, proposed update, possible duplicate, and
       stale task examples.
-- [ ] Review lanes populate from durable review items.
-- [ ] Run logs and errors are visible in Admin.
+- [x] Review lanes populate from durable review items.
+- [x] Run logs and errors are visible in Admin.
 
 ### Phase 4: Review Queue And Publishing
 
