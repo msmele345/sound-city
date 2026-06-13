@@ -55,9 +55,54 @@ type SourceTargetRecord = {
   notes: string;
 };
 
-type RefreshSnapshot = {
+type SourceSnapshot = {
   owners: SourceOwnerRecord[];
   targets: SourceTargetRecord[];
+};
+
+type RefreshRunRecord = {
+  id: string;
+  status: "pending" | "running" | "succeeded" | "failed" | "partial";
+  startedAt: string | null;
+  finishedAt: string | null;
+  sourceTargetsChecked: number;
+  sourceTargetsFailed: number;
+  draftsCreated: number;
+  updatesProposed: number;
+  duplicatesFlagged: number;
+  staleTasksCreated: number;
+  errorSummary: string | null;
+};
+
+type RefreshRunLogRecord = {
+  id: string;
+  runId: string;
+  level: "info" | "warning" | "error";
+  message: string;
+  createdAt: string;
+};
+
+type ReviewLane =
+  | "new-event"
+  | "proposed-update"
+  | "possible-duplicate"
+  | "stale-task"
+  | "source-health";
+
+type ReviewItemRecord = {
+  id: string;
+  runId: string;
+  lane: ReviewLane;
+  status: "pending" | "approved" | "rejected";
+  priority: number;
+  confidence: number;
+  normalizedDraft: Record<string, unknown>;
+};
+
+type RefreshRunSnapshot = {
+  runs: RefreshRunRecord[];
+  logsByRun: Record<string, RefreshRunLogRecord[]>;
+  reviewItems: ReviewItemRecord[];
 };
 
 type RefreshEntity = "sourceOwner" | "sourceTarget";
@@ -97,6 +142,13 @@ const healthStatuses: HealthStatus[] = [
 
 const adminSecretHeader = "x-sound-city-admin-secret";
 const adminSecretStorageKey = "sound-city.admin-secret.v1";
+const reviewLanes: ReviewLane[] = [
+  "new-event",
+  "proposed-update",
+  "possible-duplicate",
+  "stale-task",
+  "source-health",
+];
 
 class RefreshRequestError extends Error {
   constructor(
@@ -222,6 +274,25 @@ function SectionHeading({ title, index }: { title: string; index: string }) {
   );
 }
 
+function labelFromKebab(value: string) {
+  return value.replaceAll("-", " ");
+}
+
+function draftTitle(item: ReviewItemRecord) {
+  const title = item.normalizedDraft.title;
+  return typeof title === "string" && title.trim() ? title : "Untitled draft";
+}
+
+function metricLine(run: RefreshRunRecord) {
+  return [
+    `${run.sourceTargetsChecked} target`,
+    `${run.draftsCreated} new`,
+    `${run.updatesProposed} update`,
+    `${run.duplicatesFlagged} dupe`,
+    `${run.staleTasksCreated} stale`,
+  ].join(" / ");
+}
+
 export function AdminSourceTargets({
   allowDevParser = false,
 }: {
@@ -242,9 +313,14 @@ export function AdminSourceTargets({
     return window.sessionStorage.getItem(adminSecretStorageKey) ?? "";
   });
   const [requiresSecret, setRequiresSecret] = useState(false);
-  const [snapshot, setSnapshot] = useState<RefreshSnapshot>({
+  const [snapshot, setSnapshot] = useState<SourceSnapshot>({
     owners: [],
     targets: [],
+  });
+  const [refreshSnapshot, setRefreshSnapshot] = useState<RefreshRunSnapshot>({
+    runs: [],
+    logsByRun: {},
+    reviewItems: [],
   });
   const [status, setStatus] = useState("Loading source targets");
 
@@ -270,7 +346,7 @@ export function AdminSourceTargets({
       const response = await fetch("/api/admin/source-targets?city=chicago", {
         headers: adminHeaders(secret),
       });
-      const body = (await response.json()) as RefreshSnapshot & {
+      const body = (await response.json()) as SourceSnapshot & {
         error?: string;
       };
       if (!response.ok) {
@@ -284,11 +360,36 @@ export function AdminSourceTargets({
     [adminHeaders, adminSecret],
   );
 
+  const readRefreshRuns = useCallback(
+    async (secret = adminSecret) => {
+      const response = await fetch("/api/admin/refresh-runs?city=chicago", {
+        headers: adminHeaders(secret),
+      });
+      const body = (await response.json()) as Partial<RefreshRunSnapshot> & {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new RefreshRequestError(
+          response.status,
+          body.error ?? "Refresh runs unavailable",
+        );
+      }
+      return {
+        runs: body.runs ?? [],
+        logsByRun: body.logsByRun ?? {},
+        reviewItems: body.reviewItems ?? [],
+      };
+    },
+    [adminHeaders, adminSecret],
+  );
+
   const loadSources = useCallback(
     async (secret = adminSecret) => {
       try {
         const body = await readSources(secret);
+        const refreshes = await readRefreshRuns(secret);
         setSnapshot({ owners: body.owners, targets: body.targets });
+        setRefreshSnapshot(refreshes);
         setStatus("Source targets ready");
         setRequiresSecret(false);
       } catch (error) {
@@ -298,16 +399,17 @@ export function AdminSourceTargets({
         throw error;
       }
     },
-    [adminSecret, readSources],
+    [adminSecret, readRefreshRuns, readSources],
   );
 
   useEffect(() => {
     let active = true;
 
-    void readSources(adminSecret)
-      .then((body) => {
+    void Promise.all([readSources(adminSecret), readRefreshRuns(adminSecret)])
+      .then(([body, refreshes]) => {
         if (active) {
           setSnapshot({ owners: body.owners, targets: body.targets });
+          setRefreshSnapshot(refreshes);
           setStatus("Source targets ready");
           setRequiresSecret(false);
         }
@@ -326,7 +428,7 @@ export function AdminSourceTargets({
     return () => {
       active = false;
     };
-  }, [adminSecret, readSources]);
+  }, [adminSecret, readRefreshRuns, readSources]);
 
   async function mutate(
     method: "DELETE" | "PATCH" | "POST",
@@ -385,6 +487,46 @@ export function AdminSourceTargets({
       );
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Toggle failed");
+    }
+  }
+
+  async function runRefresh() {
+    try {
+      setStatus("Running refresh");
+      const response = await fetch("/api/admin/refresh-runs?city=chicago", {
+        method: "POST",
+        headers: adminHeaders(),
+      });
+      const body = (await response.json()) as {
+        run?: RefreshRunRecord;
+        logs?: RefreshRunLogRecord[];
+        reviewItems?: ReviewItemRecord[];
+        error?: string;
+      };
+      if (!response.ok || !body.run) {
+        if (response.status === 401) {
+          setRequiresSecret(true);
+        }
+        throw new RefreshRequestError(
+          response.status,
+          body.error ?? "Refresh run failed",
+        );
+      }
+
+      setRefreshSnapshot((current) => ({
+        runs: [body.run!, ...current.runs.filter((run) => run.id !== body.run!.id)],
+        logsByRun: {
+          ...current.logsByRun,
+          [body.run!.id]: body.logs ?? [],
+        },
+        reviewItems: [
+          ...(body.reviewItems ?? []),
+          ...current.reviewItems.filter((item) => item.runId !== body.run!.id),
+        ],
+      }));
+      setStatus(`Refresh ${body.run.status}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Refresh run failed");
     }
   }
 
@@ -465,6 +607,22 @@ export function AdminSourceTargets({
         <main className="mt-10 grid gap-12 lg:grid-cols-[0.95fr_1.25fr]">
           <section aria-labelledby="create-heading" className="space-y-8">
             <SectionHeading title="Configure" index="Sources / 01" />
+
+            <section aria-label="Manual refresh" className="border-b border-rule pb-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-display text-2xl uppercase leading-none text-ink">
+                    Refresh Run
+                  </h3>
+                  <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+                    {refreshSnapshot.runs[0]
+                      ? `${refreshSnapshot.runs[0].status} / ${metricLine(refreshSnapshot.runs[0])}`
+                      : "No runs recorded"}
+                  </p>
+                </div>
+                <RowButton onClick={runRefresh}>Run refresh</RowButton>
+              </div>
+            </section>
 
             <form
               aria-label="Create source owner"
@@ -589,6 +747,74 @@ export function AdminSourceTargets({
           </section>
 
           <section aria-labelledby="lists-heading" className="space-y-10">
+            <SectionHeading title="Refresh Review" index="Runs / 02" />
+
+            <section aria-label="Refresh run history" className="border-b border-rule pb-6">
+              {refreshSnapshot.runs.length === 0 ? (
+                <p className="text-sm text-ink-dim">No refresh runs yet.</p>
+              ) : (
+                <ol>
+                  {refreshSnapshot.runs.slice(0, 3).map((run) => (
+                    <li key={run.id} className="border-t border-rule py-4 first:border-t-0 first:pt-0">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+                          {run.status} / {metricLine(run)}
+                        </p>
+                        <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+                          {run.finishedAt ?? run.startedAt ?? "pending"}
+                        </p>
+                      </div>
+                      {run.errorSummary ? (
+                        <p className="mt-2 text-sm text-ink-dim">{run.errorSummary}</p>
+                      ) : null}
+                      <ol className="mt-3 space-y-2">
+                        {(refreshSnapshot.logsByRun[run.id] ?? []).map((log) => (
+                          <li
+                            key={log.id}
+                            className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim"
+                          >
+                            {log.level} / {log.message}
+                          </li>
+                        ))}
+                      </ol>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+
+            <section aria-label="Review lanes" className="border-b border-rule pb-6">
+              <div className="grid gap-5 sm:grid-cols-2">
+                {reviewLanes.map((lane) => {
+                  const items = refreshSnapshot.reviewItems.filter(
+                    (item) => item.lane === lane,
+                  );
+                  return (
+                    <section key={lane} aria-label={`${labelFromKebab(lane)} lane`}>
+                      <h3 className="font-display text-xl uppercase text-ink">
+                        {labelFromKebab(lane)}
+                      </h3>
+                      <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+                        {items.length} pending
+                      </p>
+                      <ol className="mt-2">
+                        {items.slice(0, 3).map((item) => (
+                          <li key={item.id} className="border-t border-rule py-2">
+                            <p className="truncate text-sm text-ink">
+                              {draftTitle(item)}
+                            </p>
+                            <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+                              {item.status} / {item.confidence}% confidence
+                            </p>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  );
+                })}
+              </div>
+            </section>
+
             <SectionHeading title="Targets by Owner" index="Review / 02" />
 
             {snapshot.owners.length === 0 ? (
