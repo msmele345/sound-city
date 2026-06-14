@@ -203,5 +203,12 @@ export function createSeedRefreshStore(
       snapshot.decisionHistory.push(decision);
       return decision;
     },
+
+    // ── Transaction ────────────────────────────────────────────
+    async withTransaction(fn) {
+      // Best-effort: seed store mutations are not rollback-safe.
+      // If the callback throws, prior mutations persist in the snapshot.
+      return fn(this);
+    },
   };
 }
