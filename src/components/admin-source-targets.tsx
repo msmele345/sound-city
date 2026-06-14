@@ -97,6 +97,14 @@ type ReviewItemRecord = {
   priority: number;
   confidence: number;
   normalizedDraft: Record<string, unknown>;
+  fieldDiffs?: Record<string, { current: unknown; proposed: unknown }> | null;
+  evidence?: { sourceUrls: string[]; excerpts: string[]; contentHashes: string[] };
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  rejectionReason?: string | null;
+  reviewNotes?: string | null;
+  publishedEntityId?: string | null;
+  publishedSourceId?: string | null;
 };
 
 type RefreshRunSnapshot = {
@@ -292,6 +300,340 @@ function metricLine(run: RefreshRunRecord) {
     `${run.staleTasksCreated} stale`,
   ].join(" / ");
 }
+
+// ─── Review Lane Panel ──────────────────────────────────────────────
+
+function ReviewLanePanel({
+  lane,
+  items,
+  pendingCount,
+  onApprove,
+  onReject,
+  onUpdateDraft,
+}: {
+  lane: ReviewLane;
+  items: ReviewItemRecord[];
+  pendingCount: number;
+  onApprove(
+    id: string,
+    extra?: {
+      acceptedFields?: string[];
+      editedDraft?: Record<string, unknown>;
+    },
+  ): void;
+  onReject(id: string, reason: string, notes?: string): void;
+  onUpdateDraft(id: string, draft: Record<string, unknown>): void;
+}) {
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [selectedFields, setSelectedFields] = useState<Record<string, string[]>>({});
+
+  function toggleExpanded(itemId: string) {
+    setExpandedItemId((current) => (current === itemId ? null : itemId));
+  }
+
+  function toggleField(itemId: string, field: string) {
+    setSelectedFields((prev) => {
+      const current = prev[itemId] ?? [];
+      const next = current.includes(field)
+        ? current.filter((f) => f !== field)
+        : [...current, field];
+      return { ...prev, [itemId]: next };
+    });
+  }
+
+  function draftFromForm(form: FormData) {
+    const draft: Record<string, unknown> = {};
+    for (const [key, value] of form.entries()) {
+      if (
+        (key === "styles" || key === "artistSlugs") &&
+        typeof value === "string"
+      ) {
+        try {
+          draft[key] = JSON.parse(value);
+        } catch {
+          draft[key] = value;
+        }
+      } else {
+        draft[key] = value;
+      }
+    }
+    return draft;
+  }
+
+  function handleEditSubmit(
+    event: FormEvent<HTMLFormElement>,
+    itemId: string,
+  ) {
+    event.preventDefault();
+    onUpdateDraft(itemId, draftFromForm(new FormData(event.currentTarget)));
+  }
+
+  return (
+    <section aria-label={`${labelFromKebab(lane)} lane`}>
+      <h3 className="font-display text-xl uppercase text-ink">
+        {labelFromKebab(lane)}
+      </h3>
+      <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+        {items.length} shown / {pendingCount} pending
+      </p>
+      {items.length === 0 ? (
+        <p className="mt-2 text-sm text-ink-dim">No items</p>
+      ) : (
+        <ol className="mt-2">
+          {items.map((item) => (
+            <li key={item.id} className="border-t border-rule py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(item.id)}
+                    className="truncate text-left text-sm text-ink hover:text-signal"
+                  >
+                    {draftTitle(item)}
+                  </button>
+                  <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+                    {item.status} / {item.confidence}% confidence
+                    {item.reviewedAt
+                      ? ` / reviewed ${item.reviewedAt.slice(0, 10)}`
+                      : ""}
+                  </p>
+                  {item.rejectionReason ? (
+                    <p className="mt-1 text-xs text-ink-dim">
+                      Rejected: {item.rejectionReason}
+                    </p>
+                  ) : null}
+                  {item.publishedEntityId ? (
+                    <p className="mt-1 font-mono text-[0.68rem] text-ink-dim">
+                      Published: {item.publishedEntityId}
+                    </p>
+                  ) : null}
+                </div>
+
+                {item.status === "pending" ? (
+                  <div className="flex shrink-0 gap-1">
+                    {item.lane === "proposed-update" && item.fieldDiffs ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const fields = selectedFields[item.id] ?? [];
+                            if (fields.length === 0) return;
+                            onApprove(item.id, { acceptedFields: fields });
+                          }}
+                          disabled={(selectedFields[item.id] ?? []).length === 0}
+                          className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel disabled:opacity-40"
+                        >
+                          Accept selected
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => onApprove(item.id)}
+                        className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    <RejectButton
+                      onReject={(reason, notes) =>
+                        onReject(item.id, reason, notes)
+                      }
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Expanded detail / edit form */}
+              {expandedItemId === item.id ? (
+                <div className="mt-3 border-t border-rule pt-3">
+                  {/* Field-level checkboxes for proposed-update */}
+                  {item.lane === "proposed-update" && item.fieldDiffs ? (
+                    <div className="mb-3">
+                      <p className="font-mono text-[0.62rem] uppercase tracking-[0.14em] text-ink-faint">
+                        Field changes
+                      </p>
+                      {Object.entries(item.fieldDiffs).map(([field, diff]) => (
+                        <label
+                          key={field}
+                          className="mt-2 flex items-center gap-2 font-mono text-[0.68rem] text-ink-dim"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={(selectedFields[item.id] ?? []).includes(
+                              field,
+                            )}
+                            onChange={() => toggleField(item.id, field)}
+                            className="accent-signal"
+                          />
+                          <span className="uppercase">{field}</span>
+                          <span className="text-ink-faint">
+                            {JSON.stringify(diff.current)} →{" "}
+                            {JSON.stringify(diff.proposed)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Editable draft form for pending items */}
+                  {item.status === "pending" ? (
+                    <form
+                      aria-label={`Edit ${draftTitle(item)}`}
+                      onSubmit={(e) => handleEditSubmit(e, item.id)}
+                    >
+                      <p className="mb-2 font-mono text-[0.62rem] uppercase tracking-[0.14em] text-ink-faint">
+                        Edit draft
+                      </p>
+                      <div className="grid gap-2">
+                        {Object.entries(item.normalizedDraft).map(
+                          ([key, value]) => (
+                            <label
+                              key={key}
+                              className="block font-mono text-[0.62rem] uppercase tracking-[0.12em] text-ink-faint"
+                            >
+                              {key}
+                              <input
+                                name={key}
+                                defaultValue={
+                                  typeof value === "string" ||
+                                  typeof value === "number"
+                                    ? String(value)
+                                    : Array.isArray(value)
+                                      ? JSON.stringify(value)
+                                      : ""
+                                }
+                                className="mt-1 w-full border border-rule bg-bg px-2 py-1 font-sans text-xs normal-case tracking-normal text-ink"
+                              />
+                            </label>
+                          ),
+                        )}
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="submit"
+                          className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel"
+                        >
+                          Save draft
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            const form = event.currentTarget.form;
+                            if (!form) return;
+                            onApprove(item.id, {
+                              editedDraft: draftFromForm(new FormData(form)),
+                            });
+                          }}
+                          className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel"
+                        >
+                          Approve with edits
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+
+                  {/* Evidence summary */}
+                  <div className="mt-3">
+                    <p className="font-mono text-[0.62rem] uppercase tracking-[0.14em] text-ink-faint">
+                      Evidence
+                    </p>
+                    {item.evidence && typeof item.evidence === "object" ? (
+                      <ul className="mt-1 space-y-1">
+                        {((item.evidence as Record<string, unknown>)
+                          .sourceUrls as string[])
+                          ?.slice(0, 2)
+                          .map((url: string, i: number) => (
+                            <li
+                              key={i}
+                              className="truncate font-mono text-[0.58rem] text-ink-dim"
+                            >
+                              {url}
+                            </li>
+                          ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function RejectButton({
+  onReject,
+}: {
+  onReject(reason: string, notes?: string): void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const reason = String(form.get("reason") ?? "").trim();
+    const notes = String(form.get("notes") ?? "").trim();
+    if (!reason) return;
+    onReject(reason, notes || undefined);
+    setOpen(false);
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-dim hover:bg-panel hover:text-signal"
+      >
+        Reject
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="ml-2 border border-rule p-2"
+      aria-label="Reject review item"
+    >
+      <label className="block font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-faint">
+        Reason *
+        <input
+          name="reason"
+          required
+          className="mt-1 w-full border border-rule bg-bg px-2 py-1 font-sans text-xs normal-case tracking-normal text-ink"
+        />
+      </label>
+      <label className="mt-1 block font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-faint">
+        Notes
+        <input
+          name="notes"
+          className="mt-1 w-full border border-rule bg-bg px-2 py-1 font-sans text-xs normal-case tracking-normal text-ink"
+        />
+      </label>
+      <div className="mt-2 flex gap-1">
+        <button
+          type="submit"
+          className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel"
+        >
+          Confirm
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-dim hover:bg-panel"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ─── AdminSourceTargets ─────────────────────────────────────────────
 
 export function AdminSourceTargets({
   allowDevParser = false,
@@ -527,6 +869,60 @@ export function AdminSourceTargets({
       setStatus(`Refresh ${body.run.status}`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Refresh run failed");
+    }
+  }
+
+  const [reviewStatusFilter, setReviewStatusFilter] = useState<
+    "pending" | "approved" | "rejected" | "all"
+  >("pending");
+
+  async function reviewAction(
+    action: "approve" | "reject",
+    itemId: string,
+    extra?: { acceptedFields?: string[]; editedDraft?: Record<string, unknown>; reason?: string; notes?: string },
+  ) {
+    try {
+      setStatus(`${action}ing review item`);
+      const response = await fetch("/api/admin/review-items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...adminHeaders() },
+        body: JSON.stringify({ action, id: itemId, ...extra }),
+      });
+      const body = (await response.json()) as {
+        reviewItem?: ReviewItemRecord;
+        error?: string;
+      };
+      if (!response.ok) {
+        if (response.status === 401) setRequiresSecret(true);
+        throw new Error(body.error ?? "Review action failed");
+      }
+      setStatus(`Review item ${action}d`);
+      await loadSources();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Review action failed");
+    }
+  }
+
+  async function updateDraft(itemId: string, draft: Record<string, unknown>) {
+    try {
+      setStatus("Updating draft");
+      const response = await fetch("/api/admin/review-items", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...adminHeaders() },
+        body: JSON.stringify({ id: itemId, input: { normalizedDraft: draft } }),
+      });
+      const body = (await response.json()) as {
+        reviewItem?: ReviewItemRecord;
+        error?: string;
+      };
+      if (!response.ok) {
+        if (response.status === 401) setRequiresSecret(true);
+        throw new Error(body.error ?? "Draft update failed");
+      }
+      setStatus("Draft updated");
+      await loadSources();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Draft update failed");
     }
   }
 
@@ -784,32 +1180,55 @@ export function AdminSourceTargets({
             </section>
 
             <section aria-label="Review lanes" className="border-b border-rule pb-6">
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <span className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+                  Show:
+                </span>
+                {(["pending", "approved", "rejected", "all"] as const).map(
+                  (filter) => (
+                    <button
+                      key={filter}
+                      type="button"
+                      onClick={() => setReviewStatusFilter(filter)}
+                      className={`border px-2 py-1 font-mono text-[0.68rem] uppercase tracking-[0.14em] transition-colors ${
+                        reviewStatusFilter === filter
+                          ? "border-signal text-signal"
+                          : "border-rule text-ink-dim hover:text-signal"
+                      }`}
+                    >
+                      {filter}
+                    </button>
+                  ),
+                )}
+              </div>
               <div className="grid gap-5 sm:grid-cols-2">
                 {reviewLanes.map((lane) => {
-                  const items = refreshSnapshot.reviewItems.filter(
+                  const allLaneItems = refreshSnapshot.reviewItems.filter(
                     (item) => item.lane === lane,
                   );
+                  const items =
+                    reviewStatusFilter === "all"
+                      ? allLaneItems
+                      : allLaneItems.filter(
+                          (item) => item.status === reviewStatusFilter,
+                        );
+                  const pendingCount = allLaneItems.filter(
+                    (item) => item.status === "pending",
+                  ).length;
                   return (
-                    <section key={lane} aria-label={`${labelFromKebab(lane)} lane`}>
-                      <h3 className="font-display text-xl uppercase text-ink">
-                        {labelFromKebab(lane)}
-                      </h3>
-                      <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
-                        {items.length} pending
-                      </p>
-                      <ol className="mt-2">
-                        {items.slice(0, 3).map((item) => (
-                          <li key={item.id} className="border-t border-rule py-2">
-                            <p className="truncate text-sm text-ink">
-                              {draftTitle(item)}
-                            </p>
-                            <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
-                              {item.status} / {item.confidence}% confidence
-                            </p>
-                          </li>
-                        ))}
-                      </ol>
-                    </section>
+                    <ReviewLanePanel
+                      key={lane}
+                      lane={lane}
+                      items={items}
+                      pendingCount={pendingCount}
+                      onApprove={(id, extra) =>
+                        reviewAction("approve", id, extra)
+                      }
+                      onReject={(id, reason, notes) =>
+                        reviewAction("reject", id, { reason, notes })
+                      }
+                      onUpdateDraft={updateDraft}
+                    />
                   );
                 })}
               </div>

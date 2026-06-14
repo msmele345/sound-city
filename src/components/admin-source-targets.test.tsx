@@ -279,4 +279,79 @@ describe("AdminSourceTargets", () => {
     expect(screen.getByText(/proposed update/i)).toBeInTheDocument();
     expect(screen.getByText(/bunker signal/i)).toBeInTheDocument();
   });
+
+  it("approves edits from the current draft form values", async () => {
+    const user = userEvent.setup();
+    const reviewItem = {
+      id: "review_item_edit",
+      runId: "refresh_run_city_chicago_1",
+      lane: "new-event",
+      status: "pending",
+      priority: 80,
+      confidence: 86,
+      normalizedDraft: {
+        title: "Original Warehouse Night",
+        venueSlug: "smartbar",
+        startsAt: "2026-06-13T22:00:00.000Z",
+        styles: ["house"],
+      },
+      evidence: {
+        sourceUrls: ["https://fixtures.test"],
+        excerpts: [],
+        contentHashes: [],
+      },
+    };
+    const refreshBody = {
+      runs: [],
+      logsByRun: {},
+      reviewItems: [reviewItem],
+    };
+
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/admin/source-targets?city=chicago") {
+        return Promise.resolve({ ok: true, json: async () => refreshSnapshot });
+      }
+      if (url === "/api/admin/refresh-runs?city=chicago") {
+        return Promise.resolve({ ok: true, json: async () => refreshBody });
+      }
+      if (url === "/api/admin/review-items" && init?.method === "POST") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            reviewItem: { ...reviewItem, status: "approved" },
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(<AdminSourceTargets allowDevParser />);
+
+    await user.click(await screen.findByText("Original Warehouse Night"));
+
+    const editForm = screen.getByRole("form", {
+      name: /edit original warehouse night/i,
+    });
+    const titleInput = within(editForm).getByLabelText("title");
+    await user.clear(titleInput);
+    await user.type(titleInput, "Revised Warehouse Night");
+    await user.click(
+      within(editForm).getByRole("button", { name: /approve with edits/i }),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/admin/review-items",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"title":"Revised Warehouse Night"'),
+      }),
+    );
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/admin/review-items",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"title":"Original Warehouse Night"'),
+      }),
+    );
+  });
 });

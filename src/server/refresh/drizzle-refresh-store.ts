@@ -135,7 +135,7 @@ export type RefreshDbReader = {
 
 type RefreshDbWriter = Pick<
   ReturnType<typeof createDb>,
-  "delete" | "insert" | "update"
+  "delete" | "insert" | "update" | "transaction"
 >;
 
 type RefreshDb = RefreshDbReader & Partial<RefreshDbWriter>;
@@ -563,6 +563,15 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         createdAt: now,
       });
       return { ...input, id, createdAt: now };
+    },
+
+    // ── Transaction ────────────────────────────────────────────
+    async withTransaction(fn) {
+      const writer = requireWriter(db);
+      return writer.transaction(async (tx) => {
+        const txStore = createDrizzleRefreshStore(tx);
+        return fn(txStore);
+      });
     },
   };
 }

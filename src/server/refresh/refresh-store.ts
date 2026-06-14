@@ -71,6 +71,9 @@ export type RefreshStore = {
   createDecisionHistory(
     decision: Omit<ReviewDecisionRecord, "id" | "createdAt">,
   ): Promise<ReviewDecisionRecord>;
+
+  // ── Transaction ──────────────────────────────────────────────
+  withTransaction<T>(fn: (store: RefreshStore) => Promise<T>): Promise<T>;
 };
 
 let fallbackStore: RefreshStore | null = null;
