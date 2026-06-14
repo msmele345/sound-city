@@ -41,6 +41,9 @@ type SourceTargetRow = {
   enabled: boolean;
   confidenceAdjustment: number;
   healthStatus: string;
+  failureCount: number;
+  rejectionCount: number;
+  duplicateCount: number;
   refreshCadence: string;
   lastFetchedAt: string | Date | null;
   lastSuccessfulRunAt: string | Date | null;
@@ -83,7 +86,7 @@ type ReviewItemRow = {
   id: string;
   cityId: string;
   runId: string;
-  sourceTargetId: string;
+  sourceTargetId: string | null;
   lane: string;
   status: string;
   priority: number;
@@ -192,6 +195,9 @@ function toSourceTarget(row: SourceTargetRow): SourceTargetRecord {
     parserStrategy: row.parserStrategy as SourceTargetRecord["parserStrategy"],
     trustLevel: row.trustLevel as SourceTargetRecord["trustLevel"],
     healthStatus: row.healthStatus as SourceTargetRecord["healthStatus"],
+    failureCount: row.failureCount ?? 0,
+    rejectionCount: row.rejectionCount ?? 0,
+    duplicateCount: row.duplicateCount ?? 0,
     lastFetchedAt: normalizeDateOrNull(row.lastFetchedAt),
     lastSuccessfulRunAt: normalizeDateOrNull(row.lastSuccessfulRunAt),
     lastFailureAt: normalizeDateOrNull(row.lastFailureAt),
@@ -328,6 +334,9 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         enabled: input.enabled,
         confidenceAdjustment: input.confidenceAdjustment,
         healthStatus: input.healthStatus,
+        failureCount: 0,
+        rejectionCount: 0,
+        duplicateCount: 0,
         refreshCadence: input.refreshCadence,
         lastFetchedAt: null,
         lastSuccessfulRunAt: null,
@@ -340,6 +349,9 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
       const record: SourceTargetRecord = {
         ...input,
         id,
+        failureCount: 0,
+        rejectionCount: 0,
+        duplicateCount: 0,
         lastFetchedAt: null,
         lastSuccessfulRunAt: null,
         lastFailureAt: null,
@@ -368,6 +380,27 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
       await writer
         .delete(schema.sourceTargets)
         .where(eq(schema.sourceTargets.id, id));
+    },
+
+    async incrementSourceTargetCounters(id, delta) {
+      const writer = requireWriter(db);
+      const rows = await db.query.sourceTargets.findMany();
+      const row = rows.find((r) => r.id === id);
+      if (!row) throw new Error("Source target not found");
+      const now = new Date().toISOString();
+      await writer
+        .update(schema.sourceTargets)
+        .set({
+          failureCount: (row.failureCount ?? 0) + (delta.failureCount ?? 0),
+          rejectionCount: (row.rejectionCount ?? 0) + (delta.rejectionCount ?? 0),
+          duplicateCount: (row.duplicateCount ?? 0) + (delta.duplicateCount ?? 0),
+          updatedAt: now,
+        })
+        .where(eq(schema.sourceTargets.id, id));
+      const updatedRows = await db.query.sourceTargets.findMany();
+      const updated = updatedRows.find((r) => r.id === id);
+      if (!updated) throw new Error("Source target not found");
+      return toSourceTarget(updated);
     },
 
     // ── Refresh Runs ───────────────────────────────────────────

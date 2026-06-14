@@ -47,6 +47,9 @@ type SourceTargetRecord = {
   enabled: boolean;
   confidenceAdjustment: number;
   healthStatus: HealthStatus;
+  failureCount: number;
+  rejectionCount: number;
+  duplicateCount: number;
   refreshCadence: string;
   lastFetchedAt: string | null;
   lastSuccessfulRunAt: string | null;
@@ -299,6 +302,27 @@ function metricLine(run: RefreshRunRecord) {
     `${run.duplicatesFlagged} dupe`,
     `${run.staleTasksCreated} stale`,
   ].join(" / ");
+}
+
+function healthMetrics(
+  runs: RefreshRunRecord[],
+  items: ReviewItemRecord[],
+  targets: SourceTargetRecord[],
+) {
+  const enabledTargets = targets.filter((target) => target.enabled).length;
+  const lastRun = runs[0];
+  const coverage = lastRun
+    ? `${lastRun.sourceTargetsChecked}/${enabledTargets}`
+    : "—";
+  const decided = items.filter(
+    (item) => item.status === "approved" || item.status === "rejected",
+  );
+  const approved = decided.filter((item) => item.status === "approved").length;
+  const approvalRate =
+    decided.length > 0
+      ? `${Math.round((approved / decided.length) * 100)}%`
+      : "—";
+  return { coverage, approvalRate };
 }
 
 // ─── Review Lane Panel ──────────────────────────────────────────────
@@ -867,6 +891,7 @@ export function AdminSourceTargets({
         ],
       }));
       setStatus(`Refresh ${body.run.status}`);
+      await loadSources();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Refresh run failed");
     }
@@ -1179,6 +1204,25 @@ export function AdminSourceTargets({
               )}
             </section>
 
+            <section aria-label="Source health" className="border-b border-rule pb-6">
+              <h3 className="font-display text-2xl uppercase leading-none text-ink">
+                Source Health
+              </h3>
+              {(() => {
+                const { coverage, approvalRate } = healthMetrics(
+                  refreshSnapshot.runs,
+                  refreshSnapshot.reviewItems,
+                  snapshot.targets,
+                );
+                return (
+                  <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
+                    <span>Last coverage: {coverage}</span>
+                    <span>Approval rate: {approvalRate}</span>
+                  </div>
+                );
+              })()}
+            </section>
+
             <section aria-label="Review lanes" className="border-b border-rule pb-6">
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <span className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
@@ -1285,6 +1329,11 @@ export function AdminSourceTargets({
                               {target.parserStrategy} / {target.trustLevel} /{" "}
                               {target.healthStatus} /{" "}
                               {target.enabled ? "enabled" : "disabled"}
+                            </p>
+                            <p className="mt-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-faint">
+                              failures {target.failureCount} / rejections{" "}
+                              {target.rejectionCount} / duplicates{" "}
+                              {target.duplicateCount}
                             </p>
                           </div>
                           <div className="flex gap-2">

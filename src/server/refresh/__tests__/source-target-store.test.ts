@@ -113,6 +113,44 @@ describe("source target store", () => {
     expect(found!.healthStatus).toBe("degraded");
   });
 
+  it("initializes per-target counters to zero", async () => {
+    const created = await store.createSourceTarget(makeTarget());
+
+    expect(created.failureCount).toBe(0);
+    expect(created.rejectionCount).toBe(0);
+    expect(created.duplicateCount).toBe(0);
+
+    const found = await store.getSourceTarget(created.id);
+    expect(found!.failureCount).toBe(0);
+    expect(found!.rejectionCount).toBe(0);
+    expect(found!.duplicateCount).toBe(0);
+  });
+
+  it("increments per-target counters", async () => {
+    const created = await store.createSourceTarget(makeTarget());
+
+    const updated = await store.incrementSourceTargetCounters(created.id, {
+      failureCount: 2,
+      rejectionCount: 3,
+      duplicateCount: 1,
+    });
+
+    expect(updated.failureCount).toBe(2);
+    expect(updated.rejectionCount).toBe(3);
+    expect(updated.duplicateCount).toBe(1);
+
+    const found = await store.getSourceTarget(created.id);
+    expect(found!.failureCount).toBe(2);
+    expect(found!.rejectionCount).toBe(3);
+    expect(found!.duplicateCount).toBe(1);
+  });
+
+  it("throws when incrementing counters for a missing source target", async () => {
+    await expect(
+      store.incrementSourceTargetCounters("nonexistent", { failureCount: 1 }),
+    ).rejects.toThrow("Source target not found");
+  });
+
   it("throws when updating a nonexistent source target", async () => {
     await expect(
       store.updateSourceTarget("nonexistent", { url: "nope" }),

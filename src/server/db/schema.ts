@@ -136,6 +136,9 @@ export const sourceTargets = pgTable("source_targets", {
   enabled: boolean("enabled").notNull().default(true),
   confidenceAdjustment: integer("confidence_adjustment").notNull().default(0),
   healthStatus: text("health_status").notNull().default("healthy"),
+  failureCount: integer("failure_count").notNull().default(0),
+  rejectionCount: integer("rejection_count").notNull().default(0),
+  duplicateCount: integer("duplicate_count").notNull().default(0),
   refreshCadence: text("refresh_cadence").notNull().default("daily"),
   lastFetchedAt: timestamp("last_fetched_at", { mode: "string" }),
   lastSuccessfulRunAt: timestamp("last_successful_run_at", { mode: "string" }),
@@ -186,9 +189,7 @@ export const reviewItems = pgTable("review_items", {
   runId: text("run_id")
     .notNull()
     .references(() => refreshRuns.id),
-  sourceTargetId: text("source_target_id")
-    .notNull()
-    .references(() => sourceTargets.id),
+  sourceTargetId: text("source_target_id").references(() => sourceTargets.id),
   lane: text("lane").notNull(),
   status: text("status").notNull(),
   priority: integer("priority").notNull().default(0),

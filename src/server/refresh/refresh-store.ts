@@ -12,6 +12,7 @@ import type {
   ReviewItemRecord,
   ReviewLane,
   SourceOwnerRecord,
+  SourceTargetCounterDelta,
   SourceTargetRecord,
   UpdateReviewItemInput,
   UpdateSourceOwnerInput,
@@ -40,6 +41,10 @@ export type RefreshStore = {
     input: UpdateSourceTargetInput,
   ): Promise<SourceTargetRecord>;
   deleteSourceTarget(id: string): Promise<void>;
+  incrementSourceTargetCounters(
+    id: string,
+    delta: SourceTargetCounterDelta,
+  ): Promise<SourceTargetRecord>;
 
   // ── Refresh Runs ─────────────────────────────────────────────
   listRefreshRuns(cityId: string): Promise<RefreshRunRecord[]>;

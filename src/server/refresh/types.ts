@@ -50,6 +50,9 @@ export type SourceTargetRecord = {
   enabled: boolean;
   confidenceAdjustment: number;
   healthStatus: HealthStatus;
+  failureCount: number;
+  rejectionCount: number;
+  duplicateCount: number;
   refreshCadence: string;
   lastFetchedAt: string | null;
   lastSuccessfulRunAt: string | null;
@@ -62,7 +65,16 @@ export type SourceTargetRecord = {
 
 export type CreateSourceTargetInput = Omit<
   SourceTargetRecord,
-  "id" | "lastFetchedAt" | "lastSuccessfulRunAt" | "lastFailureAt" | "lastFailureReason" | "createdAt" | "updatedAt"
+  | "id"
+  | "failureCount"
+  | "rejectionCount"
+  | "duplicateCount"
+  | "lastFetchedAt"
+  | "lastSuccessfulRunAt"
+  | "lastFailureAt"
+  | "lastFailureReason"
+  | "createdAt"
+  | "updatedAt"
 >;
 
 export type UpdateSourceTargetInput = Partial<
@@ -77,7 +89,15 @@ export type UpdateSourceTargetInput = Partial<
     | "healthStatus"
     | "refreshCadence"
     | "notes"
+    | "lastFetchedAt"
+    | "lastSuccessfulRunAt"
+    | "lastFailureAt"
+    | "lastFailureReason"
   >
+>;
+
+export type SourceTargetCounterDelta = Partial<
+  Pick<SourceTargetRecord, "failureCount" | "rejectionCount" | "duplicateCount">
 >;
 
 // ─── Refresh Run ──────────────────────────────────────────────────
@@ -140,7 +160,7 @@ export type ReviewItemRecord = {
   id: string;
   cityId: string;
   runId: string;
-  sourceTargetId: string;
+  sourceTargetId: string | null;
   lane: ReviewLane;
   status: ReviewStatus;
   priority: number;
