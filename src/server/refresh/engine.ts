@@ -1,6 +1,8 @@
+import type { CatalogReader } from "../catalog/catalog-store";
 import { parseDevStaticTarget } from "./dev-parser";
 import type { RefreshStore } from "./refresh-store";
 import type {
+  CreateReviewItemInput,
   RefreshRunRecord,
   ReviewItemRecord,
   RunStatus,
@@ -104,9 +106,75 @@ async function log(
   });
 }
 
+async function createStaleTasksForPastEvents(
+  store: RefreshStore,
+  catalogStore: CatalogReader,
+  runId: string,
+  cityId: string,
+  now: Date,
+): Promise<ReviewItemRecord[]> {
+  const cities = await catalogStore.listCities();
+  const city = cities.find((c) => c.id === cityId);
+  if (!city) {
+    return [];
+  }
+
+  const cutoff = isoNow(now);
+  const events = await catalogStore.listEvents(city.slug);
+  const existingStaleEntityIds = new Set(
+    (await store.listReviewItems(cityId))
+      .filter((item) => item.lane === "stale-task" && item.targetEntityId)
+      .map((item) => item.targetEntityId!),
+  );
+
+  const pastEvents = events.filter(
+    (event) => event.startsAt < cutoff && !existingStaleEntityIds.has(event.id),
+  );
+  const items: ReviewItemRecord[] = [];
+
+  for (const event of pastEvents) {
+    const input: CreateReviewItemInput = {
+      cityId,
+      runId,
+      sourceTargetId: null,
+      lane: "stale-task",
+      priority: 10,
+      confidence: 100,
+      confidenceReasons: ["startsAt is before current time"],
+      targetEntityType: "event",
+      targetEntityId: event.id,
+      matchFingerprint: `stale:${event.id}`,
+      normalizedDraft: {
+        title: event.title,
+        startsAt: event.startsAt,
+        action: "review-past-event",
+      },
+      fieldDiffs: null,
+      linkedDrafts: [],
+      conflicts: {
+        staleReason:
+          "Past event remains in catalog; do not auto-delete or auto-archive.",
+      },
+      evidence: {
+        sourceUrls: [event.source.url],
+        excerpts: [`Catalog event ${event.id} startsAt ${event.startsAt}`],
+        contentHashes: [`stale:${event.id}`],
+      },
+      parserVersion: "stale-detector@1",
+      fetchTimestamp: cutoff,
+    };
+
+    const item = await store.createReviewItem(input);
+    items.push(item);
+  }
+
+  return items;
+}
+
 export async function runManualRefresh(
   store: RefreshStore,
   input: RunManualRefreshInput,
+  catalogStore?: CatalogReader,
 ): Promise<RefreshRunResult> {
   const created = await store.createRefreshRun({
     cityId: input.cityId,
@@ -135,13 +203,17 @@ export async function runManualRefresh(
 
     for (const target of targets) {
       metrics.sourceTargetsChecked += 1;
+      const fetchedAt = isoNow();
+
+      await store.updateSourceTarget(target.id, {
+        lastFetchedAt: fetchedAt,
+      });
 
       try {
         if (target.parserStrategy !== "dev-static") {
           throw new Error(unsupportedParserMessage(target));
         }
 
-        const fetchedAt = isoNow();
         const candidates = parseDevStaticTarget(target, run.id, fetchedAt);
 
         for (const candidate of candidates) {
@@ -149,6 +221,19 @@ export async function runManualRefresh(
           reviewItems.push(item);
           applyItemMetrics(metrics, item);
         }
+
+        const duplicateCount = candidates.filter(
+          (candidate) => candidate.lane === "possible-duplicate",
+        ).length;
+        if (duplicateCount > 0) {
+          await store.incrementSourceTargetCounters(target.id, {
+            duplicateCount,
+          });
+        }
+
+        await store.updateSourceTarget(target.id, {
+          lastSuccessfulRunAt: fetchedAt,
+        });
 
         await log(store, run.id, {
           sourceTargetId: target.id,
@@ -160,6 +245,15 @@ export async function runManualRefresh(
         metrics.sourceTargetsFailed += 1;
         const message = errorMessage(error);
         errorSummary = errorSummary ? `${errorSummary}; ${message}` : message;
+
+        await store.incrementSourceTargetCounters(target.id, {
+          failureCount: 1,
+        });
+        await store.updateSourceTarget(target.id, {
+          lastFailureAt: fetchedAt,
+          lastFailureReason: message,
+        });
+
         await log(store, run.id, {
           sourceTargetId: target.id,
           level: "error",
@@ -173,6 +267,24 @@ export async function runManualRefresh(
       await log(store, run.id, {
         level: "warning",
         message: "No enabled source targets found",
+      });
+    }
+
+    if (catalogStore) {
+      const staleTasks = await createStaleTasksForPastEvents(
+        store,
+        catalogStore,
+        run.id,
+        input.cityId,
+        input.now ?? new Date(),
+      );
+      for (const item of staleTasks) {
+        reviewItems.push(item);
+        applyItemMetrics(metrics, item);
+      }
+      await log(store, run.id, {
+        level: "info",
+        message: `Stale detector created ${staleTasks.length} task(s)`,
       });
     }
   } catch (error) {

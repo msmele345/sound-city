@@ -8,7 +8,7 @@ import {
 } from "../review-operations";
 import type { CatalogStore } from "../../catalog/catalog-store";
 import type { RefreshStore } from "../refresh-store";
-import type { CreateReviewItemInput } from "../types";
+import type { CreateReviewItemInput, RefreshSnapshot } from "../types";
 
 function makeItem(
   overrides: Partial<CreateReviewItemInput>,
@@ -48,12 +48,58 @@ function makeItem(
   };
 }
 
+function createRefreshStoreWithTarget(): RefreshStore {
+  const timestamp = new Date().toISOString();
+  const owner = {
+    id: "source_owner_test",
+    cityId: "city_chicago",
+    name: "Test Owner",
+    slug: "test-owner",
+    kind: "venue" as const,
+    notes: "",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const target = {
+    id: "st_1",
+    ownerId: owner.id,
+    cityId: "city_chicago",
+    url: "https://example.com/calendar",
+    sourceType: "official-venue-calendar" as const,
+    parserStrategy: "venue-calendar" as const,
+    trustLevel: "primary" as const,
+    enabled: true,
+    confidenceAdjustment: 0,
+    healthStatus: "healthy" as const,
+    failureCount: 0,
+    rejectionCount: 0,
+    duplicateCount: 0,
+    refreshCadence: "daily",
+    lastFetchedAt: null,
+    lastSuccessfulRunAt: null,
+    lastFailureAt: null,
+    lastFailureReason: null,
+    notes: "",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  const snapshot: RefreshSnapshot = {
+    sourceOwners: [owner],
+    sourceTargets: [target],
+    refreshRuns: [],
+    runLogs: [],
+    reviewItems: [],
+    decisionHistory: [],
+  };
+  return createSeedRefreshStore(snapshot);
+}
+
 describe("review-operations", () => {
   let refreshStore: RefreshStore;
   let catalogStore: CatalogStore;
 
   beforeEach(async () => {
-    refreshStore = createSeedRefreshStore();
+    refreshStore = createRefreshStoreWithTarget();
     catalogStore = createSeedCatalogStore();
   });
 
@@ -786,6 +832,43 @@ describe("review-operations", () => {
 
       expect(result.reviewItem.status).toBe("rejected");
       expect(result.reviewItem.reviewNotes).toBeNull();
+    });
+
+    it("increments the source target rejection counter", async () => {
+      const item = await refreshStore.createReviewItem(makeItem({}));
+
+      await rejectReviewItem(
+        refreshStore,
+        item.id,
+        "admin-secret",
+        "Duplicate",
+      );
+
+      const target = await refreshStore.getSourceTarget("st_1");
+      expect(target!.rejectionCount).toBe(1);
+      expect(target!.failureCount).toBe(0);
+      expect(target!.duplicateCount).toBe(0);
+    });
+
+    it("does not increment counters for stale tasks with no source target", async () => {
+      const item = await refreshStore.createReviewItem(
+        makeItem({
+          lane: "stale-task",
+          sourceTargetId: null,
+          targetEntityType: "event",
+          targetEntityId: "event_stale",
+        }),
+      );
+
+      await rejectReviewItem(
+        refreshStore,
+        item.id,
+        "admin-secret",
+        "Already stale",
+      );
+
+      const target = await refreshStore.getSourceTarget("st_1");
+      expect(target!.rejectionCount).toBe(0);
     });
   });
 });

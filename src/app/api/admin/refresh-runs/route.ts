@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { getCatalogStore } from "@/server/catalog/catalog-store";
 import {
   listRefreshRunsWithReconciliation,
   runManualRefresh,
@@ -84,10 +85,15 @@ export async function POST(request: NextRequest) {
   const citySlug = request.nextUrl.searchParams.get("city") ?? "chicago";
   const cityId = cityIdFromSlug(citySlug);
   const store = getRefreshStore();
-  const result = await runManualRefresh(store, {
-    cityId,
-    triggeredBy: "admin-secret",
-  });
+  const catalogStore = getCatalogStore();
+  const result = await runManualRefresh(
+    store,
+    {
+      cityId,
+      triggeredBy: "admin-secret",
+    },
+    catalogStore,
+  );
   const logs = await store.listRunLogs(result.run.id);
 
   return NextResponse.json(

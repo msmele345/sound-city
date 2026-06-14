@@ -458,6 +458,12 @@ export async function rejectReviewItem(
       reviewNotes: notes ?? null,
     });
 
+    if (item.sourceTargetId) {
+      await txStore.incrementSourceTargetCounters(item.sourceTargetId, {
+        rejectionCount: 1,
+      });
+    }
+
     await txStore.createDecisionHistory({
       reviewItemId: item.id,
       decision: "rejected",

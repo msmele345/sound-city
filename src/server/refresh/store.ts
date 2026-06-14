@@ -74,6 +74,9 @@ export function createSeedRefreshStore(
       const target = {
         ...input,
         id,
+        failureCount: 0,
+        rejectionCount: 0,
+        duplicateCount: 0,
         lastFetchedAt: null,
         lastSuccessfulRunAt: null,
         lastFailureAt: null,
@@ -97,6 +100,21 @@ export function createSeedRefreshStore(
       const index = snapshot.sourceTargets.findIndex((t) => t.id === id);
       if (index === -1) throw new Error("Source target not found");
       snapshot.sourceTargets.splice(index, 1);
+    },
+
+    async incrementSourceTargetCounters(id, delta) {
+      const index = snapshot.sourceTargets.findIndex((t) => t.id === id);
+      if (index === -1) throw new Error("Source target not found");
+      const current = snapshot.sourceTargets[index];
+      const updated = {
+        ...current,
+        failureCount: current.failureCount + (delta.failureCount ?? 0),
+        rejectionCount: current.rejectionCount + (delta.rejectionCount ?? 0),
+        duplicateCount: current.duplicateCount + (delta.duplicateCount ?? 0),
+        updatedAt: now(),
+      };
+      snapshot.sourceTargets[index] = updated;
+      return updated;
     },
 
     // ── Refresh Runs ───────────────────────────────────────────

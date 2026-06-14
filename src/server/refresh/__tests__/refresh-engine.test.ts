@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import { createSeedCatalogStore } from "../../catalog/catalog-store";
 import { runManualRefresh, listRefreshRunsWithReconciliation } from "../engine";
 import { createSeedRefreshStore } from "../store";
 import type { RefreshStore } from "../refresh-store";
+import type { CatalogStore } from "../../catalog/catalog-store";
 
 async function createDevTarget(store: RefreshStore) {
   const owner = await store.createSourceOwner({
@@ -26,6 +28,58 @@ async function createDevTarget(store: RefreshStore) {
     refreshCadence: "manual",
     notes: "",
   });
+}
+
+function createCatalogWithPastEvent(
+  startsAt = "2026-05-30T03:00:00.000Z",
+): CatalogStore {
+  const catalog = createSeedCatalogStore({
+    cities: [
+      {
+        id: "city_chicago",
+        name: "Chicago",
+        slug: "chicago",
+        timeZone: "America/Chicago",
+      },
+    ],
+    venues: [],
+    artists: [],
+    events: [],
+  });
+  const venue = {
+    id: "venue_past",
+    citySlug: "chicago",
+    name: "Past Venue",
+    slug: "past-venue",
+    neighborhood: "Test",
+    address: "123 Test St",
+    capacity: null,
+    source: {
+      id: "source_past_venue",
+      title: "Past Venue",
+      url: "https://past-venue.test",
+      lastVerifiedAt: "2026-05-15",
+    },
+    signals: [],
+  };
+  catalog.createVenue(venue);
+  catalog.createEvent({
+    id: "event_past_listing",
+    citySlug: "chicago",
+    title: "Past Listing",
+    slug: "past-listing",
+    startsAt,
+    venue,
+    artists: [],
+    styles: ["techno"],
+    source: {
+      id: "source_past_event",
+      title: "Past Listing",
+      url: "https://past-venue.test/event",
+      lastVerifiedAt: "2026-05-15",
+    },
+  });
+  return catalog;
 }
 
 describe("refresh engine", () => {
@@ -135,5 +189,129 @@ describe("refresh engine", () => {
       errorSummary: expect.stringMatching(/reconciled/i),
     });
     expect(runs[0].finishedAt).toBe("2026-06-12T10:30:00.000Z");
+  });
+
+  it("creates stale tasks for past events when a catalog store is provided", async () => {
+    const store = createSeedRefreshStore();
+    const catalog = createCatalogWithPastEvent("2026-05-30T03:00:00.000Z");
+    await createDevTarget(store);
+
+    const result = await runManualRefresh(
+      store,
+      {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+        now: new Date("2026-06-13T00:00:00.000Z"),
+      },
+      catalog,
+    );
+
+    expect(result.run.staleTasksCreated).toBeGreaterThanOrEqual(2); // fixture + past event
+    const staleTasks = result.reviewItems.filter(
+      (item) => item.lane === "stale-task",
+    );
+    const pastEventTask = staleTasks.find(
+      (item) => item.targetEntityId === "event_past_listing",
+    );
+    expect(pastEventTask).toBeDefined();
+    expect(pastEventTask!.sourceTargetId).toBeNull();
+    expect(pastEventTask!.normalizedDraft).toMatchObject({
+      title: "Past Listing",
+      action: "review-past-event",
+    });
+
+    const events = await catalog.listEvents("chicago");
+    expect(events.find((e) => e.id === "event_past_listing")).toBeDefined();
+  });
+
+  it("does not auto-delete or auto-archive catalog records when creating stale tasks", async () => {
+    const store = createSeedRefreshStore();
+    const catalog = createCatalogWithPastEvent("2026-05-30T03:00:00.000Z");
+    await createDevTarget(store);
+
+    const before = await catalog.listEvents("chicago");
+    expect(before).toHaveLength(1);
+
+    await runManualRefresh(
+      store,
+      {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+        now: new Date("2026-06-13T00:00:00.000Z"),
+      },
+      catalog,
+    );
+
+    const after = await catalog.listEvents("chicago");
+    expect(after).toHaveLength(1);
+    expect(after[0].id).toBe("event_past_listing");
+  });
+
+  it("records per-target failure and duplicate counters", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Fixture Venue",
+      slug: "fixture-venue",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://fixtures.sound-city.test/dev-static",
+      sourceType: "other",
+      parserStrategy: "dev-static",
+      trustLevel: "experimental",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "manual",
+      notes: "",
+    });
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    const updated = await store.getSourceTarget(target.id);
+    expect(updated!.duplicateCount).toBe(1);
+    expect(updated!.failureCount).toBe(0);
+    expect(updated!.lastSuccessfulRunAt).not.toBeNull();
+  });
+
+  it("increments failure counter and timestamps when a target fails", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "smartbar",
+      slug: "smartbar",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://smartbarchicago.com/calendar",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    const updated = await store.getSourceTarget(target.id);
+    expect(updated!.failureCount).toBe(1);
+    expect(updated!.lastFailureAt).not.toBeNull();
+    expect(updated!.lastFailureReason).toMatch(/no phase 3 parser/i);
   });
 });
