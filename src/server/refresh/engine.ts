@@ -8,6 +8,10 @@ import type {
   RunStatus,
   SourceTargetRecord,
 } from "./types";
+import {
+  parseVenueCalendarTarget,
+  type Fetcher,
+} from "./venue-calendar-parser";
 
 const defaultMaxRunAgeMs = 15 * 60 * 1000;
 
@@ -15,6 +19,7 @@ type RunManualRefreshInput = {
   cityId: string;
   triggeredBy: string;
   now?: Date;
+  fetcher?: Fetcher;
 };
 
 type RefreshRunResult = {
@@ -55,7 +60,18 @@ function errorMessage(error: unknown) {
 }
 
 function unsupportedParserMessage(target: SourceTargetRecord) {
-  return `No Phase 3 parser is available for ${target.parserStrategy}`;
+  return `No parser is available for strategy: ${target.parserStrategy}`;
+}
+
+async function defaultFetcher(
+  url: string,
+): Promise<{ body: string; contentType: string; status: number }> {
+  const response = await fetch(url);
+  return {
+    body: await response.text(),
+    contentType: response.headers.get("content-type") ?? "",
+    status: response.status,
+  };
 }
 
 function terminalStatus(metrics: Metrics): RunStatus {
@@ -210,11 +226,21 @@ export async function runManualRefresh(
       });
 
       try {
-        if (target.parserStrategy !== "dev-static") {
+        const fetcher = input.fetcher ?? defaultFetcher;
+        let candidates: CreateReviewItemInput[];
+
+        if (target.parserStrategy === "dev-static") {
+          candidates = parseDevStaticTarget(target, run.id, fetchedAt);
+        } else if (target.parserStrategy === "venue-calendar") {
+          candidates = await parseVenueCalendarTarget(
+            target,
+            run.id,
+            fetchedAt,
+            fetcher,
+          );
+        } else {
           throw new Error(unsupportedParserMessage(target));
         }
-
-        const candidates = parseDevStaticTarget(target, run.id, fetchedAt);
 
         for (const candidate of candidates) {
           const item = await store.createReviewItem(candidate);
@@ -238,7 +264,7 @@ export async function runManualRefresh(
         await log(store, run.id, {
           sourceTargetId: target.id,
           level: "info",
-          message: `Dev parser created ${candidates.length} review items`,
+          message: `${target.parserStrategy} parser created ${candidates.length} review items`,
           metadata: { parserStrategy: target.parserStrategy },
         });
       } catch (error) {
