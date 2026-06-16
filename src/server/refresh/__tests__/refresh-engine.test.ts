@@ -116,7 +116,7 @@ describe("refresh engine", () => {
     expect(logs.map((log) => log.message)).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/refresh run started/i),
-        expect.stringMatching(/dev parser created 4 review items/i),
+        expect.stringMatching(/dev-static parser created 4 review items/i),
         expect.stringMatching(/refresh run completed/i),
       ]),
     );
@@ -136,7 +136,7 @@ describe("refresh engine", () => {
       cityId: "city_chicago",
       url: "https://smartbarchicago.com/calendar",
       sourceType: "official-venue-calendar",
-      parserStrategy: "venue-calendar",
+      parserStrategy: "artist-social",
       trustLevel: "primary",
       enabled: true,
       confidenceAdjustment: 0,
@@ -153,14 +153,14 @@ describe("refresh engine", () => {
     expect(result.run.status).toBe("failed");
     expect(result.run.sourceTargetsChecked).toBe(1);
     expect(result.run.sourceTargetsFailed).toBe(1);
-    expect(result.run.errorSummary).toMatch(/no phase 3 parser/i);
+    expect(result.run.errorSummary).toMatch(/no parser is available/i);
 
     const logs = await store.listRunLogs(result.run.id);
     expect(logs).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           level: "error",
-          message: expect.stringMatching(/no phase 3 parser/i),
+          message: expect.stringMatching(/no parser is available/i),
         }),
       ]),
     );
@@ -295,7 +295,7 @@ describe("refresh engine", () => {
       cityId: "city_chicago",
       url: "https://smartbarchicago.com/calendar",
       sourceType: "official-venue-calendar",
-      parserStrategy: "venue-calendar",
+      parserStrategy: "artist-social",
       trustLevel: "primary",
       enabled: true,
       confidenceAdjustment: 0,
@@ -312,6 +312,178 @@ describe("refresh engine", () => {
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.failureCount).toBe(1);
     expect(updated!.lastFailureAt).not.toBeNull();
-    expect(updated!.lastFailureReason).toMatch(/no phase 3 parser/i);
+    expect(updated!.lastFailureReason).toMatch(/no parser is available/i);
+  });
+
+  it("runs the venue-calendar parser with a mock fetcher and creates review items from ICS", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Smartbar",
+      slug: "smartbar",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://smartbarchicago.com/calendar.ics",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+
+    const icsBody = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Smartbar//EN",
+      "BEGIN:VEVENT",
+      "UID:smartbar-1@sound-city.test",
+      "DTSTART:20260620T220000Z",
+      "DTEND:20260621T030000Z",
+      "SUMMARY:Warehouse Sessions",
+      "LOCATION:Smartbar\\, Chicago",
+      "URL:https://smartbarchicago.com/events/warehouse-sessions",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:smartbar-2@sound-city.test",
+      "DTSTART:20260627T220000Z",
+      "SUMMARY:Late Night Techno",
+      "LOCATION:Smartbar\\, Chicago",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const mockFetcher = async () => ({
+      body: icsBody,
+      contentType: "text/calendar",
+      status: 200,
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: mockFetcher,
+    });
+
+    expect(result.run.status).toBe("succeeded");
+    expect(result.run.sourceTargetsChecked).toBe(1);
+    expect(result.run.sourceTargetsFailed).toBe(0);
+    expect(result.run.draftsCreated).toBe(2);
+
+    const items = result.reviewItems.filter(
+      (item) => item.lane === "new-event",
+    );
+    expect(items).toHaveLength(2);
+    expect(items[0].normalizedDraft).toMatchObject({
+      title: "Warehouse Sessions",
+      venueName: "Smartbar, Chicago",
+    });
+    expect(items[0].evidence.sourceUrls).toEqual([
+      "https://smartbarchicago.com/events/warehouse-sessions",
+    ]);
+    expect(items[0].evidence.contentHashes).toEqual([
+      "smartbar-1@sound-city.test:venue-calendar@1",
+    ]);
+    expect(items[0].parserVersion).toBe("venue-calendar@1");
+    expect(items[0].linkedDrafts).toEqual([
+      { type: "venue", name: "Smartbar, Chicago" },
+    ]);
+    expect(items[0].sourceTargetId).toBe(target.id);
+
+    const updated = await store.getSourceTarget(target.id);
+    expect(updated!.lastSuccessfulRunAt).not.toBeNull();
+    expect(updated!.failureCount).toBe(0);
+  });
+
+  it("marks venue-calendar target as failed when fetch returns non-ICS content", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Smartbar",
+      slug: "smartbar",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://smartbarchicago.com/calendar",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+
+    const mockFetcher = async () => ({
+      body: "<html><body>JavaScript required</body></html>",
+      contentType: "text/html",
+      status: 200,
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: mockFetcher,
+    });
+
+    expect(result.run.status).toBe("failed");
+    expect(result.run.sourceTargetsFailed).toBe(1);
+    expect(result.run.errorSummary).toMatch(/structured feed/i);
+
+    const updated = await store.getSourceTarget(target.id);
+    expect(updated!.failureCount).toBe(1);
+    expect(updated!.lastFailureReason).toMatch(/structured feed/i);
+  });
+
+  it("marks venue-calendar target as failed when fetch returns non-200 status", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Smartbar",
+      slug: "smartbar",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://smartbarchicago.com/calendar.ics",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+
+    const mockFetcher = async () => ({
+      body: "Not Found",
+      contentType: "text/plain",
+      status: 404,
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: mockFetcher,
+    });
+
+    expect(result.run.status).toBe("failed");
+    expect(result.run.errorSummary).toMatch(/status 404/i);
+
+    const updated = await store.getSourceTarget(target.id);
+    expect(updated!.failureCount).toBe(1);
   });
 });

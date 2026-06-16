@@ -8,5 +8,7 @@ coverage
 .vercel
 *.tsbuildinfo
 
+.idea
+
 plans/admin-crud-guide.md
 .env*
