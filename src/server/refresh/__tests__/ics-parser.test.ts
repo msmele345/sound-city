@@ -210,4 +210,44 @@ describe("parseIcs", () => {
     expect(events[0].dtStart).toBe("2026-06-21T03:00:00.000Z");
     expect(events[0].dtEnd).toBe("2026-06-21T07:00:00.000Z");
   });
+
+  it("uses calendar-level timezone for floating date-times", () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "X-WR-TIMEZONE:America/Chicago",
+      "BEGIN:VEVENT",
+      "UID:calendar-tz@test",
+      "DTSTART:20260620T220000",
+      "DTEND:20260621T020000",
+      "SUMMARY:Calendar Time Zone Event",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const events = parseIcs(ics);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].dtStart).toBe("2026-06-21T03:00:00.000Z");
+    expect(events[0].dtEnd).toBe("2026-06-21T07:00:00.000Z");
+  });
+
+  it("uses VTIMEZONE TZID for floating date-times", () => {
+    const ics = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VTIMEZONE",
+      "TZID:America/Chicago",
+      "END:VTIMEZONE",
+      "BEGIN:VEVENT",
+      "UID:vtimezone@test",
+      "DTSTART:20260620T220000",
+      "SUMMARY:VTIMEZONE Event",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const events = parseIcs(ics);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].dtStart).toBe("2026-06-21T03:00:00.000Z");
+  });
 });

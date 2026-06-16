@@ -20,7 +20,14 @@ function normalizeForFingerprint(value: string): string {
 }
 
 function isIcsContent(url: string, contentType: string): boolean {
-  return url.endsWith(".ics") || contentType.includes("text/calendar");
+  const normalizedContentType = contentType.toLowerCase();
+  if (normalizedContentType.includes("text/calendar")) return true;
+
+  try {
+    return new URL(url).pathname.toLowerCase().endsWith(".ics");
+  } catch {
+    return url.split(/[?#]/, 1)[0].toLowerCase().endsWith(".ics");
+  }
 }
 
 export async function parseVenueCalendarTarget(

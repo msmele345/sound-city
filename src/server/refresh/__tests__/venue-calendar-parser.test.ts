@@ -232,6 +232,26 @@ describe("parseVenueCalendarTarget", () => {
     expect(items).toHaveLength(1);
   });
 
+  it("accepts tokenized ICS URLs when content-type is generic", async () => {
+    const target = createTarget({
+      url: "https://venue.test/calendar.ics?secret=abc123",
+    });
+    const fetcher: Fetcher = async () => ({
+      body: sampleIcs,
+      contentType: "application/octet-stream",
+      status: 200,
+    });
+
+    const items = await parseVenueCalendarTarget(
+      target,
+      "run_1",
+      "2026-06-13T00:00:00.000Z",
+      fetcher,
+    );
+
+    expect(items).toHaveLength(1);
+  });
+
   it("returns empty array when ICS feed has no VEVENT blocks", async () => {
     const ics = [
       "BEGIN:VCALENDAR",

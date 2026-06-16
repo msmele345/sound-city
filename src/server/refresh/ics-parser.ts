@@ -171,7 +171,58 @@ function extractVEventBlocks(lines: string[]): string[][] {
   return blocks;
 }
 
-function parseVEventBlock(lines: string[]): IcsEvent | null {
+function extractCalendarTimeZone(lines: string[]): string | undefined {
+  let inEvent = false;
+  let inVTimeZone = false;
+  let vTimeZoneTzid: string | undefined;
+
+  for (const line of lines) {
+    const upper = line.toUpperCase().trim();
+
+    if (upper === "BEGIN:VEVENT") {
+      inEvent = true;
+      continue;
+    }
+    if (upper === "END:VEVENT") {
+      inEvent = false;
+      continue;
+    }
+    if (inEvent) continue;
+
+    if (upper === "BEGIN:VTIMEZONE") {
+      inVTimeZone = true;
+      continue;
+    }
+    if (upper === "END:VTIMEZONE") {
+      inVTimeZone = false;
+      continue;
+    }
+
+    const property = parsePropertyLine(line);
+    if (!property) continue;
+
+    const value = property.value.trim();
+    if (property.name === "X-WR-TIMEZONE" && value) return value;
+    if (inVTimeZone && property.name === "TZID" && value && !vTimeZoneTzid) {
+      vTimeZoneTzid = value;
+    }
+  }
+
+  return vTimeZoneTzid;
+}
+
+function dateParamsWithCalendarFallback(
+  params: IcsDateParams,
+  calendarTimeZone: string | undefined,
+): IcsDateParams {
+  if (params.tzid || !calendarTimeZone) return params;
+  return { ...params, tzid: calendarTimeZone };
+}
+
+function parseVEventBlock(
+  lines: string[],
+  calendarTimeZone: string | undefined,
+): IcsEvent | null {
   const properties = new Map<string, ParsedProperty>();
 
   for (const line of lines) {
@@ -192,8 +243,16 @@ function parseVEventBlock(lines: string[]): IcsEvent | null {
   return {
     uid: properties.get("UID")?.value ?? "",
     summary: unescapeIcsText(summary.trim()),
-    dtStart: parseIcsDate(dtStart.value.trim(), dtStart.params),
-    dtEnd: dtEnd ? parseIcsDate(dtEnd.value.trim(), dtEnd.params) : null,
+    dtStart: parseIcsDate(
+      dtStart.value.trim(),
+      dateParamsWithCalendarFallback(dtStart.params, calendarTimeZone),
+    ),
+    dtEnd: dtEnd
+      ? parseIcsDate(
+          dtEnd.value.trim(),
+          dateParamsWithCalendarFallback(dtEnd.params, calendarTimeZone),
+        )
+      : null,
     location: properties.get("LOCATION")?.value
       ? unescapeIcsText(properties.get("LOCATION")!.value.trim())
       : null,
@@ -209,10 +268,11 @@ export function parseIcs(text: string): IcsEvent[] {
 
   const lines = unfoldLines(text);
   const blocks = extractVEventBlocks(lines);
+  const calendarTimeZone = extractCalendarTimeZone(lines);
   const events: IcsEvent[] = [];
 
   for (const block of blocks) {
-    const event = parseVEventBlock(block);
+    const event = parseVEventBlock(block, calendarTimeZone);
     if (event) events.push(event);
   }
 
