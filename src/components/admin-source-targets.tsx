@@ -406,12 +406,12 @@ function ReviewLanePanel({
         <ol className="mt-2">
           {items.map((item) => (
             <li key={item.id} className="border-t border-rule py-2">
-              <div className="flex items-start justify-between gap-2">
+              <div className="grid gap-2">
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
                     onClick={() => toggleExpanded(item.id)}
-                    className="truncate text-left text-sm text-ink hover:text-signal"
+                    className="block w-full truncate text-left text-sm text-ink hover:text-signal"
                   >
                     {draftTitle(item)}
                   </button>
@@ -434,7 +434,11 @@ function ReviewLanePanel({
                 </div>
 
                 {item.status === "pending" ? (
-                  <div className="flex shrink-0 gap-1">
+                  <div
+                    role="group"
+                    aria-label={`Actions for ${draftTitle(item)}`}
+                    className="flex flex-wrap gap-1"
+                  >
                     {item.lane === "proposed-update" && item.fieldDiffs ? (
                       <>
                         <button

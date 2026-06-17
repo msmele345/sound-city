@@ -82,4 +82,64 @@ describe("rankRecommendedEvents", () => {
     expect(recommendations[0].reason).toMatch(/acid|techno|small-room/i);
     expect(recommendations[1].reason).toMatch(/saved/i);
   });
+
+  it("uses source confidence and freshness only as ranking tie-breakers", () => {
+    const recommendations = rankRecommendedEvents(
+      [
+        event({
+          id: "event_best_fit",
+          title: "Small Room Acid Night",
+          styles: ["acid", "techno"],
+          source: {
+            ...source,
+            lastVerifiedAt: "2026-01-01",
+            confidence: 40,
+          },
+        }),
+        event({
+          id: "event_stale_tie",
+          title: "Deep House Room",
+          source: {
+            ...source,
+            lastVerifiedAt: "2026-01-01",
+            confidence: 60,
+          },
+        }),
+        event({
+          id: "event_fresh_tie",
+          title: "Deep House Room",
+          source: {
+            ...source,
+            lastVerifiedAt: "2026-05-20",
+            confidence: 95,
+          },
+        }),
+      ],
+      {
+        profile: {
+          ...defaultTasteProfile,
+          styles: ["acid", "techno"],
+          vibe: "raw",
+          venueSize: "small-room",
+          startTime: "late",
+          discoveryLevel: 5,
+        },
+        actions: {
+          savedEventIds: [],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+        },
+      },
+    );
+
+    expect(recommendations.map((item) => item.event.id)).toEqual([
+      "event_best_fit",
+      "event_fresh_tie",
+      "event_stale_tie",
+    ]);
+    expect(recommendations[0].score).toBeGreaterThan(
+      recommendations[1].score,
+    );
+    expect(recommendations[1].score).toBe(recommendations[2].score);
+  });
 });

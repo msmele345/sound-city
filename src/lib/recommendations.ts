@@ -38,6 +38,7 @@ export type RecommendationEvent = {
     title: string;
     url: string;
     lastVerifiedAt: string;
+    confidence?: number;
   };
 };
 
@@ -152,6 +153,24 @@ function discoveryPotential(event: RecommendationEvent) {
   return Math.min(1, score);
 }
 
+function sourceConfidence(event: RecommendationEvent) {
+  if (event.source.confidence === undefined) return 0.5;
+  return Math.min(1, Math.max(0, event.source.confidence / 100));
+}
+
+function sourceFreshness(event: RecommendationEvent) {
+  const verifiedAt = Date.parse(event.source.lastVerifiedAt);
+  const startsAt = Date.parse(event.startsAt);
+  if (Number.isNaN(verifiedAt) || Number.isNaN(startsAt)) return 0;
+
+  const ageDays = Math.max(0, (startsAt - verifiedAt) / 86_400_000);
+  return Math.max(0, 1 - ageDays / 120);
+}
+
+function sourceTrustTieBreaker(event: RecommendationEvent) {
+  return sourceConfidence(event) * 0.6 + sourceFreshness(event) * 0.4;
+}
+
 function reasonFor(
   event: RecommendationEvent,
   profile: TasteProfile,
@@ -217,6 +236,8 @@ export function rankRecommendedEvents(
     })
     .toSorted(
       (a, b) =>
-        b.score - a.score || a.event.startsAt.localeCompare(b.event.startsAt),
+        b.score - a.score ||
+        sourceTrustTieBreaker(b.event) - sourceTrustTieBreaker(a.event) ||
+        a.event.startsAt.localeCompare(b.event.startsAt),
     );
 }

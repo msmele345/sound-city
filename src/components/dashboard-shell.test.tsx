@@ -297,6 +297,52 @@ describe("DashboardShell", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("shows public source freshness and source links on recommended events", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: [
+          {
+            id: "event_recommended",
+            title: "Recommended Source Test",
+            startsAt: "2026-05-23T03:00:00.000Z",
+            venue: {
+              name: "Podlasie Club",
+              neighborhood: "Avondale",
+              capacity: 220,
+            },
+            artists: [{ name: "Local Selector" }],
+            styles: ["house"],
+            source: {
+              title: "Venue calendar",
+              url: "https://example.com/calendar",
+              lastVerifiedAt: "2026-05-15",
+              confidence: 94,
+            },
+          },
+        ],
+      }),
+    });
+
+    render(<DashboardShell />);
+
+    const recommended = screen.getByRole("region", {
+      name: /recommended tonight/i,
+    });
+    const eventHeading = await within(recommended).findByRole("heading", {
+      name: /recommended source test/i,
+    });
+    const eventRow = eventHeading.closest("li");
+    expect(eventRow).not.toBeNull();
+    expect(within(eventRow!).getByText(/verified may 15, 2026/i)).toBeInTheDocument();
+    expect(
+      within(eventRow!).getByRole("link", { name: /venue calendar/i }),
+    ).toHaveAttribute("href", "https://example.com/calendar");
+    expect(within(eventRow!).queryByText(/confidence/i)).not.toBeInTheDocument();
+    expect(within(eventRow!).queryByText(/parser/i)).not.toBeInTheDocument();
+  });
+
   it("loads the artist showcase and venue directory from catalog APIs", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/events?city=chicago") {
@@ -419,6 +465,9 @@ describe("DashboardShell", () => {
         name: /family matters feat\. posthuman/i,
       }),
     ).toBeInTheDocument();
+    expect(
+      within(showcase).getByRole("link", { name: /family matters listing/i }),
+    ).toHaveAttribute("href", "https://example.com/event");
 
     const venues = screen.getByRole("region", { name: /venue signals/i });
     expect(
@@ -433,5 +482,8 @@ describe("DashboardShell", () => {
         name: /family matters feat\. posthuman/i,
       }),
     ).toBeInTheDocument();
+    expect(
+      within(venues).getByRole("link", { name: /family matters listing/i }),
+    ).toHaveAttribute("href", "https://example.com/event");
   });
 });
