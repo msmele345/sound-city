@@ -495,10 +495,10 @@ confidence/freshness into recommendations as soft inputs.
 
 Acceptance criteria:
 
-- [ ] Public event surfaces show last-verified date and source link.
-- [ ] Public UI does not expose parser internals.
-- [ ] Recommendation ranking can use confidence/freshness as tie-breakers.
-- [ ] Taste match and discovery-first scoring remain primary.
+- [x] Public event surfaces show last-verified date and source link.
+- [x] Public UI does not expose parser internals.
+- [x] Recommendation ranking can use confidence/freshness as tie-breakers.
+- [x] Taste match and discovery-first scoring remain primary.
 
 (Public "source count" / multi-source badge is out of this phase; see v2.1.)
 

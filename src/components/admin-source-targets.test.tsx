@@ -278,7 +278,17 @@ describe("AdminSourceTargets", () => {
     );
     expect(await screen.findByText(/dev parser created 4 review items/i)).toBeInTheDocument();
     expect(screen.getByText(/new event/i)).toBeInTheDocument();
-    expect(screen.getByText(/late shift control room/i)).toBeInTheDocument();
+    const newEventTitle = screen.getByRole("button", {
+      name: /late shift control room/i,
+    });
+    expect(newEventTitle).toHaveClass("block", "w-full", "truncate");
+    const newEventActions = screen.getByRole("group", {
+      name: /actions for late shift control room/i,
+    });
+    expect(within(newEventActions).getByRole("button", { name: /approve/i }))
+      .toBeInTheDocument();
+    expect(within(newEventActions).getByRole("button", { name: /reject/i }))
+      .toBeInTheDocument();
     expect(screen.getByText(/proposed update/i)).toBeInTheDocument();
     expect(screen.getByText(/bunker signal/i)).toBeInTheDocument();
   });

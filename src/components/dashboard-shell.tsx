@@ -206,6 +206,23 @@ function formatEventTime(startsAt: string) {
   }).format(new Date(startsAt));
 }
 
+function formatVerifiedDate(lastVerifiedAt: string) {
+  const dateOnlyMatch = lastVerifiedAt.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const date = dateOnlyMatch
+    ? new Date(
+        Number(dateOnlyMatch[1]),
+        Number(dateOnlyMatch[2]) - 1,
+        Number(dateOnlyMatch[3]),
+      )
+    : new Date(lastVerifiedAt);
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
 function formatSignalCategory(category: CatalogVenueSignal["category"]) {
   return category.replace("-", " ");
 }
@@ -224,6 +241,24 @@ function MatchMeter({ score }: { score: number }) {
       </span>
       <span className="sr-only">Match {pct} percent</span>
     </span>
+  );
+}
+
+function SourceTrustLine({ source }: { source: CatalogSource }) {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.14em]">
+      <span className="text-ink-faint">
+        Verified {formatVerifiedDate(source.lastVerifiedAt)}
+      </span>
+      <a
+        href={source.url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
+      >
+        {source.title}
+      </a>
+    </div>
   );
 }
 
@@ -331,18 +366,8 @@ function EventDiscoveryFeed({ feed }: { feed: EventFeedState }) {
                   <span className="text-ink-faint">
                     {event.styles.join(" / ")}
                   </span>
-                  <span className="text-ink-faint">
-                    Verified {event.source.lastVerifiedAt}
-                  </span>
-                  <a
-                    href={event.source.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
-                  >
-                    {event.source.title}
-                  </a>
                 </div>
+                <SourceTrustLine source={event.source} />
               </div>
             </li>
           ))}
@@ -584,6 +609,7 @@ function RecommendedEvents({
                 <p className="mt-3 max-w-xl text-[0.95rem] leading-relaxed text-ink-dim">
                   {item.reason}
                 </p>
+                <SourceTrustLine source={item.event.source} />
                 <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
                   <MatchMeter score={item.score} />
                   <button
@@ -727,6 +753,7 @@ function ArtistShowcase({
                   <span className="text-ink-faint"> / </span>
                   {event.venue.name}
                 </p>
+                <SourceTrustLine source={event.source} />
               </li>
             ))}
           </ol>
@@ -844,6 +871,7 @@ function VenueDirectory({
                         <span className="text-ink-faint"> / </span>
                         {formatEventTime(event.startsAt)}
                       </p>
+                      <SourceTrustLine source={event.source} />
                     </li>
                   ))}
                 </ol>
