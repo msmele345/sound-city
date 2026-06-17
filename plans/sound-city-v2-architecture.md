@@ -502,7 +502,76 @@ Acceptance criteria:
 
 (Public "source count" / multi-source badge is out of this phase; see v2.1.)
 
-### Phase 8 (v2.1 candidates)
+
+### Phase 8 (v2.1.0): RSS Event Feed Parser
+
+Add an RSS parser strategy for official venue event feeds that expose structured
+RSS/XML but not venue-wide ICS. This is a meaningful v2 admin-refresh constraint:
+Smartbar exposes `https://smartbarchicago.com/events/feed/` with useful event
+titles, source links, publication/update timestamps, and description text, but
+does not expose a discoverable venue-wide `.ics` feed from the public events or
+event-detail pages. The current `venue-calendar` parser rejects RSS because it
+expects `text/calendar` or an `.ics` URL, so Smartbar-style sources are manual
+evidence only until RSS is supported.
+
+Recommended scope:
+
+- Add `parserStrategy: "rss-event-feed"` and pair it with source type
+  `official-venue-calendar` or `other` for venues whose official site publishes
+  events through RSS.
+- Fetch RSS/XML feeds and parse `<item>` records into review candidates.
+- Prefer item `<link>` as the evidence/source URL; use item `<title>` as the
+  draft title.
+- Extract `startsAt` from common event-description patterns before falling back
+  to `pubDate`. `pubDate` is usually the publish/update date, not the event
+  date, so using it as the event start time would create bad catalog records.
+- Preserve raw description excerpts as compact evidence so admins can verify
+  date, time, artists, price, and age policy before approval.
+- Treat ambiguous dates or missing event dates as `source-health` or
+  low-confidence review items rather than publishing-ready `new-event` drafts.
+- Keep RSS parsing review-first; do not auto-publish and do not scrape linked
+  event pages in the first slice.
+
+Effort estimate:
+
+- **Small parser slice (1-2 days)**: add parser strategy validation, fetch
+  XML, parse RSS items, create low-confidence `new-event` review items when a
+  date can be extracted from the description, and add unit tests with Smartbar-
+  shaped fixtures.
+- **Useful production slice (3-5 days)**: add robust date/time extraction,
+  HTML entity cleanup, duplicate fingerprinting, source-health handling for
+  ambiguous items, Admin copy/status messages, and integration coverage through
+  manual refresh.
+- **Hardening slice (1+ week if needed)**: support multiple RSS variants
+  (`content:encoded`, custom event fields, Atom), linked event-page enrichment,
+  per-source parsing rules, and stronger duplicate/update matching.
+
+Risks and constraints:
+
+- RSS event feeds are less normalized than ICS. Event dates often live inside
+  human-written descriptions, so parser confidence should start lower than
+  `venue-calendar`.
+- `pubDate` should not be trusted as `startsAt`; it often means "posted at" or
+  "last updated."
+- Venue names, artist names, styles, prices, and age policy may need admin edits
+  after parsing.
+- Some feeds may only include the most recently announced events, not the full
+  upcoming calendar. Source health should make that visible rather than hiding
+  it.
+
+V2 Phase 8 acceptance criteria:
+
+- [ ] Admins can create an enabled RSS source target without using the
+      `venue-calendar` parser.
+- [ ] A Smartbar-shaped RSS fixture creates review items with event title,
+      candidate start date/time, source URL, parser version, and evidence
+      excerpt.
+- [ ] Items with no reliable event date are flagged as low-confidence or source
+      health issues instead of creating publish-ready drafts.
+- [ ] RSS parser failures update run logs and source-target failure counters.
+- [ ] Existing ICS `venue-calendar` behavior remains unchanged.
+
+### Phase 9 (v2.2.0 candidates)
 
 Deferred work, in rough priority order:
 
