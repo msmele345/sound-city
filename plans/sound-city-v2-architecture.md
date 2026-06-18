@@ -561,15 +561,15 @@ Risks and constraints:
 
 V2 Phase 8 acceptance criteria:
 
-- [ ] Admins can create an enabled RSS source target without using the
+- [x] Admins can create an enabled RSS source target without using the
       `venue-calendar` parser.
-- [ ] A Smartbar-shaped RSS fixture creates review items with event title,
+- [x] A Smartbar-shaped RSS fixture creates review items with event title,
       candidate start date/time, source URL, parser version, and evidence
       excerpt.
-- [ ] Items with no reliable event date are flagged as low-confidence or source
+- [x] Items with no reliable event date are flagged as low-confidence or source
       health issues instead of creating publish-ready drafts.
-- [ ] RSS parser failures update run logs and source-target failure counters.
-- [ ] Existing ICS `venue-calendar` behavior remains unchanged.
+- [x] RSS parser failures update run logs and source-target failure counters.
+- [x] Existing ICS `venue-calendar` behavior remains unchanged.
 
 ### Phase 9 (v2.2.0 candidates)
 

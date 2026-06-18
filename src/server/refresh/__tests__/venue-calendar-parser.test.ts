@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseVenueCalendarTarget, type Fetcher } from "../venue-calendar-parser";
-import type { SourceTargetRecord } from "../types";
+import { parseVenueCalendarTarget } from "../venue-calendar-parser";
+import type { Fetcher, SourceTargetRecord } from "../types";
 
 function createTarget(overrides: Partial<SourceTargetRecord> = {}): SourceTargetRecord {
   return {

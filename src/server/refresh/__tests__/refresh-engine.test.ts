@@ -401,6 +401,131 @@ describe("refresh engine", () => {
     expect(updated!.failureCount).toBe(0);
   });
 
+  it("runs the RSS event feed parser and creates review items from XML", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Smartbar",
+      slug: "smartbar",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://smartbarchicago.com/events/feed/",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "rss-event-feed",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+
+    const rssBody = `<?xml version="1.0"?><rss><channel><item>
+      <title>Queen! with Derrick Carter</title>
+      <link>https://smartbarchicago.com/event/queen-derrick-carter/</link>
+      <pubDate>Mon, 01 Jun 2026 15:00:00 -0500</pubDate>
+      <description><![CDATA[
+        <p>Sunday, June 28, 2026</p>
+        <p>Doors: 10:00 PM</p>
+      ]]></description>
+    </item></channel></rss>`;
+    const mockFetcher = async () => ({
+      body: rssBody,
+      contentType: "application/rss+xml",
+      status: 200,
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: mockFetcher,
+    });
+
+    expect(result.run.status).toBe("succeeded");
+    expect(result.run.sourceTargetsChecked).toBe(1);
+    expect(result.run.sourceTargetsFailed).toBe(0);
+    expect(result.run.draftsCreated).toBe(1);
+
+    expect(result.reviewItems).toHaveLength(1);
+    expect(result.reviewItems[0]).toMatchObject({
+      lane: "new-event",
+      sourceTargetId: target.id,
+      parserVersion: "rss-event-feed@1",
+    });
+    expect(result.reviewItems[0].normalizedDraft).toMatchObject({
+      title: "Queen! with Derrick Carter",
+      venueName: "Smartbar",
+      startsAt: "2026-06-29T03:00:00.000Z",
+      ticketUrl: "https://smartbarchicago.com/event/queen-derrick-carter/",
+    });
+    expect(result.reviewItems[0].linkedDrafts).toEqual([
+      { type: "venue", name: "Smartbar" },
+    ]);
+
+    const updated = await store.getSourceTarget(target.id);
+    expect(updated!.lastSuccessfulRunAt).not.toBeNull();
+    expect(updated!.failureCount).toBe(0);
+  });
+
+  it("marks RSS event feed targets as failed and logs parser failures", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Smartbar",
+      slug: "smartbar",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://smartbarchicago.com/events/feed/",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "rss-event-feed",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+    const mockFetcher = async () => ({
+      body: "<html><body>JavaScript required</body></html>",
+      contentType: "text/html",
+      status: 200,
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: mockFetcher,
+    });
+
+    expect(result.run.status).toBe("failed");
+    expect(result.run.sourceTargetsFailed).toBe(1);
+    expect(result.run.errorSummary).toMatch(/rss\/xml/i);
+
+    const updated = await store.getSourceTarget(target.id);
+    expect(updated!.failureCount).toBe(1);
+    expect(updated!.lastFailureReason).toMatch(/rss\/xml/i);
+
+    const logs = await store.listRunLogs(result.run.id);
+    expect(logs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          level: "error",
+          message: expect.stringMatching(/rss\/xml/i),
+          metadata: { parserStrategy: "rss-event-feed" },
+        }),
+      ]),
+    );
+  });
+
   it("marks venue-calendar target as failed when fetch returns non-ICS content", async () => {
     const store = createSeedRefreshStore();
     const owner = await store.createSourceOwner({

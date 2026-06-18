@@ -200,6 +200,40 @@ describe("admin source-targets route handlers", () => {
     });
   });
 
+  it("creates an enabled RSS event feed source target", async () => {
+    const owner = await createOwner("RSS Smartbar", "rss-smartbar");
+
+    const response = await POST(
+      requestFor("/api/admin/source-targets", {
+        method: "POST",
+        body: JSON.stringify({
+          entity: "sourceTarget",
+          input: {
+            cityId: "city_chicago",
+            ownerId: owner.id,
+            url: "https://smartbarchicago.com/events/feed/",
+            sourceType: "official-venue-calendar",
+            parserStrategy: "rss-event-feed",
+            trustLevel: "primary",
+            enabled: true,
+            confidenceAdjustment: 0,
+            healthStatus: "healthy",
+            refreshCadence: "daily",
+            notes: "",
+          },
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect((await response.json()).target).toMatchObject({
+      ownerId: owner.id,
+      parserStrategy: "rss-event-feed",
+      sourceType: "official-venue-calendar",
+      enabled: true,
+    });
+  });
+
   it("rejects the dev-static parser strategy in production", async () => {
     process.env.VERCEL_ENV = "production";
 

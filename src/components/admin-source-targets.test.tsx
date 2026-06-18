@@ -120,6 +120,7 @@ describe("AdminSourceTargets", () => {
       (option) => (option as HTMLOptionElement).value,
     );
     expect(options).toContain("venue-calendar");
+    expect(options).toContain("rss-event-feed");
     expect(options).not.toContain("dev-static");
   });
 

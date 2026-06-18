@@ -19,6 +19,7 @@ type SourceType =
 
 type ParserStrategy =
   | "venue-calendar"
+  | "rss-event-feed"
   | "artist-social"
   | "resident-advisor"
   | "dev-static";
@@ -138,6 +139,7 @@ const sourceTypes: SourceType[] = [
 
 const realParserStrategies: ParserStrategy[] = [
   "venue-calendar",
+  "rss-event-feed",
   "artist-social",
   "resident-advisor",
 ];
