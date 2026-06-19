@@ -1,6 +1,7 @@
 import type { CatalogStore } from "../catalog/catalog-store";
 import * as CatalogOps from "../catalog/operations";
 import type { CreateEventInput, SourceInput } from "../catalog/types";
+import { slugFromText } from "../slug";
 import type { RefreshStore } from "./refresh-store";
 import type {
   ReviewItemRecord,
@@ -22,6 +23,13 @@ export type ApproveResult = {
   publishedSourceId: string | null;
 };
 
+export type ApprovalTransaction = <T>(
+  callback: (
+    refreshStore: RefreshStore,
+    catalogStore: CatalogStore,
+  ) => Promise<T>,
+) => Promise<T>;
+
 export type RejectResult = {
   reviewItem: ReviewItemRecord;
 };
@@ -36,14 +44,6 @@ function assertPresent(value: string | undefined | null, field: string): string 
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
-
-function slugFromText(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
-}
 
 function now(): string {
   return new Date().toISOString();
@@ -215,6 +215,24 @@ async function publishNewEvent(
   assertPresent(draft.title, "event title");
   assertPresent(draft.startsAt, "event start date");
 
+  const eventTitle = draft.title!;
+  const eventStartsAt = draft.startsAt!;
+  const eventSlug = slugFromText(eventTitle);
+  const existingEvent = (await catalogStore.listEvents("chicago")).find(
+    (event) => event.slug === eventSlug,
+  );
+  if (existingEvent) {
+    if (existingEvent.startsAt !== eventStartsAt) {
+      throw new Error(
+        `Event slug already exists with a different start date: ${eventSlug}`,
+      );
+    }
+    return {
+      entityId: existingEvent.id,
+      sourceId: existingEvent.source.id,
+    };
+  }
+
   const { venueSlug } = await ensureVenue(
     catalogStore,
     draft,
@@ -232,9 +250,6 @@ async function publishNewEvent(
     "chicago",
   );
 
-  const eventTitle = draft.title!;
-  const eventStartsAt = draft.startsAt!;
-  const eventSlug = slugFromText(eventTitle);
   const source = sourceFromEvidence(sourceTitle, sourceUrl);
 
   const eventInput: CreateEventInput = {
@@ -328,6 +343,7 @@ export async function approveReviewItem(
   itemId: string,
   reviewer: string,
   options: ApproveOptions = {},
+  transaction?: ApprovalTransaction,
 ): Promise<ApproveResult> {
   const item = await refreshStore.getReviewItem(itemId);
   if (!item) {
@@ -350,11 +366,18 @@ export async function approveReviewItem(
   let publishedEntityId: string | null = null;
   let publishedSourceId: string | null = null;
 
-  return refreshStore.withTransaction(async (txStore) => {
+  const withTransaction: ApprovalTransaction =
+    transaction ??
+    ((callback) =>
+      refreshStore.withTransaction((txStore) =>
+        callback(txStore, catalogStore),
+      ));
+
+  return withTransaction(async (txStore, txCatalogStore) => {
     switch (item.lane as ReviewLane) {
       case "new-event": {
         const result = await publishNewEvent(
-          catalogStore,
+          txCatalogStore,
           { ...item, normalizedDraft: effectiveDraft },
           sourceTitle,
           sourceUrl,
@@ -366,7 +389,7 @@ export async function approveReviewItem(
       case "proposed-update": {
         const acceptedFields = options.acceptedFields ?? [];
         const result = await publishEventUpdate(
-          catalogStore,
+          txCatalogStore,
           item,
           acceptedFields,
           sourceTitle,

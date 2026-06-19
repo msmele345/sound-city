@@ -1,3 +1,4 @@
+import { slugFromText } from "../slug";
 import type { RefreshStore } from "./refresh-store";
 import type {
   CreateSourceOwnerInput,
@@ -101,14 +102,6 @@ export function validateParserStrategy(strategy: ParserStrategy): void {
   if (strategy === "dev-static" && process.env.VERCEL_ENV === "production") {
     throw new Error("dev-static parser strategy is not allowed in production");
   }
-}
-
-function slugFromText(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
 }
 
 // ─── Source Owner operations ──────────────────────────────────────

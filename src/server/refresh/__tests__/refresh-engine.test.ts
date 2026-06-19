@@ -122,6 +122,97 @@ describe("refresh engine", () => {
     );
   });
 
+  it("does not enqueue the same review fingerprints on repeated refreshes", async () => {
+    const store = createSeedRefreshStore();
+    await createDevTarget(store);
+
+    const first = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    const second = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    expect(first.reviewItems).toHaveLength(4);
+    expect(second.reviewItems).toHaveLength(0);
+    expect(await store.listReviewItems("city_chicago")).toHaveLength(4);
+    expect(second.run.draftsCreated).toBe(0);
+    expect(second.run.updatesProposed).toBe(0);
+    expect(second.run.duplicatesFlagged).toBe(0);
+    expect(second.run.staleTasksCreated).toBe(0);
+  });
+
+  it("does not enqueue a new-event candidate already present in the catalog", async () => {
+    const store = createSeedRefreshStore();
+    await createDevTarget(store);
+    const catalog = createSeedCatalogStore({
+      cities: [
+        {
+          id: "city_chicago",
+          name: "Chicago",
+          slug: "chicago",
+          timeZone: "America/Chicago",
+        },
+      ],
+      venues: [
+        {
+          id: "venue_fixture_warehouse",
+          citySlug: "chicago",
+          name: "Fixture Warehouse",
+          slug: "fixture-warehouse",
+          neighborhood: "West Loop",
+          address: "TBD",
+          capacity: null,
+          source: {
+            id: "source_fixture_warehouse",
+            title: "Fixture Warehouse",
+            url: "https://fixtures.sound-city.test/dev-static",
+            lastVerifiedAt: "2026-06-01T00:00:00.000Z",
+          },
+          signals: [],
+        },
+      ],
+      artists: [],
+      events: [],
+    });
+    const [venue] = await catalog.listVenues("chicago");
+    await catalog.createEvent({
+      id: "event_late_shift_control_room",
+      citySlug: "chicago",
+      title: "Late Shift Control Room",
+      slug: "late-shift-control-room",
+      startsAt: "2026-06-19T04:00:00.000Z",
+      venue,
+      artists: [],
+      styles: ["house", "groovy"],
+      source: {
+        id: "source_event_late-shift-control-room",
+        title: "Late Shift Control Room",
+        url: "https://fixtures.sound-city.test/dev-static/late-shift",
+        lastVerifiedAt: "2026-06-01T00:00:00.000Z",
+      },
+    });
+
+    const result = await runManualRefresh(
+      store,
+      {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+        now: new Date("2026-06-01T00:00:00.000Z"),
+      },
+      catalog,
+    );
+
+    expect(
+      result.reviewItems.some(
+        (item) => item.matchFingerprint === "fixture-new-late-shift",
+      ),
+    ).toBe(false);
+    expect(result.run.draftsCreated).toBe(0);
+  });
+
   it("marks unsupported enabled targets as partial and records visible errors", async () => {
     const store = createSeedRefreshStore();
     const owner = await store.createSourceOwner({

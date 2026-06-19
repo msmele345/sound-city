@@ -1,4 +1,5 @@
 import type { CatalogReader } from "../catalog/catalog-store";
+import { slugFromText } from "../slug";
 import { parseDevStaticTarget } from "./dev-parser";
 import type { RefreshStore } from "./refresh-store";
 import { parseRssEventFeedTarget } from "./rss-event-feed-parser";
@@ -56,6 +57,17 @@ function isoNow(date = new Date()) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Refresh failed";
+}
+
+function candidateEventKey(candidate: CreateReviewItemInput): string | null {
+  if (candidate.lane !== "new-event") {
+    return null;
+  }
+  const draft = candidate.normalizedDraft as Record<string, unknown>;
+  if (typeof draft.title !== "string" || typeof draft.startsAt !== "string") {
+    return null;
+  }
+  return `${slugFromText(draft.title)}:${draft.startsAt}`;
 }
 
 function unsupportedParserMessage(target: SourceTargetRecord) {
@@ -215,6 +227,22 @@ export async function runManualRefresh(
     const targets = (await store.listSourceTargets(input.cityId)).filter(
       (target) => target.enabled,
     );
+    const knownFingerprints = new Set(
+      (await store.listReviewItems(input.cityId)).map(
+        (item) => item.matchFingerprint,
+      ),
+    );
+    const knownEventKeys = new Set<string>();
+    if (catalogStore) {
+      const city = (await catalogStore.listCities()).find(
+        (candidate) => candidate.id === input.cityId,
+      );
+      if (city) {
+        for (const event of await catalogStore.listEvents(city.slug)) {
+          knownEventKeys.add(`${event.slug}:${event.startsAt}`);
+        }
+      }
+    }
 
     for (const target of targets) {
       metrics.sourceTargetsChecked += 1;
@@ -250,13 +278,24 @@ export async function runManualRefresh(
           throw new Error(unsupportedParserMessage(target));
         }
 
-        for (const candidate of candidates) {
+        const newCandidates = candidates.filter((candidate) => {
+          const eventKey = candidateEventKey(candidate);
+          return (
+            !knownFingerprints.has(candidate.matchFingerprint) &&
+            (!eventKey || !knownEventKeys.has(eventKey))
+          );
+        });
+
+        for (const candidate of newCandidates) {
           const item = await store.createReviewItem(candidate);
+          knownFingerprints.add(candidate.matchFingerprint);
+          const eventKey = candidateEventKey(candidate);
+          if (eventKey) knownEventKeys.add(eventKey);
           reviewItems.push(item);
           applyItemMetrics(metrics, item);
         }
 
-        const duplicateCount = candidates.filter(
+        const duplicateCount = newCandidates.filter(
           (candidate) => candidate.lane === "possible-duplicate",
         ).length;
         if (duplicateCount > 0) {
@@ -272,8 +311,11 @@ export async function runManualRefresh(
         await log(store, run.id, {
           sourceTargetId: target.id,
           level: "info",
-          message: `${target.parserStrategy} parser created ${candidates.length} review items`,
-          metadata: { parserStrategy: target.parserStrategy },
+          message: `${target.parserStrategy} parser created ${newCandidates.length} review items`,
+          metadata: {
+            parserStrategy: target.parserStrategy,
+            candidatesSkipped: candidates.length - newCandidates.length,
+          },
         });
       } catch (error) {
         metrics.sourceTargetsFailed += 1;

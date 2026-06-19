@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getCatalogStore } from "@/server/catalog/catalog-store";
 import { getRefreshStore } from "@/server/refresh/refresh-store";
 import {
   approveReviewItem,
   rejectReviewItem,
 } from "@/server/refresh/review-operations";
 import type { ApproveOptions } from "@/server/refresh/review-operations";
+import { getReviewStoreBundle } from "@/server/refresh/review-store-bundle";
 import type {
   ReviewLane,
   ReviewStatus,
@@ -166,8 +166,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as ReviewActionBody;
-    const refreshStore = getRefreshStore();
-    const catalogStore = getCatalogStore();
+    const reviewStores = getReviewStoreBundle();
+    const { refreshStore, catalogStore } = reviewStores;
     const reviewer = "admin-secret";
 
     switch (body.action) {
@@ -187,6 +187,7 @@ export async function POST(request: NextRequest) {
           id,
           reviewer,
           options,
+          reviewStores.withTransaction,
         );
 
         const history = await refreshStore.listDecisionHistory(id);

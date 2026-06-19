@@ -165,6 +165,51 @@ describe("review-operations", () => {
       expect(result.reviewItem.publishedSourceId).toBe(created!.source.id);
     });
 
+    it("reconciles a pending new-event approval when the event already exists", async () => {
+      const item = await refreshStore.createReviewItem(makeItem({}));
+      const draft = item.normalizedDraft as {
+        title: string;
+        startsAt: string;
+      };
+      const venue = (await catalogStore.listVenues("chicago")).find(
+        (candidate) => candidate.slug === "smartbar",
+      )!;
+      await catalogStore.createEvent({
+        id: "event_friday_night_house",
+        citySlug: "chicago",
+        title: draft.title,
+        slug: "friday-night-house",
+        startsAt: draft.startsAt,
+        venue,
+        artists: [],
+        styles: ["house", "techno"],
+        source: {
+          id: "source_event_friday-night-house",
+          title: "Existing event source",
+          url: "https://smartbarchicago.com/calendar",
+          lastVerifiedAt: new Date().toISOString(),
+        },
+      });
+
+      const result = await approveReviewItem(
+        refreshStore,
+        catalogStore,
+        item.id,
+        "admin-secret",
+      );
+
+      expect(result.reviewItem.status).toBe("approved");
+      expect(result.publishedEntityId).toBe("event_friday_night_house");
+      expect(result.publishedSourceId).toBe(
+        "source_event_friday-night-house",
+      );
+      expect(
+        (await catalogStore.listEvents("chicago")).filter(
+          (event) => event.id === "event_friday_night_house",
+        ),
+      ).toHaveLength(1);
+    });
+
     it("publishes a new event and creates linked venue when it doesn't exist", async () => {
       const item = await refreshStore.createReviewItem(
         makeItem({

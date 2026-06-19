@@ -20,19 +20,12 @@ import type {
 } from "./types";
 
 import type { CatalogStore } from "./catalog-store";
+import { slugFromText } from "../slug";
 
 function assertPresent(value: string, field: string) {
   if (!value.trim()) {
     throw new Error(`${field} is required`);
   }
-}
-
-function slugFromText(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
 }
 
 function assertSource(source: SourceInput) {
