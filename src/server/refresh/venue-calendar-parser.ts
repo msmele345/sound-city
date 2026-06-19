@@ -1,15 +1,7 @@
 import { parseIcs } from "./ics-parser";
-import type { CreateReviewItemInput, SourceTargetRecord } from "./types";
+import type { CreateReviewItemInput, Fetcher, SourceTargetRecord } from "./types";
 
 const parserVersion = "venue-calendar@1";
-
-export type FetchResult = {
-  body: string;
-  contentType: string;
-  status: number;
-};
-
-export type Fetcher = (url: string) => Promise<FetchResult>;
 
 function normalizeForFingerprint(value: string): string {
   return value

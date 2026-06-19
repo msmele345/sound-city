@@ -1,17 +1,16 @@
 import type { CatalogReader } from "../catalog/catalog-store";
 import { parseDevStaticTarget } from "./dev-parser";
 import type { RefreshStore } from "./refresh-store";
+import { parseRssEventFeedTarget } from "./rss-event-feed-parser";
 import type {
   CreateReviewItemInput,
+  Fetcher,
   RefreshRunRecord,
   ReviewItemRecord,
   RunStatus,
   SourceTargetRecord,
 } from "./types";
-import {
-  parseVenueCalendarTarget,
-  type Fetcher,
-} from "./venue-calendar-parser";
+import { parseVenueCalendarTarget } from "./venue-calendar-parser";
 
 const defaultMaxRunAgeMs = 15 * 60 * 1000;
 
@@ -237,6 +236,15 @@ export async function runManualRefresh(
             run.id,
             fetchedAt,
             fetcher,
+          );
+        } else if (target.parserStrategy === "rss-event-feed") {
+          const owner = await store.getSourceOwner(target.ownerId);
+          candidates = await parseRssEventFeedTarget(
+            target,
+            run.id,
+            fetchedAt,
+            fetcher,
+            { owner },
           );
         } else {
           throw new Error(unsupportedParserMessage(target));

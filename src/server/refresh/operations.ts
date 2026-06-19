@@ -46,6 +46,7 @@ const sourceTypes = new Set<SourceType>([
 
 const parserStrategies = new Set<ParserStrategy>([
   "venue-calendar",
+  "rss-event-feed",
   "artist-social",
   "resident-advisor",
   "dev-static",

@@ -11,6 +11,14 @@ export type SourceOwnerRecord = {
   updatedAt: string;
 };
 
+export type FetchResult = {
+  body: string;
+  contentType: string;
+  status: number;
+};
+
+export type Fetcher = (url: string) => Promise<FetchResult>;
+
 export type CreateSourceOwnerInput = Omit<
   SourceOwnerRecord,
   "id" | "createdAt" | "updatedAt"
@@ -31,6 +39,7 @@ export type SourceType =
 
 export type ParserStrategy =
   | "venue-calendar"
+  | "rss-event-feed"
   | "artist-social"
   | "resident-advisor"
   | "dev-static";

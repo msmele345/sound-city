@@ -168,6 +168,22 @@ describe("source target operations", () => {
     expect(target.parserStrategy).toBe("dev-static");
   });
 
+  it("creates an enabled RSS event feed target for official venue feeds", async () => {
+    const target = await createSourceTarget(
+      store,
+      targetInput(ownerId, {
+        url: "https://smartbarchicago.com/events/feed/",
+        parserStrategy: "rss-event-feed",
+        sourceType: "official-venue-calendar",
+        enabled: true,
+      }),
+    );
+
+    expect(target.parserStrategy).toBe("rss-event-feed");
+    expect(target.sourceType).toBe("official-venue-calendar");
+    expect(target.enabled).toBe(true);
+  });
+
   it("validates URL on update", async () => {
     const target = await createSourceTarget(store, targetInput(ownerId));
 
