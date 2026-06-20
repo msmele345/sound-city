@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type SourceOwnerKind =
   | "listing-platform"
@@ -259,15 +266,18 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
 function RowButton({
   onClick,
   children,
+  disabled = false,
 }: {
   onClick(): void;
   children: React.ReactNode;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
+      disabled={disabled}
+      className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal disabled:cursor-not-allowed disabled:opacity-40"
     >
       {children}
     </button>
@@ -294,6 +304,16 @@ function labelFromKebab(value: string) {
 function draftTitle(item: ReviewItemRecord) {
   const title = item.normalizedDraft.title;
   return typeof title === "string" && title.trim() ? title : "Untitled draft";
+}
+
+function approvalLabel(lane: ReviewLane) {
+  return {
+    "new-event": "Approve and publish",
+    "proposed-update": "Apply selected changes",
+    "possible-duplicate": "Resolve duplicate",
+    "stale-task": "Acknowledge",
+    "source-health": "Acknowledge",
+  }[lane];
 }
 
 function metricLine(run: RefreshRunRecord) {
@@ -336,6 +356,8 @@ function ReviewLanePanel({
   onApprove,
   onReject,
   onUpdateDraft,
+  submittingItemId,
+  itemErrors,
 }: {
   lane: ReviewLane;
   items: ReviewItemRecord[];
@@ -346,12 +368,18 @@ function ReviewLanePanel({
       acceptedFields?: string[];
       editedDraft?: Record<string, unknown>;
     },
-  ): void;
-  onReject(id: string, reason: string, notes?: string): void;
+  ): Promise<boolean>;
+  onReject(id: string, reason: string, notes?: string): Promise<boolean>;
   onUpdateDraft(id: string, draft: Record<string, unknown>): void;
+  submittingItemId: string | null;
+  itemErrors: Record<string, string>;
 }) {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [selectedFields, setSelectedFields] = useState<Record<string, string[]>>({});
+  const [approvalConfirmation, setApprovalConfirmation] = useState<{
+    itemId: string;
+    extra?: { acceptedFields?: string[]; editedDraft?: Record<string, unknown> };
+  } | null>(null);
 
   function toggleExpanded(itemId: string) {
     setExpandedItemId((current) => (current === itemId ? null : itemId));
@@ -448,28 +476,75 @@ function ReviewLanePanel({
                           onClick={() => {
                             const fields = selectedFields[item.id] ?? [];
                             if (fields.length === 0) return;
-                            onApprove(item.id, { acceptedFields: fields });
+                            setApprovalConfirmation({
+                              itemId: item.id,
+                              extra: { acceptedFields: fields },
+                            });
                           }}
-                          disabled={(selectedFields[item.id] ?? []).length === 0}
+                          disabled={
+                            (selectedFields[item.id] ?? []).length === 0 ||
+                            submittingItemId === item.id
+                          }
                           className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel disabled:opacity-40"
                         >
-                          Accept selected
+                          {approvalLabel(item.lane)}
                         </button>
                       </>
                     ) : (
                       <button
                         type="button"
-                        onClick={() => onApprove(item.id)}
+                        onClick={() => setApprovalConfirmation({ itemId: item.id })}
+                        disabled={submittingItemId === item.id}
                         className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel"
                       >
-                        Approve
+                        {approvalLabel(item.lane)}
                       </button>
                     )}
                     <RejectButton
+                      itemTitle={draftTitle(item)}
+                      disabled={submittingItemId === item.id}
                       onReject={(reason, notes) =>
                         onReject(item.id, reason, notes)
                       }
                     />
+                    {approvalConfirmation?.itemId === item.id ? (
+                      <div className="basis-full border-l-2 border-signal py-2 pl-3">
+                        <p className="text-sm text-ink">
+                          {item.lane === "new-event"
+                            ? `Publish ${draftTitle(item)} to the public catalog?`
+                            : `${approvalLabel(item.lane)} for ${draftTitle(item)}?`}
+                        </p>
+                        <div className="mt-2 flex gap-1">
+                          <button
+                            type="button"
+                            disabled={submittingItemId === item.id}
+                            onClick={async () => {
+                              const succeeded = await onApprove(
+                                item.id,
+                                approvalConfirmation.extra,
+                              );
+                              if (succeeded) setApprovalConfirmation(null);
+                            }}
+                            className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal disabled:opacity-40"
+                          >
+                            {submittingItemId === item.id ? "Approving…" : "Confirm"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={submittingItemId === item.id}
+                            onClick={() => setApprovalConfirmation(null)}
+                            className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-dim disabled:opacity-40"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                    {itemErrors[item.id] ? (
+                      <p role="alert" className="basis-full text-sm text-ink">
+                        {itemErrors[item.id]} Try again or cancel and review the item.
+                      </p>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -551,13 +626,17 @@ function ReviewLanePanel({
                           onClick={(event) => {
                             const form = event.currentTarget.form;
                             if (!form) return;
-                            onApprove(item.id, {
-                              editedDraft: draftFromForm(new FormData(form)),
+                            setApprovalConfirmation({
+                              itemId: item.id,
+                              extra: {
+                                editedDraft: draftFromForm(new FormData(form)),
+                              },
                             });
                           }}
+                          disabled={submittingItemId === item.id}
                           className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel"
                         >
-                          Approve with edits
+                          Approve edits and publish
                         </button>
                       </div>
                     </form>
@@ -596,25 +675,30 @@ function ReviewLanePanel({
 
 function RejectButton({
   onReject,
+  itemTitle,
+  disabled,
 }: {
-  onReject(reason: string, notes?: string): void;
+  onReject(reason: string, notes?: string): Promise<boolean>;
+  itemTitle: string;
+  disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const reason = String(form.get("reason") ?? "").trim();
     const notes = String(form.get("notes") ?? "").trim();
     if (!reason) return;
-    onReject(reason, notes || undefined);
-    setOpen(false);
+    const succeeded = await onReject(reason, notes || undefined);
+    if (succeeded) setOpen(false);
   }
 
   if (!open) {
     return (
       <button
         type="button"
+        disabled={disabled}
         onClick={() => setOpen(true)}
         className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-dim hover:bg-panel hover:text-signal"
       >
@@ -627,8 +711,9 @@ function RejectButton({
     <form
       onSubmit={handleSubmit}
       className="ml-2 border border-rule p-2"
-      aria-label="Reject review item"
+      aria-label={`Reject ${itemTitle}`}
     >
+      <p className="mb-2 text-xs text-ink-dim">Reject {itemTitle}</p>
       <label className="block font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-faint">
         Reason *
         <input
@@ -647,12 +732,14 @@ function RejectButton({
       <div className="mt-2 flex gap-1">
         <button
           type="submit"
+          disabled={disabled}
           className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-signal hover:bg-panel"
         >
           Confirm
         </button>
         <button
           type="button"
+          disabled={disabled}
           onClick={() => setOpen(false)}
           className="border border-rule px-2 py-1 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink-dim hover:bg-panel"
         >
@@ -695,6 +782,30 @@ export function AdminSourceTargets({
     reviewItems: [],
   });
   const [status, setStatus] = useState("Loading source targets");
+  const [statusKind, setStatusKind] = useState<"status" | "alert">("status");
+  const reportStatus = useCallback((message: string) => {
+    setStatusKind("status");
+    setStatus(message);
+  }, []);
+  const reportError = useCallback((message: string) => {
+    setStatusKind("alert");
+    setStatus(message);
+  }, []);
+  const [submittingItemId, setSubmittingItemId] = useState<string | null>(null);
+  const submittingItemRef = useRef<string | null>(null);
+  const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
+  const [reviewResult, setReviewResult] = useState<{
+    message: string;
+    filter: "approved" | "rejected";
+  } | null>(null);
+  const [isRefreshRunning, setIsRefreshRunning] = useState(false);
+  const refreshRunningRef = useRef(false);
+  const [refreshResult, setRefreshResult] = useState<{
+    run: RefreshRunRecord;
+    pendingCount: number;
+  } | null>(null);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const reviewSectionRef = useRef<HTMLElement | null>(null);
 
   const targetsByOwner = useMemo(() => {
     const grouped = new Map<string, SourceTargetRecord[]>();
@@ -762,7 +873,7 @@ export function AdminSourceTargets({
         const refreshes = await readRefreshRuns(secret);
         setSnapshot({ owners: body.owners, targets: body.targets });
         setRefreshSnapshot(refreshes);
-        setStatus("Source targets ready");
+        reportStatus("Source targets ready");
         setRequiresSecret(false);
       } catch (error) {
         if (isUnauthorized(error)) {
@@ -771,7 +882,7 @@ export function AdminSourceTargets({
         throw error;
       }
     },
-    [adminSecret, readRefreshRuns, readSources],
+    [adminSecret, readRefreshRuns, readSources, reportStatus],
   );
 
   useEffect(() => {
@@ -782,7 +893,7 @@ export function AdminSourceTargets({
         if (active) {
           setSnapshot({ owners: body.owners, targets: body.targets });
           setRefreshSnapshot(refreshes);
-          setStatus("Source targets ready");
+          reportStatus("Source targets ready");
           setRequiresSecret(false);
         }
       })
@@ -791,7 +902,7 @@ export function AdminSourceTargets({
           if (isUnauthorized(error)) {
             setRequiresSecret(true);
           }
-          setStatus(
+          reportError(
             error instanceof Error ? error.message : "Source targets failed",
           );
         }
@@ -800,7 +911,7 @@ export function AdminSourceTargets({
     return () => {
       active = false;
     };
-  }, [adminSecret, readRefreshRuns, readSources]);
+  }, [adminSecret, readRefreshRuns, readSources, reportError, reportStatus]);
 
   async function mutate(
     method: "DELETE" | "PATCH" | "POST",
@@ -820,7 +931,7 @@ export function AdminSourceTargets({
       }
       throw new Error(body.error ?? "Source target mutation failed");
     }
-    setStatus(`${entity} saved`);
+    reportStatus(`${entity} saved`);
     await loadSources();
   }
 
@@ -831,7 +942,7 @@ export function AdminSourceTargets({
       try {
         await handler(form);
       } catch (error) {
-        setStatus(
+        reportError(
           error instanceof Error ? error.message : "Source target mutation failed",
         );
       }
@@ -845,7 +956,7 @@ export function AdminSourceTargets({
     try {
       await mutate("DELETE", entity, undefined, id);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Deletion failed");
+      reportError(error instanceof Error ? error.message : "Deletion failed");
     }
   }
 
@@ -858,13 +969,17 @@ export function AdminSourceTargets({
         target.id,
       );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Toggle failed");
+      reportError(error instanceof Error ? error.message : "Toggle failed");
     }
   }
 
   async function runRefresh() {
+    if (refreshRunningRef.current) return;
+    refreshRunningRef.current = true;
+    setIsRefreshRunning(true);
+    setRefreshError(null);
     try {
-      setStatus("Running refresh");
+      reportStatus("Running refresh");
       const response = await fetch("/api/admin/refresh-runs?city=chicago", {
         method: "POST",
         headers: adminHeaders(),
@@ -896,10 +1011,21 @@ export function AdminSourceTargets({
           ...current.reviewItems.filter((item) => item.runId !== body.run!.id),
         ],
       }));
-      setStatus(`Refresh ${body.run.status}`);
+      setRefreshResult({
+        run: body.run,
+        pendingCount: (body.reviewItems ?? []).filter(
+          (item) => item.status === "pending",
+        ).length,
+      });
+      reportStatus(`Refresh ${body.run.status}`);
       await loadSources();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Refresh run failed");
+      const message = error instanceof Error ? error.message : "Refresh run failed";
+      reportError(message);
+      setRefreshError(message);
+    } finally {
+      refreshRunningRef.current = false;
+      setIsRefreshRunning(false);
     }
   }
 
@@ -911,9 +1037,19 @@ export function AdminSourceTargets({
     action: "approve" | "reject",
     itemId: string,
     extra?: { acceptedFields?: string[]; editedDraft?: Record<string, unknown>; reason?: string; notes?: string },
-  ) {
+  ): Promise<boolean> {
+    if (submittingItemRef.current === itemId) return false;
+    const item = refreshSnapshot.reviewItems.find((candidate) => candidate.id === itemId);
+    if (!item) return false;
+    submittingItemRef.current = itemId;
+    setSubmittingItemId(itemId);
+    setItemErrors((current) => {
+      const next = { ...current };
+      delete next[itemId];
+      return next;
+    });
     try {
-      setStatus(`${action}ing review item`);
+      reportStatus(`${action}ing review item`);
       const response = await fetch("/api/admin/review-items", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...adminHeaders() },
@@ -927,16 +1063,46 @@ export function AdminSourceTargets({
         if (response.status === 401) setRequiresSecret(true);
         throw new Error(body.error ?? "Review action failed");
       }
-      setStatus(`Review item ${action}d`);
+      if (!body.reviewItem) throw new Error("Review action returned no item");
+      setRefreshSnapshot((current) => ({
+        ...current,
+        reviewItems: current.reviewItems.map((candidate) =>
+          candidate.id === itemId ? body.reviewItem! : candidate,
+        ),
+      }));
+      const editedTitle = extra?.editedDraft?.title;
+      const title =
+        typeof editedTitle === "string" && editedTitle.trim()
+          ? editedTitle
+          : draftTitle(item);
+      const message =
+        action === "reject"
+          ? `Rejected: ${title}`
+          : item.lane === "new-event"
+            ? `Approved and published: ${title}`
+            : item.lane === "proposed-update"
+              ? `Applied selected changes: ${title}`
+              : item.lane === "possible-duplicate"
+                ? `Resolved duplicate: ${title}`
+                : `Acknowledged: ${title}`;
+      setReviewResult({ message, filter: action === "reject" ? "rejected" : "approved" });
+      reportStatus(`Review item ${action}d`);
       await loadSources();
+      return true;
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Review action failed");
+      const message = error instanceof Error ? error.message : "Review action failed";
+      reportError(message);
+      setItemErrors((current) => ({ ...current, [itemId]: message }));
+      return false;
+    } finally {
+      submittingItemRef.current = null;
+      setSubmittingItemId(null);
     }
   }
 
   async function updateDraft(itemId: string, draft: Record<string, unknown>) {
     try {
-      setStatus("Updating draft");
+      reportStatus("Updating draft");
       const response = await fetch("/api/admin/review-items", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...adminHeaders() },
@@ -950,10 +1116,10 @@ export function AdminSourceTargets({
         if (response.status === 401) setRequiresSecret(true);
         throw new Error(body.error ?? "Draft update failed");
       }
-      setStatus("Draft updated");
+      reportStatus("Draft updated");
       await loadSources();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Draft update failed");
+      reportError(error instanceof Error ? error.message : "Draft update failed");
     }
   }
 
@@ -964,12 +1130,12 @@ export function AdminSourceTargets({
 
     setAdminSecret(secret);
     window.sessionStorage.setItem(adminSecretStorageKey, secret);
-    setStatus("Checking admin secret");
+    reportStatus("Checking admin secret");
 
     try {
       await loadSources(secret);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Admin secret failed");
+      reportError(error instanceof Error ? error.message : "Admin secret failed");
     }
   }
 
@@ -1001,7 +1167,7 @@ export function AdminSourceTargets({
       </header>
 
       <p
-        role="alert"
+        role={statusKind}
         aria-label="Source targets status"
         className="mt-5 border-y border-rule py-3 font-mono text-xs uppercase tracking-[0.16em] text-ink-dim"
       >
@@ -1047,8 +1213,45 @@ export function AdminSourceTargets({
                       : "No runs recorded"}
                   </p>
                 </div>
-                <RowButton onClick={runRefresh}>Run refresh</RowButton>
+                <RowButton onClick={runRefresh} disabled={isRefreshRunning}>
+                  {isRefreshRunning ? "Running…" : "Run refresh"}
+                </RowButton>
               </div>
+              {isRefreshRunning ? (
+                <p role="status" className="mt-3 text-sm text-ink-dim">
+                  Running {snapshot.targets.filter((target) => target.enabled).length}{" "}
+                  enabled targets…
+                </p>
+              ) : null}
+              {refreshResult ? (
+                <div
+                  role="status"
+                  aria-label="Refresh run result"
+                  className="mt-3 border-t border-rule pt-3 text-sm text-ink"
+                >
+                  <p>
+                    Refresh {refreshResult.run.status} / {metricLine(refreshResult.run)}.
+                  </p>
+                  <p className="mt-1">
+                    {refreshResult.pendingCount} items need review. {" "}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReviewStatusFilter("pending");
+                        reviewSectionRef.current?.focus();
+                      }}
+                      className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-signal underline underline-offset-4"
+                    >
+                      View pending
+                    </button>
+                  </p>
+                </div>
+              ) : null}
+              {refreshError ? (
+                <p role="alert" className="mt-3 text-sm text-ink">
+                  {refreshError}. Check target health and run logs, then try again.
+                </p>
+              ) : null}
             </section>
 
             <form
@@ -1229,7 +1432,28 @@ export function AdminSourceTargets({
               })()}
             </section>
 
-            <section aria-label="Review lanes" className="border-b border-rule pb-6">
+            <section
+              ref={reviewSectionRef}
+              tabIndex={-1}
+              aria-label="Review lanes"
+              className="scroll-mt-6 border-b border-rule pb-6"
+            >
+              {reviewResult ? (
+                <div
+                  role="status"
+                  aria-label="Review action result"
+                  className="mb-4 border-y border-rule py-3 text-sm text-ink"
+                >
+                  {reviewResult.message}.{" "}
+                  <button
+                    type="button"
+                    onClick={() => setReviewStatusFilter(reviewResult.filter)}
+                    className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-signal underline underline-offset-4"
+                  >
+                    View {reviewResult.filter}
+                  </button>
+                </div>
+              ) : null}
               <div className="mb-4 flex flex-wrap items-center gap-3">
                 <span className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
                   Show:
@@ -1278,6 +1502,8 @@ export function AdminSourceTargets({
                         reviewAction("reject", id, { reason, notes })
                       }
                       onUpdateDraft={updateDraft}
+                      submittingItemId={submittingItemId}
+                      itemErrors={itemErrors}
                     />
                   );
                 })}
