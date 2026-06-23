@@ -32,7 +32,7 @@ export function normalizeStyleTags(styles: string[]): string[] {
     const trimmed = style.trim();
     if (!trimmed) continue;
 
-    const value = styleAliases.get(aliasKey(trimmed)) ?? trimmed;
+    const value = styleAliases.get(aliasKey(trimmed)) ?? trimmed.toLowerCase();
     const key = aliasKey(value);
     if (seen.has(key)) continue;
 

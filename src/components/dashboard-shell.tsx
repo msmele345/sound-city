@@ -797,9 +797,11 @@ function ArtistShowcase({
 function ArtistStyleMatches({
   directory,
   activeStyle,
+  excludeArtistId,
 }: {
   directory: ArtistDirectoryState;
   activeStyle: string;
+  excludeArtistId?: string;
 }) {
   if (activeStyle === "all") return null;
 
@@ -819,8 +821,9 @@ function ArtistStyleMatches({
     );
   }
 
-  const artists = directory.artists.filter((artist) =>
-    artist.styles.includes(activeStyle),
+  const artists = directory.artists.filter(
+    (artist) =>
+      artist.styles.includes(activeStyle) && artist.id !== excludeArtistId,
   );
 
   return (
@@ -1244,6 +1247,9 @@ export function DashboardShell() {
             <ArtistStyleMatches
               directory={artistDirectory}
               activeStyle={activeStyle}
+              excludeArtistId={
+                showcase.status === "ready" ? showcase.artist?.id : undefined
+              }
             />
           </section>
 

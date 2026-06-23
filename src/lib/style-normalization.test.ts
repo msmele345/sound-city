@@ -24,4 +24,10 @@ describe("normalizeStyleTags", () => {
       ]),
     ).toEqual(["hard house", "hard", "leftfield bass"]);
   });
+
+  it("lowercases unknown free-form styles for consistent filtering", () => {
+    expect(
+      normalizeStyleTags(["Hard House", "LEFTFIELD BASS", "Dub Techno"]),
+    ).toEqual(["hard house", "leftfield bass", "dub techno"]);
+  });
 });
