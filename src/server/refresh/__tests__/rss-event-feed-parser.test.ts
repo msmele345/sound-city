@@ -40,6 +40,8 @@ const smartbarRss = `<?xml version="1.0" encoding="UTF-8"?>
       <title>Queen! with Derrick Carter</title>
       <link>https://smartbarchicago.com/event/queen-derrick-carter/</link>
       <pubDate>Mon, 01 Jun 2026 15:00:00 -0500</pubDate>
+      <category>Melodic Techno</category>
+      <category>groovy-techno</category>
       <description><![CDATA[
         <p>Sunday, June 28, 2026</p>
         <p>Doors: 10:00 PM</p>
@@ -102,7 +104,7 @@ describe("parseRssEventFeedTarget", () => {
       title: "Queen! with Derrick Carter",
       startsAt: "2026-06-29T03:00:00.000Z",
       ticketUrl: "https://smartbarchicago.com/event/queen-derrick-carter/",
-      styles: [],
+      styles: ["melodic", "groovy"],
     });
     expect(items[0].evidence).toEqual({
       sourceUrls: ["https://smartbarchicago.com/event/queen-derrick-carter/"],

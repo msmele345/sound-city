@@ -14,6 +14,7 @@ import {
   type TasteVibe,
   type VenueSizePreference,
 } from "@/lib/recommendations";
+import { canonicalTechnoSubGenres } from "@/lib/style-normalization";
 
 const manifest = [
   { value: "24", label: "Verified" },
@@ -37,6 +38,7 @@ const styleOptions: TasteStyle[] = [
   "acid",
   "melodic house",
   "deep house",
+  ...canonicalTechnoSubGenres,
 ];
 
 const vibeOptions: { value: TasteVibe; label: string }[] = [
@@ -114,6 +116,11 @@ type ShowcaseState =
   | { status: "loading"; artist: null }
   | { status: "ready"; artist: ShowcaseArtist | null }
   | { status: "error"; artist: null };
+
+type ArtistDirectoryState =
+  | { status: "loading"; artists: ShowcaseArtist[] }
+  | { status: "ready"; artists: ShowcaseArtist[] }
+  | { status: "error"; artists: ShowcaseArtist[] };
 
 type CatalogVenueSignal = {
   id: string;
@@ -262,16 +269,27 @@ function SourceTrustLine({ source }: { source: CatalogSource }) {
   );
 }
 
-function EventDiscoveryFeed({ feed }: { feed: EventFeedState }) {
-  const [activeStyle, setActiveStyle] = useState("all");
-
+function EventDiscoveryFeed({
+  feed,
+  activeStyle,
+  onStyleChange,
+}: {
+  feed: EventFeedState;
+  activeStyle: string;
+  onStyleChange(style: string): void;
+}) {
   const events = useMemo(
     () =>
       feed.events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
     [feed.events],
   );
   const styles = useMemo(
-    () => [...new Set(events.flatMap((event) => event.styles))].toSorted(),
+    () => [
+      ...new Set([
+        ...canonicalTechnoSubGenres,
+        ...events.flatMap((event) => event.styles).toSorted(),
+      ]),
+    ],
     [events],
   );
   const visibleEvents = useMemo(
@@ -317,7 +335,7 @@ function EventDiscoveryFeed({ feed }: { feed: EventFeedState }) {
             key={style}
             type="button"
             aria-pressed={activeStyle === style}
-            onClick={() => setActiveStyle(style)}
+            onClick={() => onStyleChange(style)}
             className={`shrink-0 border-r border-rule px-3 py-2 transition-colors duration-150 hover:bg-panel hover:text-signal ${
               activeStyle === style ? "bg-panel text-signal" : "text-ink-dim"
             }`}
@@ -647,9 +665,11 @@ function RecommendedEvents({
 function ArtistShowcase({
   showcase,
   feed,
+  activeStyle,
 }: {
   showcase: ShowcaseState;
   feed: EventFeedState;
+  activeStyle: string;
 }) {
   if (showcase.status === "loading") {
     return (
@@ -672,6 +692,17 @@ function ArtistShowcase({
     return (
       <p className="border-b border-rule py-5 text-sm text-ink-dim">
         No weekly artist showcase is selected yet.
+      </p>
+    );
+  }
+
+  if (
+    activeStyle !== "all" &&
+    !showcase.artist.styles.includes(activeStyle)
+  ) {
+    return (
+      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        No featured artist matches {activeStyle}.
       </p>
     );
   }
@@ -759,6 +790,63 @@ function ArtistShowcase({
           </ol>
         )}
       </div>
+    </div>
+  );
+}
+
+function ArtistStyleMatches({
+  directory,
+  activeStyle,
+}: {
+  directory: ArtistDirectoryState;
+  activeStyle: string;
+}) {
+  if (activeStyle === "all") return null;
+
+  if (directory.status === "loading") {
+    return (
+      <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+        Loading artist style matches
+      </p>
+    );
+  }
+
+  if (directory.status === "error") {
+    return (
+      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        Artist style matches are unavailable.
+      </p>
+    );
+  }
+
+  const artists = directory.artists.filter((artist) =>
+    artist.styles.includes(activeStyle),
+  );
+
+  return (
+    <div className="border-b border-rule py-5">
+      <h4 className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">
+        Artists tagged {activeStyle}
+      </h4>
+      {artists.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-dim">
+          No verified artists match that style.
+        </p>
+      ) : (
+        <ol className="mt-2">
+          {artists.map((artist) => (
+            <li key={artist.id} className="border-t border-rule py-3">
+              <h5 className="font-display text-xl uppercase leading-none text-ink">
+                {artist.name}
+              </h5>
+              <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
+                {artist.styles.join(" / ")}
+              </p>
+              <SourceTrustLine source={artist.source} />
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }
@@ -920,6 +1008,7 @@ function SectionMark({
 }
 
 export function DashboardShell() {
+  const [activeStyle, setActiveStyle] = useState("all");
   const [feed, setFeed] = useState<EventFeedState>({
     status: "loading",
     events: [],
@@ -927,6 +1016,10 @@ export function DashboardShell() {
   const [showcase, setShowcase] = useState<ShowcaseState>({
     status: "loading",
     artist: null,
+  });
+  const [artistDirectory, setArtistDirectory] = useState<ArtistDirectoryState>({
+    status: "loading",
+    artists: [],
   });
   const [venueDirectory, setVenueDirectory] = useState<VenueDirectoryState>({
     status: "loading",
@@ -975,6 +1068,28 @@ export function DashboardShell() {
       }
     }
 
+    async function loadArtists() {
+      try {
+        const response = await fetch("/api/catalog/artists?city=chicago");
+        if (!response.ok) {
+          throw new Error("Artist directory unavailable");
+        }
+        const body = (await response.json()) as {
+          artists?: ShowcaseArtist[];
+        };
+        if (active) {
+          setArtistDirectory({
+            status: "ready",
+            artists: Array.isArray(body.artists) ? body.artists : [],
+          });
+        }
+      } catch {
+        if (active) {
+          setArtistDirectory({ status: "error", artists: [] });
+        }
+      }
+    }
+
     async function loadVenues() {
       try {
         const response = await fetch("/api/catalog/venues?city=chicago");
@@ -997,6 +1112,7 @@ export function DashboardShell() {
 
     void loadEvents();
     void loadShowcase();
+    void loadArtists();
     void loadVenues();
 
     return () => {
@@ -1105,7 +1221,11 @@ export function DashboardShell() {
               title="Latest Events"
               index="Source verified / 03"
             />
-            <EventDiscoveryFeed feed={feed} />
+            <EventDiscoveryFeed
+              feed={feed}
+              activeStyle={activeStyle}
+              onStyleChange={setActiveStyle}
+            />
           </section>
         </div>
 
@@ -1116,7 +1236,15 @@ export function DashboardShell() {
               title="Artist Showcase"
               index="Feature / 04"
             />
-            <ArtistShowcase showcase={showcase} feed={feed} />
+            <ArtistShowcase
+              showcase={showcase}
+              feed={feed}
+              activeStyle={activeStyle}
+            />
+            <ArtistStyleMatches
+              directory={artistDirectory}
+              activeStyle={activeStyle}
+            />
           </section>
 
           <section id="venues" aria-labelledby="venue-heading" className="min-w-0 scroll-mt-6">

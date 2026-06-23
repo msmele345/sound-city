@@ -372,12 +372,12 @@ sub-genres alongside the existing free-form `styles` values.
 
 Acceptance criteria:
 
-- [ ] `melodic`, `groovy`, `hard`, and `trance` are selectable in the public
+- [x] `melodic`, `groovy`, `hard`, and `trance` are selectable in the public
       style filter.
-- [ ] Events/artists tagged with these styles are returned when filtering by
+- [x] Events/artists tagged with these styles are returned when filtering by
       them.
-- [ ] Parser/review normalization maps common variants to the canonical tags.
-- [ ] No catalog schema migration is required (reuses `styles`).
+- [x] Parser/review normalization maps common variants to the canonical tags.
+- [x] No catalog schema migration is required (reuses `styles`).
 
 ## Source Health
 

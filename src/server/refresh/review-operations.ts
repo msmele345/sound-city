@@ -1,6 +1,7 @@
 import type { CatalogStore } from "../catalog/catalog-store";
 import * as CatalogOps from "../catalog/operations";
 import type { CreateEventInput, SourceInput } from "../catalog/types";
+import { normalizeStyleTags } from "@/lib/style-normalization";
 import type { RefreshStore } from "./refresh-store";
 import type {
   ReviewItemRecord,
@@ -191,7 +192,7 @@ async function ensureArtists(
       name: artistDraft.name,
       slug,
       bio: artistDraft.bio,
-      styles: artistDraft.styles ?? [],
+      styles: normalizeStyleTags(artistDraft.styles ?? []),
       showcase: false,
       source: sourceFromEvidence(sourceTitle, sourceUrl),
     });
@@ -244,7 +245,7 @@ async function publishNewEvent(
     startsAt: eventStartsAt,
     venueSlug,
     artistSlugs,
-    styles: draft.styles ?? [],
+    styles: normalizeStyleTags(draft.styles ?? []),
     source,
   };
 
@@ -290,7 +291,9 @@ async function publishEventUpdate(
   const catalogUpdate: Record<string, unknown> = { source };
   if (updateInput.title !== undefined) catalogUpdate.title = updateInput.title;
   if (updateInput.startsAt !== undefined) catalogUpdate.startsAt = updateInput.startsAt;
-  if (updateInput.styles !== undefined) catalogUpdate.styles = updateInput.styles;
+  if (updateInput.styles !== undefined) {
+    catalogUpdate.styles = normalizeStyleTags(updateInput.styles as string[]);
+  }
   if (updateInput.venueSlug !== undefined) catalogUpdate.venueSlug = updateInput.venueSlug;
   if (updateInput.artistSlugs !== undefined) catalogUpdate.artistSlugs = updateInput.artistSlugs;
 

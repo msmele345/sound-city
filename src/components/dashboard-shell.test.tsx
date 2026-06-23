@@ -171,6 +171,154 @@ describe("DashboardShell", () => {
     ).toBeInTheDocument();
   });
 
+  it("filters events and the featured artist by canonical techno sub-genre", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/catalog/events?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            events: [
+              {
+                id: "event_melodic",
+                title: "Melodic Signal",
+                startsAt: "2026-07-01T02:00:00.000Z",
+                venue: { name: "Smartbar", neighborhood: "Wrigleyville" },
+                artists: [{ name: "Melodic Artist", slug: "melodic-artist" }],
+                styles: ["melodic"],
+                source: {
+                  title: "Melodic listing",
+                  url: "https://example.com/melodic",
+                  lastVerifiedAt: "2026-06-20",
+                },
+              },
+              {
+                id: "event_hard",
+                title: "Hard Signal",
+                startsAt: "2026-07-02T02:00:00.000Z",
+                venue: { name: "Podlasie Club", neighborhood: "Avondale" },
+                artists: [{ name: "Hard Artist", slug: "hard-artist" }],
+                styles: ["hard"],
+                source: {
+                  title: "Hard listing",
+                  url: "https://example.com/hard",
+                  lastVerifiedAt: "2026-06-20",
+                },
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url === "/api/catalog/showcase?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            artist: {
+              id: "artist_melodic",
+              citySlug: "chicago",
+              name: "Melodic Artist",
+              slug: "melodic-artist",
+              bio: "Melodic techno from Chicago.",
+              styles: ["melodic"],
+              showcase: true,
+              source: {
+                title: "Artist source",
+                url: "https://example.com/artist",
+                lastVerifiedAt: "2026-06-20",
+              },
+              links: [],
+            },
+          }),
+        });
+      }
+
+      if (url === "/api/catalog/artists?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            artists: [
+              {
+                id: "artist_melodic",
+                citySlug: "chicago",
+                name: "Melodic Artist",
+                slug: "melodic-artist",
+                bio: "Melodic techno from Chicago.",
+                styles: ["melodic"],
+                showcase: true,
+                source: {
+                  title: "Melodic artist source",
+                  url: "https://example.com/artists/melodic",
+                  lastVerifiedAt: "2026-06-20",
+                },
+                links: [],
+              },
+              {
+                id: "artist_hard",
+                citySlug: "chicago",
+                name: "Hard Artist",
+                slug: "hard-artist",
+                bio: "Hard techno from Chicago.",
+                styles: ["hard"],
+                showcase: false,
+                source: {
+                  title: "Hard artist source",
+                  url: "https://example.com/artists/hard",
+                  lastVerifiedAt: "2026-06-20",
+                },
+                links: [],
+              },
+            ],
+          }),
+        });
+      }
+
+      return Promise.resolve({ ok: true, json: async () => ({ venues: [] }) });
+    });
+
+    render(<DashboardShell />);
+
+    const latestEvents = screen.getByRole("region", { name: /latest events/i });
+    const artistShowcase = screen.getByRole("region", { name: /artist showcase/i });
+
+    await within(latestEvents).findByRole("heading", { name: /melodic signal/i });
+    for (const style of ["melodic", "groovy", "hard", "trance"]) {
+      expect(
+        within(latestEvents).getByRole("button", { name: style }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("checkbox", { name: style }),
+      ).toBeInTheDocument();
+    }
+
+    await user.click(
+      within(latestEvents).getByRole("button", { name: "melodic" }),
+    );
+    expect(
+      within(latestEvents).getByRole("heading", { name: /melodic signal/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(latestEvents).queryByRole("heading", { name: /hard signal/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(artistShowcase).getAllByRole("heading", { name: /melodic artist/i }),
+    ).not.toHaveLength(0);
+
+    await user.click(
+      within(latestEvents).getByRole("button", { name: "hard" }),
+    );
+    expect(
+      within(latestEvents).getByRole("heading", { name: /hard signal/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(artistShowcase).queryByRole("heading", { name: /melodic artist/i }),
+    ).not.toBeInTheDocument();
+    expect(artistShowcase).toHaveTextContent(/no featured artist matches hard/i);
+    expect(
+      within(artistShowcase).getByRole("heading", { name: /hard artist/i }),
+    ).toBeInTheDocument();
+  });
+
   it("shows loading, empty, and error states for the event feed", async () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 

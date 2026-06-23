@@ -208,7 +208,7 @@ describe("review-operations", () => {
             venueName: "Smartbar",
             venueSlug: "smartbar",
             startsAt: new Date().toISOString(),
-            styles: ["house"],
+            styles: ["Melodic Techno", "hard house"],
           },
           linkedDrafts: [
             {
@@ -216,7 +216,7 @@ describe("review-operations", () => {
               name: "New Artist",
               slug: "new-artist",
               bio: "A fresh face",
-              styles: ["house"],
+              styles: ["groovy-techno", "leftfield bass"],
             },
           ],
         }),
@@ -233,6 +233,11 @@ describe("review-operations", () => {
       const created = artists.find((a) => a.slug === "new-artist");
       expect(created).toBeDefined();
       expect(created!.name).toBe("New Artist");
+      expect(created!.styles).toEqual(["groovy", "leftfield bass"]);
+
+      const events = await catalogStore.listEvents("chicago");
+      const publishedEvent = events.find((event) => event.title === "Artist Night");
+      expect(publishedEvent?.styles).toEqual(["melodic", "hard house"]);
     });
 
     it("reuses existing venue instead of creating a duplicate", async () => {
@@ -355,7 +360,7 @@ describe("review-operations", () => {
         venueName: "Smartbar",
         venueSlug: "smartbar",
         startsAt: new Date().toISOString(),
-        styles: ["house"],
+        styles: ["Trance Techno", "house"],
       };
 
       const result = await approveReviewItem(
@@ -369,6 +374,7 @@ describe("review-operations", () => {
       const events = await catalogStore.listEvents("chicago");
       const created = events.find((e) => e.id === result.publishedEntityId);
       expect(created!.title).toBe("Admin Revised Title");
+      expect(created!.styles).toEqual(["trance", "house"]);
     });
 
     it("approves a proposed-update with field-level acceptance", async () => {

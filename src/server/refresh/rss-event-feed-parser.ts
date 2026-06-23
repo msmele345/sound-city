@@ -1,3 +1,5 @@
+import { normalizeStyleTags } from "@/lib/style-normalization";
+
 import type {
   CreateReviewItemInput,
   Fetcher,
@@ -12,6 +14,7 @@ type RssItem = {
   title: string;
   link: string;
   description: string;
+  categories: string[];
 };
 
 type ParserContext = {
@@ -59,6 +62,20 @@ function tagValue(xml: string, tag: string): string {
   return match ? cleanText(match[1]) : "";
 }
 
+function tagValues(xml: string, tag: string): string[] {
+  const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return [
+    ...xml.matchAll(
+      new RegExp(
+        `<${escapedTag}\\b[^>]*>([\\s\\S]*?)<\\/${escapedTag}>`,
+        "gi",
+      ),
+    ),
+  ]
+    .map((match) => cleanText(match[1]))
+    .filter(Boolean);
+}
+
 function parseRssItems(xml: string): RssItem[] {
   const itemMatches = xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi);
 
@@ -67,6 +84,7 @@ function parseRssItems(xml: string): RssItem[] {
       title: tagValue(match[1], "title"),
       link: tagValue(match[1], "link"),
       description: tagValue(match[1], "description"),
+      categories: tagValues(match[1], "category"),
     }))
     .filter((item) => item.title && item.link);
 }
@@ -239,7 +257,7 @@ function reviewItemForItem(
       title: item.title,
       startsAt,
       ...(venueName ? { venueName } : {}),
-      styles: [],
+      styles: normalizeStyleTags(item.categories),
       ticketUrl: item.link,
     },
     fieldDiffs: null,
