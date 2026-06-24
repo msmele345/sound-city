@@ -39,6 +39,7 @@ const sampleIcs = [
   "DTEND:20260621T030000Z",
   "SUMMARY:Techno Night",
   "LOCATION:The Warehouse",
+  "CATEGORIES:Melodic Techno,hard house",
   "URL:https://venue.test/events/techno-night",
   "END:VEVENT",
   "END:VCALENDAR",
@@ -75,6 +76,7 @@ describe("parseVenueCalendarTarget", () => {
       title: "Techno Night",
       venueName: "The Warehouse",
       startsAt: "2026-06-20T22:00:00.000Z",
+      styles: ["melodic", "hard house"],
       ticketUrl: "https://venue.test/events/techno-night",
     });
     expect(items[0].evidence).toEqual({

@@ -1,3 +1,5 @@
+import { normalizeStyleTags } from "@/lib/style-normalization";
+
 import { parseIcs } from "./ics-parser";
 import type { CreateReviewItemInput, Fetcher, SourceTargetRecord } from "./types";
 
@@ -74,7 +76,7 @@ export async function parseVenueCalendarTarget(
         title,
         venueName,
         startsAt,
-        styles: [],
+        styles: normalizeStyleTags(event.categories),
         ticketUrl: eventUrl,
       },
       fieldDiffs: null,

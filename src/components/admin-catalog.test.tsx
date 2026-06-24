@@ -110,6 +110,26 @@ afterEach(() => {
 });
 
 describe("AdminCatalog", () => {
+  it("keeps header navigation clickable above the display masthead", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => adminSnapshot });
+
+    render(<AdminCatalog />);
+
+    const dashboardLink = screen.getByRole("link", {
+      name: /back to dashboard/i,
+    });
+    const sourceTargetsLink = screen.getByRole("link", {
+      name: /source targets/i,
+    });
+    const masthead = await screen.findByRole("heading", {
+      name: /admin catalog/i,
+    });
+
+    expect(dashboardLink).toHaveAttribute("href", "/");
+    expect(sourceTargetsLink).toHaveAttribute("href", "/admin/sources");
+    expect(masthead).toHaveClass("pointer-events-none");
+  });
+
   it("unlocks protected admin catalog requests with a maintainer secret", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((_url: string, init?: RequestInit) => {

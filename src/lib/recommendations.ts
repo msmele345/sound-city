@@ -1,9 +1,12 @@
+import type { CanonicalTechnoSubGenre } from "./style-normalization";
+
 export type TasteStyle =
   | "house"
   | "techno"
   | "acid"
   | "melodic house"
-  | "deep house";
+  | "deep house"
+  | CanonicalTechnoSubGenre;
 
 export type TasteVibe = "raw" | "deep" | "melodic" | "high-energy";
 export type VenueSizePreference = "small-room" | "midsize-club" | "warehouse";

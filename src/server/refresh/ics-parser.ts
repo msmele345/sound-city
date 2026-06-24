@@ -5,6 +5,7 @@ export type IcsEvent = {
   dtEnd: string | null;
   location: string | null;
   description: string | null;
+  categories: string[];
   url: string | null;
 };
 
@@ -259,6 +260,13 @@ function parseVEventBlock(
     description: properties.get("DESCRIPTION")?.value
       ? unescapeIcsText(properties.get("DESCRIPTION")!.value.trim())
       : null,
+    categories: properties.get("CATEGORIES")?.value
+      ? properties
+          .get("CATEGORIES")!
+          .value.split(/(?<!\\),/)
+          .map((category) => unescapeIcsText(category.trim()))
+          .filter(Boolean)
+      : [],
     url: properties.get("URL")?.value ? properties.get("URL")!.value.trim() : null,
   };
 }

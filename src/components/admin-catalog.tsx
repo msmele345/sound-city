@@ -403,7 +403,7 @@ export function AdminCatalog() {
             Source targets
           </Link>
         </div>
-        <h1 className="mt-4 font-display text-[clamp(3rem,10vw,7rem)] uppercase leading-[0.84] text-ink">
+        <h1 className="pointer-events-none mt-4 font-display text-[clamp(3rem,10vw,7rem)] uppercase leading-[0.84] text-ink">
           Admin Catalog
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-relaxed text-ink-dim">

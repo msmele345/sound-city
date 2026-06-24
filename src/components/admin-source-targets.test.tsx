@@ -53,6 +53,26 @@ afterEach(() => {
 });
 
 describe("AdminSourceTargets", () => {
+  it("keeps header navigation clickable above the display masthead", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => refreshSnapshot });
+
+    render(<AdminSourceTargets allowDevParser={false} />);
+
+    const dashboardLink = screen.getByRole("link", {
+      name: /back to dashboard/i,
+    });
+    const catalogLink = screen.getByRole("link", {
+      name: /admin catalog/i,
+    });
+    const masthead = await screen.findByRole("heading", {
+      name: /source targets/i,
+    });
+
+    expect(dashboardLink).toHaveAttribute("href", "/");
+    expect(catalogLink).toHaveAttribute("href", "/admin");
+    expect(masthead).toHaveClass("pointer-events-none");
+  });
+
   it("unlocks protected refresh source requests with a maintainer secret", async () => {
     const user = userEvent.setup();
     fetchMock.mockImplementation((_url: string, init?: RequestInit) => {
