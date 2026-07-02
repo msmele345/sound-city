@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import SubmitButton from "./ui/SubmitButton";
+import AdminLoginForm from "./ui/AdminLoginForm";
 
 type SourceRecord = {
   id?: string;
@@ -199,16 +201,6 @@ function FormGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid gap-4 sm:grid-cols-2">{children}</div>;
 }
 
-function SubmitButton({ children }: { children: React.ReactNode }) {
-  return (
-    <button
-      type="submit"
-      className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-signal transition-colors duration-150 hover:bg-panel hover:text-ink"
-    >
-      {children}
-    </button>
-  );
-}
 
 function DeleteButton({ onClick }: { onClick(): void }) {
   return (
@@ -421,25 +413,7 @@ export function AdminCatalog() {
       </p>
 
       {requiresSecret ? (
-        <form
-          aria-label="Unlock admin catalog"
-          className="mt-8 max-w-xl border-b border-rule pb-6"
-          onSubmit={unlockAdmin}
-        >
-          <label className="block font-mono text-[0.68rem] uppercase tracking-[0.16em] text-ink-faint">
-            Admin secret
-            <input
-              name="adminSecret"
-              required
-              type="password"
-              autoComplete="current-password"
-              className="mt-2 w-full border border-rule bg-bg px-3 py-2 font-sans text-sm normal-case tracking-normal text-ink"
-            />
-          </label>
-          <div className="mt-4">
-            <SubmitButton>Unlock admin</SubmitButton>
-          </div>
-        </form>
+        <AdminLoginForm unlockAdmin={unlockAdmin} />
       ) : null}
 
       {requiresSecret ? null : (

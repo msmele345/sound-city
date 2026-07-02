@@ -6,9 +6,10 @@ coverage
 .env
 .env*.local
 .vercel
+.impeccable
+.idea
 *.tsbuildinfo
 
-.idea
 
 plans/admin-crud-guide.md
 .env*

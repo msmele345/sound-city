@@ -143,6 +143,60 @@ describe("parseRssEventFeedTarget", () => {
     expect(items[0].linkedDrafts).toEqual([{ type: "venue", name: "Smartbar" }]);
   });
 
+  it("discovers an advertised RSS feed from a venue events page", async () => {
+    const target = createTarget({
+      id: "target_radius_events",
+      ownerId: "owner_radius",
+      url: "https://www.radius-chicago.com/events",
+    });
+    const fetchedUrls: string[] = [];
+    const fetcher: Fetcher = async (url) => {
+      fetchedUrls.push(url);
+      if (url === "https://www.radius-chicago.com/events") {
+        return {
+          body: `<!doctype html><html><body>
+            <a href="https://www.radius-chicago.com/events/rss" title="Subscribe to Events Feed">RSS</a>
+          </body></html>`,
+          contentType: "text/html; charset=UTF-8",
+          status: 200,
+        };
+      }
+
+      return {
+        body: `<?xml version="1.0"?><rss><channel><item>
+          <title>Radius Open Air: Ranger Trucco on Aug 15, 2026</title>
+          <link>https://www.radius-chicago.com/events/detail/1497817</link>
+          <description><p><a href="https://www.axs.com/events/1497817/ranger-trucco-tickets">Buy Tickets</a></p></description>
+        </item></channel></rss>`,
+        contentType: "application/rss+xml",
+        status: 200,
+      };
+    };
+
+    const items = await parseRssEventFeedTarget(
+      target,
+      "run_1",
+      "2026-06-27T12:00:00.000Z",
+      fetcher,
+      { owner: createOwner({ id: "owner_radius", name: "Radius" }) },
+    );
+
+    expect(fetchedUrls).toEqual([
+      "https://www.radius-chicago.com/events",
+      "https://www.radius-chicago.com/events/rss",
+    ]);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      lane: "source-health",
+      sourceTargetId: "target_radius_events",
+      parserVersion: "rss-event-feed@1",
+    });
+    expect(items[0].normalizedDraft).toMatchObject({
+      title: "Radius Open Air: Ranger Trucco on Aug 15, 2026",
+      sourceUrl: "https://www.radius-chicago.com/events/detail/1497817",
+    });
+  });
+
   it("flags RSS items without reliable event dates as source-health issues", async () => {
     const target = createTarget();
     const fetcher: Fetcher = async () => ({

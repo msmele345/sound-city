@@ -109,6 +109,70 @@ function isRssContent(url: string, contentType: string, body: string): boolean {
   return /<(rss|feed)\b/i.test(body);
 }
 
+function isHtmlContent(contentType: string, body: string): boolean {
+  return (
+    contentType.toLowerCase().includes("html") ||
+    /<html\b|<!doctype html/i.test(body)
+  );
+}
+
+function attrValue(attributes: string, name: string): string {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = attributes.match(
+    new RegExp(
+      `\\b${escapedName}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`,
+      "i",
+    ),
+  );
+  return decodeXmlEntities(match?.[1] ?? match?.[2] ?? match?.[3] ?? "");
+}
+
+function sameOriginUrl(pageUrl: string, candidateUrl: string): string | null {
+  try {
+    const page = new URL(pageUrl);
+    const candidate = new URL(candidateUrl, page);
+    return candidate.origin === page.origin ? candidate.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function looksLikeRssLink(attributes: string, label = ""): boolean {
+  const searchable = `${attributes} ${label}`.toLowerCase();
+  return (
+    searchable.includes("application/rss+xml") ||
+    searchable.includes("application/atom+xml") ||
+    /\brss\b/.test(searchable) ||
+    searchable.includes("/feed") ||
+    searchable.includes("/events/rss")
+  );
+}
+
+function discoverAdvertisedRssFeedUrl(
+  pageUrl: string,
+  contentType: string,
+  body: string,
+): string | null {
+  if (!isHtmlContent(contentType, body)) return null;
+
+  for (const match of body.matchAll(/<link\b([^>]*?)>/gi)) {
+    const attributes = match[1];
+    const href = attrValue(attributes, "href");
+    const resolved = href ? sameOriginUrl(pageUrl, href) : null;
+    if (resolved && looksLikeRssLink(attributes)) return resolved;
+  }
+
+  for (const match of body.matchAll(/<a\b([^>]*?)>([\s\S]*?)<\/a>/gi)) {
+    const attributes = match[1];
+    const label = cleanText(match[2]);
+    const href = attrValue(attributes, "href");
+    const resolved = href ? sameOriginUrl(pageUrl, href) : null;
+    if (resolved && looksLikeRssLink(attributes, label)) return resolved;
+  }
+
+  return null;
+}
+
 function timeZoneOffsetMs(date: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
@@ -280,13 +344,29 @@ export async function parseRssEventFeedTarget(
   fetcher: Fetcher,
   context: ParserContext = {},
 ): Promise<CreateReviewItemInput[]> {
-  const result = await fetcher(target.url);
+  let feedUrl = target.url;
+  let result = await fetcher(feedUrl);
 
   if (result.status < 200 || result.status >= 300) {
     throw new Error(`RSS event feed fetch failed with status ${result.status}`);
   }
 
-  if (!isRssContent(target.url, result.contentType, result.body)) {
+  if (!isRssContent(feedUrl, result.contentType, result.body)) {
+    const discoveredFeedUrl = discoverAdvertisedRssFeedUrl(
+      feedUrl,
+      result.contentType,
+      result.body,
+    );
+    if (discoveredFeedUrl) {
+      feedUrl = discoveredFeedUrl;
+      result = await fetcher(feedUrl);
+      if (result.status < 200 || result.status >= 300) {
+        throw new Error(`RSS event feed fetch failed with status ${result.status}`);
+      }
+    }
+  }
+
+  if (!isRssContent(feedUrl, result.contentType, result.body)) {
     throw new Error("RSS event feed source does not serve structured RSS/XML.");
   }
 
