@@ -30,6 +30,44 @@ async function createDevTarget(store: RefreshStore) {
   });
 }
 
+async function createRssObservationFixture(store: RefreshStore) {
+  const owner = await store.createSourceOwner({
+    cityId: "city_chicago",
+    name: "Smartbar",
+    slug: "smartbar-observation",
+    kind: "venue",
+    notes: "",
+  });
+  const target = await store.createSourceTarget({
+    ownerId: owner.id,
+    cityId: "city_chicago",
+    url: "https://smartbarchicago.com/events/feed/",
+    sourceType: "official-venue-calendar",
+    parserStrategy: "rss-event-feed",
+    trustLevel: "primary",
+    enabled: true,
+    confidenceAdjustment: 0,
+    healthStatus: "healthy",
+    refreshCadence: "manual",
+    notes: "",
+  });
+  const fetcher = async () => ({
+    body: `<?xml version="1.0"?><rss><channel><item>
+      <guid>smartbar-event-42</guid>
+      <title>Queen! with Derrick Carter</title>
+      <link>https://smartbarchicago.com/event/queen-derrick-carter/</link>
+      <description><![CDATA[
+        <p>Sunday, June 28, 2026</p>
+        <p>Doors: 10:00 PM</p>
+      ]]></description>
+    </item></channel></rss>`,
+    contentType: "application/rss+xml",
+    status: 200,
+  });
+
+  return { target, fetcher };
+}
+
 function createCatalogWithPastEvent(
   startsAt = "2026-05-30T03:00:00.000Z",
 ): CatalogStore {
@@ -469,6 +507,75 @@ describe("refresh engine", () => {
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.lastSuccessfulRunAt).not.toBeNull();
     expect(updated!.failureCount).toBe(0);
+  });
+
+  it("creates and links a source observation when an event is first seen", async () => {
+    const store = createSeedRefreshStore();
+    const { target, fetcher } = await createRssObservationFixture(store);
+    const seenAt = new Date("2026-07-11T12:00:00.000Z");
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: seenAt,
+      fetcher,
+    });
+
+    expect(result.reviewItems).toHaveLength(1);
+    const reviewItem = result.reviewItems[0];
+    const observation = await store.getSourceEventObservation(
+      target.id,
+      "smartbar-event-42",
+    );
+    expect(observation).toMatchObject({
+      sourceTargetId: target.id,
+      sourceEventKey: "smartbar-event-42",
+      matchFingerprint: reviewItem.matchFingerprint,
+      normalizedCandidate: reviewItem.normalizedDraft,
+      firstSeenAt: seenAt.toISOString(),
+      lastSeenAt: seenAt.toISOString(),
+      lastChangedAt: seenAt.toISOString(),
+      latestReviewItemId: reviewItem.id,
+      publishedEventId: null,
+      parserVersion: reviewItem.parserVersion,
+    });
+  });
+
+  it("records an unchanged event as seen again without creating review work", async () => {
+    const store = createSeedRefreshStore();
+    const { target, fetcher } = await createRssObservationFixture(store);
+    const firstSeenAt = new Date("2026-07-11T12:00:00.000Z");
+    const seenAgainAt = new Date("2026-07-11T13:00:00.000Z");
+
+    const firstResult = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: firstSeenAt,
+      fetcher,
+    });
+    const repeatedResult = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: seenAgainAt,
+      fetcher,
+    });
+
+    expect(firstResult.reviewItems).toHaveLength(1);
+    expect(repeatedResult.run.status).toBe("succeeded");
+    expect(repeatedResult.run.draftsCreated).toBe(0);
+    expect(repeatedResult.reviewItems).toEqual([]);
+    expect(await store.listReviewItems("city_chicago")).toHaveLength(1);
+
+    const observation = await store.getSourceEventObservation(
+      target.id,
+      "smartbar-event-42",
+    );
+    expect(observation).toMatchObject({
+      firstSeenAt: firstSeenAt.toISOString(),
+      lastSeenAt: seenAgainAt.toISOString(),
+      lastChangedAt: firstSeenAt.toISOString(),
+      latestReviewItemId: firstResult.reviewItems[0].id,
+    });
   });
 
   it("marks RSS event feed targets as failed and logs parser failures", async () => {

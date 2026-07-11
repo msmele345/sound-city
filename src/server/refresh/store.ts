@@ -253,6 +253,22 @@ export function createSeedRefreshStore(
       return observation;
     },
 
+    async updateSourceEventObservation(id, input) {
+      const index = snapshot.sourceEventObservations.findIndex(
+        (observation) => observation.id === id,
+      );
+      if (index === -1) throw new Error("Source event observation not found");
+      const updated = {
+        ...snapshot.sourceEventObservations[index],
+        ...input,
+        normalizedCandidate: input.normalizedCandidate
+          ? structuredClone(input.normalizedCandidate)
+          : snapshot.sourceEventObservations[index].normalizedCandidate,
+      };
+      snapshot.sourceEventObservations[index] = updated;
+      return updated;
+    },
+
     // ── Decision History ────────────────────────────────────────
     async listDecisionHistory(reviewItemId) {
       return snapshot.decisionHistory.filter((d) => d.reviewItemId === reviewItemId);
