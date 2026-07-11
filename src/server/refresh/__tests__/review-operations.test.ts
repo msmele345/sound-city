@@ -89,6 +89,7 @@ function createRefreshStoreWithTarget(): RefreshStore {
     refreshRuns: [],
     runLogs: [],
     reviewItems: [],
+    sourceEventObservations: [],
     decisionHistory: [],
   };
   return createSeedRefreshStore(snapshot);

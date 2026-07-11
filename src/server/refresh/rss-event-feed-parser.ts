@@ -1,8 +1,13 @@
 import { normalizeStyleTags } from "@/lib/style-normalization";
 
+import {
+  buildMatchFingerprint,
+  buildMaterialContentHash,
+  canonicalizeSourceUrl,
+} from "./candidate-identity";
 import type {
-  CreateReviewItemInput,
   Fetcher,
+  ParserCandidate,
   SourceOwnerRecord,
   SourceTargetRecord,
 } from "./types";
@@ -11,6 +16,7 @@ const parserVersion = "rss-event-feed@1";
 const chicagoTimeZone = "America/Chicago";
 
 type RssItem = {
+  guid: string;
   title: string;
   link: string;
   description: string;
@@ -20,15 +26,6 @@ type RssItem = {
 type ParserContext = {
   owner?: SourceOwnerRecord | null;
 };
-
-function normalizeForFingerprint(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 function clampConfidence(value: number): number {
   return Math.max(0, Math.min(100, value));
@@ -81,6 +78,7 @@ function parseRssItems(xml: string): RssItem[] {
 
   return [...itemMatches]
     .map((match) => ({
+      guid: tagValue(match[1], "guid"),
       title: tagValue(match[1], "title"),
       link: tagValue(match[1], "link"),
       description: tagValue(match[1], "description"),
@@ -195,14 +193,22 @@ function reviewItemForItem(
   fetchedAt: string,
   item: RssItem,
   context: ParserContext = {},
-): CreateReviewItemInput {
+): ParserCandidate {
   const startsAt = extractDescriptionStart(item.description);
   const excerpt = cleanText(item.description);
   const venueName = context.owner?.kind === "venue" ? context.owner.name : "";
   const linkedDrafts = venueName ? [{ type: "venue", name: venueName }] : [];
+  const sourceEventKey = item.guid || canonicalizeSourceUrl(item.link);
 
   if (!startsAt) {
+    const normalizedDraft = {
+      issue: "rss-item-missing-event-date",
+      title: item.title,
+      sourceUrl: item.link,
+    };
     return {
+      sourceEventKey,
+      materialContentHash: buildMaterialContentHash(normalizedDraft),
       cityId: target.cityId,
       runId,
       sourceTargetId: target.id,
@@ -214,12 +220,8 @@ function reviewItemForItem(
       ],
       targetEntityType: "source-target",
       targetEntityId: target.id,
-      matchFingerprint: `rss-health:${target.id}:${normalizeForFingerprint(item.title)}:${normalizeForFingerprint(item.link)}`,
-      normalizedDraft: {
-        issue: "rss-item-missing-event-date",
-        title: item.title,
-        sourceUrl: item.link,
-      },
+      matchFingerprint: `source-health:${target.id}:${sourceEventKey}`,
+      normalizedDraft,
       fieldDiffs: null,
       linkedDrafts: [],
       conflicts: {
@@ -237,8 +239,17 @@ function reviewItemForItem(
   }
 
   const confidence = clampConfidence(68 + target.confidenceAdjustment);
+  const normalizedDraft = {
+    title: item.title,
+    startsAt,
+    ...(venueName ? { venueName } : {}),
+    styles: normalizeStyleTags(item.categories),
+    ticketUrl: item.link,
+  };
 
   return {
+    sourceEventKey,
+    materialContentHash: buildMaterialContentHash(normalizedDraft),
     cityId: target.cityId,
     runId,
     sourceTargetId: target.id,
@@ -252,14 +263,8 @@ function reviewItemForItem(
     ],
     targetEntityType: "event",
     targetEntityId: null,
-    matchFingerprint: `rss-feed:${normalizeForFingerprint(item.title)}:${normalizeForFingerprint(startsAt)}`,
-    normalizedDraft: {
-      title: item.title,
-      startsAt,
-      ...(venueName ? { venueName } : {}),
-      styles: normalizeStyleTags(item.categories),
-      ticketUrl: item.link,
-    },
+    matchFingerprint: buildMatchFingerprint(normalizedDraft),
+    normalizedDraft,
     fieldDiffs: null,
     linkedDrafts,
     conflicts: null,
@@ -279,7 +284,7 @@ export async function parseRssEventFeedTarget(
   fetchedAt: string,
   fetcher: Fetcher,
   context: ParserContext = {},
-): Promise<CreateReviewItemInput[]> {
+): Promise<ParserCandidate[]> {
   const result = await fetcher(target.url);
 
   if (result.status < 200 || result.status >= 300) {

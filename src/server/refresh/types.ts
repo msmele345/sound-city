@@ -213,6 +213,48 @@ export type CreateReviewItemInput = Omit<
   | "updatedAt"
 >;
 
+/**
+ * A parser candidate carries three intentionally separate identities:
+ * sourceEventKey identifies one item within one source target; matchFingerprint
+ * compares likely-equivalent events across sources; materialContentHash changes
+ * only when normalized catalog-relevant fields change.
+ */
+export type ParserCandidate = CreateReviewItemInput & {
+  sourceEventKey: string;
+  materialContentHash: string;
+};
+
+// ─── Source Event Observation ────────────────────────────────────
+
+export type SourceEventObservationRecord = {
+  id: string;
+  sourceTargetId: string;
+  sourceEventKey: string;
+  matchFingerprint: string;
+  materialContentHash: string;
+  normalizedCandidate: Record<string, unknown>;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastChangedAt: string;
+  latestReviewItemId: string | null;
+  publishedEventId: string | null;
+  parserVersion: string;
+};
+
+export type CreateSourceEventObservationInput = Pick<
+  SourceEventObservationRecord,
+  | "sourceTargetId"
+  | "sourceEventKey"
+  | "matchFingerprint"
+  | "materialContentHash"
+  | "normalizedCandidate"
+  | "latestReviewItemId"
+  | "publishedEventId"
+  | "parserVersion"
+> & {
+  seenAt: string;
+};
+
 export type UpdateReviewItemInput = Partial<
   Pick<
     ReviewItemRecord,
@@ -262,5 +304,6 @@ export type RefreshSnapshot = {
   refreshRuns: RefreshRunRecord[];
   runLogs: RefreshRunLogRecord[];
   reviewItems: ReviewItemRecord[];
+  sourceEventObservations: SourceEventObservationRecord[];
   decisionHistory: ReviewDecisionRecord[];
 };

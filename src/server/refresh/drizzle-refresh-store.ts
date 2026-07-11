@@ -7,6 +7,7 @@ import type {
   RefreshRunRecord,
   ReviewDecisionRecord,
   ReviewItemRecord,
+  SourceEventObservationRecord,
   SourceOwnerRecord,
   SourceTargetRecord,
 } from "./types";
@@ -123,6 +124,21 @@ type ReviewDecisionRow = {
   createdAt: string | Date;
 };
 
+type SourceEventObservationRow = {
+  id: string;
+  sourceTargetId: string;
+  sourceEventKey: string;
+  matchFingerprint: string;
+  materialContentHash: string;
+  normalizedCandidate: string;
+  firstSeenAt: string | Date;
+  lastSeenAt: string | Date;
+  lastChangedAt: string | Date;
+  latestReviewItemId: string | null;
+  publishedEventId: string | null;
+  parserVersion: string;
+};
+
 // ── DB type ────────────────────────────────────────────────────────
 
 export type RefreshDbReader = {
@@ -132,6 +148,7 @@ export type RefreshDbReader = {
     refreshRuns: FindManyTable<RefreshRunRow>;
     refreshRunLogs: FindManyTable<RefreshRunLogRow>;
     reviewItems: FindManyTable<ReviewItemRow>;
+    sourceEventObservations: FindManyTable<SourceEventObservationRow>;
     reviewDecisionHistory: FindManyTable<ReviewDecisionRow>;
   };
 };
@@ -249,6 +266,18 @@ function toDecisionHistory(row: ReviewDecisionRow): ReviewDecisionRecord {
     ...row,
     decision: row.decision as ReviewDecisionRecord["decision"],
     createdAt: normalizeDate(row.createdAt),
+  };
+}
+
+function toSourceEventObservation(
+  row: SourceEventObservationRow,
+): SourceEventObservationRecord {
+  return {
+    ...row,
+    normalizedCandidate: parseJson(row.normalizedCandidate),
+    firstSeenAt: normalizeDate(row.firstSeenAt),
+    lastSeenAt: normalizeDate(row.lastSeenAt),
+    lastChangedAt: normalizeDate(row.lastChangedAt),
   };
 }
 
@@ -573,6 +602,41 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
       const row = rows.find((r) => r.id === id);
       if (!row) throw new Error("Review item not found");
       return toReviewItem(row);
+    },
+
+    // ── Source Event Observations ──────────────────────────────
+    async getSourceEventObservation(sourceTargetId, sourceEventKey) {
+      const rows = await db.query.sourceEventObservations.findMany();
+      const row = rows.find(
+        (observation) =>
+          observation.sourceTargetId === sourceTargetId &&
+          observation.sourceEventKey === sourceEventKey,
+      );
+      return row ? toSourceEventObservation(row) : null;
+    },
+
+    async createSourceEventObservation(input) {
+      const writer = requireWriter(db);
+      const id = uniqueId("source_event_observation");
+      const observation: SourceEventObservationRecord = {
+        id,
+        sourceTargetId: input.sourceTargetId,
+        sourceEventKey: input.sourceEventKey,
+        matchFingerprint: input.matchFingerprint,
+        materialContentHash: input.materialContentHash,
+        normalizedCandidate: input.normalizedCandidate,
+        firstSeenAt: input.seenAt,
+        lastSeenAt: input.seenAt,
+        lastChangedAt: input.seenAt,
+        latestReviewItemId: input.latestReviewItemId,
+        publishedEventId: input.publishedEventId,
+        parserVersion: input.parserVersion,
+      };
+      await writer.insert(schema.sourceEventObservations).values({
+        ...observation,
+        normalizedCandidate: JSON.stringify(observation.normalizedCandidate),
+      });
+      return observation;
     },
 
     // ── Decision History ────────────────────────────────────────

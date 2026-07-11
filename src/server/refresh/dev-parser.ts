@@ -1,4 +1,9 @@
-import type { CreateReviewItemInput, SourceTargetRecord } from "./types";
+import { buildMaterialContentHash } from "./candidate-identity";
+import type {
+  CreateReviewItemInput,
+  ParserCandidate,
+  SourceTargetRecord,
+} from "./types";
 
 const parserVersion = "dev-static@1";
 
@@ -117,9 +122,11 @@ export function parseDevStaticTarget(
   target: SourceTargetRecord,
   runId: string,
   fetchedAt: string,
-): CreateReviewItemInput[] {
+): ParserCandidate[] {
   return devFixtures.map((fixture) => ({
     ...fixture,
+    sourceEventKey: fixture.matchFingerprint,
+    materialContentHash: buildMaterialContentHash(fixture.normalizedDraft),
     cityId: target.cityId,
     runId,
     sourceTargetId: target.id,

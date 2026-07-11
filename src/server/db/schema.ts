@@ -5,6 +5,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const cities = pgTable("cities", {
@@ -214,6 +215,34 @@ export const reviewItems = pgTable("review_items", {
   createdAt: timestamp("created_at", { mode: "string" }).notNull(),
   updatedAt: timestamp("updated_at", { mode: "string" }).notNull(),
 });
+
+export const sourceEventObservations = pgTable(
+  "source_event_observations",
+  {
+    id: text("id").primaryKey(),
+    sourceTargetId: text("source_target_id")
+      .notNull()
+      .references(() => sourceTargets.id),
+    sourceEventKey: text("source_event_key").notNull(),
+    matchFingerprint: text("match_fingerprint").notNull(),
+    materialContentHash: text("material_content_hash").notNull(),
+    normalizedCandidate: text("normalized_candidate").notNull(),
+    firstSeenAt: timestamp("first_seen_at", { mode: "string" }).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { mode: "string" }).notNull(),
+    lastChangedAt: timestamp("last_changed_at", { mode: "string" }).notNull(),
+    latestReviewItemId: text("latest_review_item_id").references(
+      () => reviewItems.id,
+    ),
+    publishedEventId: text("published_event_id").references(() => events.id),
+    parserVersion: text("parser_version").notNull(),
+  },
+  (table) => [
+    uniqueIndex("source_event_observations_target_event_key_unique").on(
+      table.sourceTargetId,
+      table.sourceEventKey,
+    ),
+  ],
+);
 
 export const reviewDecisionHistory = pgTable("review_decision_history", {
   id: text("id").primaryKey(),
