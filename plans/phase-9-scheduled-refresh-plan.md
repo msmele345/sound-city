@@ -35,8 +35,8 @@ Extend the parser candidate contract with stable source identity and normalized 
 
 ### Acceptance criteria
 
-- [ ] Source event key, cross-source match fingerprint, and material content hash are distinct fields with documented semantics.
-- [ ] Source-event observations are durable and unique by source target plus source event key.
+- [x] Source event key, cross-source match fingerprint, and material content hash are distinct fields with documented semantics.
+- [x] Source-event observations are durable and unique by source target plus source event key.
 - [ ] A first observation creates the expected review item and links the observation to it.
 - [ ] An immediate unchanged repeat creates no new review item and records the observation as seen again.
 - [ ] A material change updates the existing pending review item instead of creating a competing draft.

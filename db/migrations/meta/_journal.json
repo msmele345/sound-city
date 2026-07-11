@@ -22,6 +22,13 @@
       "when": 1781400888757,
       "tag": "0002_v2_phase5_source_health",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783770532686,
+      "tag": "0003_phase9_source_event_observations",
+      "breakpoints": true
     }
   ]
 }

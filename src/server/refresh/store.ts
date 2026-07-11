@@ -11,6 +11,7 @@ const emptySnapshot: RefreshSnapshot = {
   refreshRuns: [],
   runLogs: [],
   reviewItems: [],
+  sourceEventObservations: [],
   decisionHistory: [],
 };
 
@@ -208,6 +209,48 @@ export function createSeedRefreshStore(
       const updated = { ...snapshot.reviewItems[index], ...input, updatedAt: now() };
       snapshot.reviewItems[index] = updated;
       return updated;
+    },
+
+    // ── Source Event Observations ──────────────────────────────
+    async getSourceEventObservation(sourceTargetId, sourceEventKey) {
+      return snapshot.sourceEventObservations.find(
+        (observation) =>
+          observation.sourceTargetId === sourceTargetId &&
+          observation.sourceEventKey === sourceEventKey,
+      ) ?? null;
+    },
+
+    async createSourceEventObservation(input) {
+      const existing = snapshot.sourceEventObservations.some(
+        (observation) =>
+          observation.sourceTargetId === input.sourceTargetId &&
+          observation.sourceEventKey === input.sourceEventKey,
+      );
+      if (existing) {
+        throw new Error(
+          "Source event observation already exists for this target and source event key",
+        );
+      }
+      const id = makeId(
+        "source_event_observation",
+        `${input.sourceTargetId}_${input.sourceEventKey}`,
+      );
+      const observation = {
+        id,
+        sourceTargetId: input.sourceTargetId,
+        sourceEventKey: input.sourceEventKey,
+        matchFingerprint: input.matchFingerprint,
+        materialContentHash: input.materialContentHash,
+        normalizedCandidate: structuredClone(input.normalizedCandidate),
+        firstSeenAt: input.seenAt,
+        lastSeenAt: input.seenAt,
+        lastChangedAt: input.seenAt,
+        latestReviewItemId: input.latestReviewItemId,
+        publishedEventId: input.publishedEventId,
+        parserVersion: input.parserVersion,
+      };
+      snapshot.sourceEventObservations.push(observation);
+      return observation;
     },
 
     // ── Decision History ────────────────────────────────────────

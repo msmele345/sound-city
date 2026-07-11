@@ -5,6 +5,7 @@ import { parseRssEventFeedTarget } from "./rss-event-feed-parser";
 import type {
   CreateReviewItemInput,
   Fetcher,
+  ParserCandidate,
   RefreshRunRecord,
   ReviewItemRecord,
   RunStatus,
@@ -100,6 +101,13 @@ function applyItemMetrics(metrics: Metrics, item: ReviewItemRecord) {
     case "source-health":
       break;
   }
+}
+
+function toReviewItemInput(candidate: ParserCandidate): CreateReviewItemInput {
+  const { sourceEventKey, materialContentHash, ...input } = candidate;
+  void sourceEventKey;
+  void materialContentHash;
+  return input;
 }
 
 async function log(
@@ -226,7 +234,7 @@ export async function runManualRefresh(
 
       try {
         const fetcher = input.fetcher ?? defaultFetcher;
-        let candidates: CreateReviewItemInput[];
+        let candidates: ParserCandidate[];
 
         if (target.parserStrategy === "dev-static") {
           candidates = parseDevStaticTarget(target, run.id, fetchedAt);
@@ -251,7 +259,7 @@ export async function runManualRefresh(
         }
 
         for (const candidate of candidates) {
-          const item = await store.createReviewItem(candidate);
+          const item = await store.createReviewItem(toReviewItemInput(candidate));
           reviewItems.push(item);
           applyItemMetrics(metrics, item);
         }

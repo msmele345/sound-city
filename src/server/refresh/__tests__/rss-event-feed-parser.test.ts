@@ -116,7 +116,55 @@ describe("parseRssEventFeedTarget", () => {
       ],
     });
     expect(items[0].matchFingerprint).toBe(
-      "rss-feed:queen-with-derrick-carter:2026-06-29t03-00-00-000z",
+      "queen-with-derrick-carter:2026-06-29t03-00-00-000z",
+    );
+  });
+
+  it("uses the RSS guid as source identity while keeping comparison identities separate", async () => {
+    const target = createTarget();
+    const fetcher: Fetcher = async () => ({
+      body: smartbarRss.replace(
+        "<link>https://smartbarchicago.com/event/queen-derrick-carter/</link>",
+        "<guid>smartbar-event-42</guid><link>https://smartbarchicago.com/event/queen-derrick-carter/</link>",
+      ),
+      contentType: "application/rss+xml; charset=utf-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      target,
+      "run_1",
+      "2026-06-17T20:00:00.000Z",
+      fetcher,
+      { owner: createOwner() },
+    );
+
+    expect(candidate.sourceEventKey).toBe("smartbar-event-42");
+    expect(candidate.matchFingerprint).toBe(
+      "queen-with-derrick-carter:2026-06-29t03-00-00-000z:smartbar",
+    );
+    expect(candidate.materialContentHash).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("uses a canonical item link as source identity when the RSS guid is absent", async () => {
+    const fetcher: Fetcher = async () => ({
+      body: smartbarRss.replace(
+        /queen-derrick-carter\//g,
+        "queen-derrick-carter/?utm_source=rss",
+      ),
+      contentType: "application/rss+xml; charset=utf-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      createTarget(),
+      "run_1",
+      "2026-06-17T20:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.sourceEventKey).toBe(
+      "https://smartbarchicago.com/event/queen-derrick-carter/",
     );
   });
 

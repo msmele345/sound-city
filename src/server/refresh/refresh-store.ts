@@ -4,6 +4,7 @@ import { createSeedRefreshStore } from "./store";
 import type {
   CreateRefreshRunInput,
   CreateReviewItemInput,
+  CreateSourceEventObservationInput,
   CreateSourceOwnerInput,
   CreateSourceTargetInput,
   RefreshRunLogRecord,
@@ -11,6 +12,7 @@ import type {
   ReviewDecisionRecord,
   ReviewItemRecord,
   ReviewLane,
+  SourceEventObservationRecord,
   SourceOwnerRecord,
   SourceTargetCounterDelta,
   SourceTargetRecord,
@@ -70,6 +72,15 @@ export type RefreshStore = {
     id: string,
     input: UpdateReviewItemInput,
   ): Promise<ReviewItemRecord>;
+
+  // ── Source Event Observations ────────────────────────────────
+  getSourceEventObservation(
+    sourceTargetId: string,
+    sourceEventKey: string,
+  ): Promise<SourceEventObservationRecord | null>;
+  createSourceEventObservation(
+    input: CreateSourceEventObservationInput,
+  ): Promise<SourceEventObservationRecord>;
 
   // ── Decision History ─────────────────────────────────────────
   listDecisionHistory(reviewItemId: string): Promise<ReviewDecisionRecord[]>;

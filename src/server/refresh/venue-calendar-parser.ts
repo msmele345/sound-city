@@ -1,17 +1,13 @@
 import { normalizeStyleTags } from "@/lib/style-normalization";
 
+import {
+  buildMatchFingerprint,
+  buildMaterialContentHash,
+} from "./candidate-identity";
 import { parseIcs } from "./ics-parser";
-import type { CreateReviewItemInput, Fetcher, SourceTargetRecord } from "./types";
+import type { Fetcher, ParserCandidate, SourceTargetRecord } from "./types";
 
 const parserVersion = "venue-calendar@1";
-
-function normalizeForFingerprint(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 function isIcsContent(url: string, contentType: string): boolean {
   const normalizedContentType = contentType.toLowerCase();
@@ -29,7 +25,7 @@ export async function parseVenueCalendarTarget(
   runId: string,
   fetchedAt: string,
   fetcher: Fetcher,
-): Promise<CreateReviewItemInput[]> {
+): Promise<ParserCandidate[]> {
   const result = await fetcher(target.url);
 
   if (result.status < 200 || result.status >= 300) {
@@ -55,10 +51,19 @@ export async function parseVenueCalendarTarget(
       0,
       Math.min(100, 82 + target.confidenceAdjustment),
     );
-    const matchFingerprint = `venue-cal:${normalizeForFingerprint(title)}:${normalizeForFingerprint(startsAt)}:${normalizeForFingerprint(venueName)}`;
     const eventUrl = event.url ?? target.url;
+    const normalizedDraft = {
+      title,
+      venueName,
+      startsAt,
+      styles: normalizeStyleTags(event.categories),
+      ticketUrl: eventUrl,
+    };
 
     return {
+      sourceEventKey: event.uid,
+      matchFingerprint: buildMatchFingerprint(normalizedDraft),
+      materialContentHash: buildMaterialContentHash(normalizedDraft),
       cityId: target.cityId,
       runId,
       sourceTargetId: target.id,
@@ -71,14 +76,7 @@ export async function parseVenueCalendarTarget(
       ],
       targetEntityType: "event" as const,
       targetEntityId: null,
-      matchFingerprint,
-      normalizedDraft: {
-        title,
-        venueName,
-        startsAt,
-        styles: normalizeStyleTags(event.categories),
-        ticketUrl: eventUrl,
-      },
+      normalizedDraft,
       fieldDiffs: null,
       linkedDrafts: venueName
         ? [{ type: "venue", name: venueName }]

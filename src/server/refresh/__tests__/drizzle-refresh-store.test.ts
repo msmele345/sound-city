@@ -18,6 +18,7 @@ function createMockDb() {
     "refresh_runs",
     "refresh_run_logs",
     "review_items",
+    "source_event_observations",
     "review_decision_history",
   ];
   for (const t of tables) {
@@ -45,6 +46,7 @@ function createMockDb() {
       refreshRuns: table([]),
       refreshRunLogs: table([]),
       reviewItems: table([]),
+      sourceEventObservations: table([]),
       reviewDecisionHistory: table([]),
     },
     insert,
@@ -179,6 +181,29 @@ describe("drizzle refresh store", () => {
 
       expect(decision.reviewItemId).toBe("ri_1");
       expect(decision.decision).toBe("approved");
+    });
+  });
+
+  describe("source event observations", () => {
+    it("creates a durable observation with first-seen timestamps", async () => {
+      const observation = await store.createSourceEventObservation({
+        sourceTargetId: "target_1",
+        sourceEventKey: "event-42",
+        matchFingerprint: "event:2026-07-12t03-00-00-000z:venue",
+        materialContentHash: "b".repeat(64),
+        normalizedCandidate: { title: "Event" },
+        seenAt: "2026-07-11T12:00:00.000Z",
+        latestReviewItemId: null,
+        publishedEventId: null,
+        parserVersion: "venue-calendar@1",
+      });
+
+      expect(observation).toMatchObject({
+        sourceEventKey: "event-42",
+        firstSeenAt: "2026-07-11T12:00:00.000Z",
+        lastSeenAt: "2026-07-11T12:00:00.000Z",
+        lastChangedAt: "2026-07-11T12:00:00.000Z",
+      });
     });
   });
 });

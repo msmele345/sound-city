@@ -88,12 +88,34 @@ describe("parseVenueCalendarTarget", () => {
       { type: "venue", name: "The Warehouse" },
     ]);
     expect(items[0].matchFingerprint).toBe(
-      "venue-cal:techno-night:2026-06-20t22-00-00-000z:the-warehouse",
+      "techno-night:2026-06-20t22-00-00-000z:the-warehouse",
     );
     expect(items[0].confidenceReasons).toEqual([
       "official venue calendar",
       "structured ICS feed",
     ]);
+  });
+
+  it("exposes stable source identity separately from cross-source and material identity", async () => {
+    const target = createTarget();
+    const fetcher: Fetcher = async () => ({
+      body: sampleIcs,
+      contentType: "text/calendar",
+      status: 200,
+    });
+
+    const [candidate] = await parseVenueCalendarTarget(
+      target,
+      "run_1",
+      "2026-06-13T00:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.sourceEventKey).toBe("venue-1@test");
+    expect(candidate.matchFingerprint).toBe(
+      "techno-night:2026-06-20t22-00-00-000z:the-warehouse",
+    );
+    expect(candidate.materialContentHash).toMatch(/^[a-f0-9]{64}$/);
   });
 
   it("applies confidenceAdjustment from the source target", async () => {
