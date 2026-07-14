@@ -39,8 +39,8 @@ Extend the parser candidate contract with stable source identity and normalized 
 - [x] Source-event observations are durable and unique by source target plus source event key.
 - [x] A first observation creates the expected review item and links the observation to it.
 - [x] An immediate unchanged repeat creates no new review item and records the observation as seen again.
-- [ ] A material change updates the existing pending review item instead of creating a competing draft.
-- [ ] A material change after publication creates a field-level proposed update linked to the published event.
+- [x] A material change updates the existing pending review item instead of creating a competing draft.
+- [x] A material change after publication creates a field-level proposed update linked to the published event.
 - [ ] A rejected observation remains suppressed until its material hash changes.
 - [ ] Evidence-only changes do not reopen review work.
 - [ ] Observation classification and review-item writes are atomic under concurrent attempts.
