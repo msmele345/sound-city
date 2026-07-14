@@ -226,7 +226,7 @@ export async function runManualRefresh(
 
     for (const target of targets) {
       metrics.sourceTargetsChecked += 1;
-      const fetchedAt = isoNow();
+      const fetchedAt = isoNow(input.now);
 
       await store.updateSourceTarget(target.id, {
         lastFetchedAt: fetchedAt,
@@ -258,14 +258,61 @@ export async function runManualRefresh(
           throw new Error(unsupportedParserMessage(target));
         }
 
+        const targetReviewItems: ReviewItemRecord[] = [];
         for (const candidate of candidates) {
-          const item = await store.createReviewItem(toReviewItemInput(candidate));
+          const item = await store.withTransaction(async (transactionStore) => {
+            const observation =
+              await transactionStore.getSourceEventObservation(
+                target.id,
+                candidate.sourceEventKey,
+              );
+            if (
+              observation?.materialContentHash ===
+              candidate.materialContentHash
+            ) {
+              await transactionStore.updateSourceEventObservation(
+                observation.id,
+                {
+                  matchFingerprint: candidate.matchFingerprint,
+                  normalizedCandidate: candidate.normalizedDraft,
+                  lastSeenAt: fetchedAt,
+                  parserVersion: candidate.parserVersion,
+                },
+              );
+              return null;
+            }
+            if (observation) {
+              throw new Error(
+                `Material change handling is not implemented for source event ${candidate.sourceEventKey}`,
+              );
+            }
+
+            const createdItem = await transactionStore.createReviewItem(
+              toReviewItemInput(candidate),
+            );
+            await transactionStore.createSourceEventObservation({
+              sourceTargetId: target.id,
+              sourceEventKey: candidate.sourceEventKey,
+              matchFingerprint: candidate.matchFingerprint,
+              materialContentHash: candidate.materialContentHash,
+              normalizedCandidate: candidate.normalizedDraft,
+              seenAt: fetchedAt,
+              latestReviewItemId: createdItem.id,
+              publishedEventId: null,
+              parserVersion: candidate.parserVersion,
+            });
+            return createdItem;
+          });
+          if (!item) {
+            continue;
+          }
           reviewItems.push(item);
+          targetReviewItems.push(item);
           applyItemMetrics(metrics, item);
         }
 
-        const duplicateCount = candidates.filter(
-          (candidate) => candidate.lane === "possible-duplicate",
+        const duplicateCount = targetReviewItems.filter(
+          (item) => item.lane === "possible-duplicate",
         ).length;
         if (duplicateCount > 0) {
           await store.incrementSourceTargetCounters(target.id, {
@@ -280,7 +327,7 @@ export async function runManualRefresh(
         await log(store, run.id, {
           sourceTargetId: target.id,
           level: "info",
-          message: `${target.parserStrategy} parser created ${candidates.length} review items`,
+          message: `${target.parserStrategy} parser created ${targetReviewItems.length} review items`,
           metadata: { parserStrategy: target.parserStrategy },
         });
       } catch (error) {

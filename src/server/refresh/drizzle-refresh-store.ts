@@ -639,6 +639,22 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
       return observation;
     },
 
+    async updateSourceEventObservation(id, input) {
+      const writer = requireWriter(db);
+      const setValues: Record<string, unknown> = { ...input };
+      if (input.normalizedCandidate) {
+        setValues.normalizedCandidate = JSON.stringify(input.normalizedCandidate);
+      }
+      await writer
+        .update(schema.sourceEventObservations)
+        .set(setValues)
+        .where(eq(schema.sourceEventObservations.id, id));
+      const rows = await db.query.sourceEventObservations.findMany();
+      const row = rows.find((observation) => observation.id === id);
+      if (!row) throw new Error("Source event observation not found");
+      return toSourceEventObservation(row);
+    },
+
     // ── Decision History ────────────────────────────────────────
     async listDecisionHistory(reviewItemId) {
       const rows = await db.query.reviewDecisionHistory.findMany();

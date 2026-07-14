@@ -255,6 +255,20 @@ export type CreateSourceEventObservationInput = Pick<
   seenAt: string;
 };
 
+export type UpdateSourceEventObservationInput = Partial<
+  Pick<
+    SourceEventObservationRecord,
+    | "matchFingerprint"
+    | "materialContentHash"
+    | "normalizedCandidate"
+    | "lastSeenAt"
+    | "lastChangedAt"
+    | "latestReviewItemId"
+    | "publishedEventId"
+    | "parserVersion"
+  >
+>;
+
 export type UpdateReviewItemInput = Partial<
   Pick<
     ReviewItemRecord,

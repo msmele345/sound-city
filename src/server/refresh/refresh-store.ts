@@ -17,6 +17,7 @@ import type {
   SourceTargetCounterDelta,
   SourceTargetRecord,
   UpdateReviewItemInput,
+  UpdateSourceEventObservationInput,
   UpdateSourceOwnerInput,
   UpdateSourceTargetInput,
 } from "./types";
@@ -80,6 +81,10 @@ export type RefreshStore = {
   ): Promise<SourceEventObservationRecord | null>;
   createSourceEventObservation(
     input: CreateSourceEventObservationInput,
+  ): Promise<SourceEventObservationRecord>;
+  updateSourceEventObservation(
+    id: string,
+    input: UpdateSourceEventObservationInput,
   ): Promise<SourceEventObservationRecord>;
 
   // ── Decision History ─────────────────────────────────────────
