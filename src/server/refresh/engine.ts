@@ -458,6 +458,65 @@ export async function runManualRefresh(
                 );
                 return proposedUpdate;
               }
+              if (latestItem?.status === "rejected") {
+                let reviewItemInput = toReviewItemInput(candidate);
+                const rejectedPublishedEventId =
+                  observation.publishedEventId ??
+                  (latestItem.lane === "proposed-update"
+                    ? latestItem.targetEntityId
+                    : null);
+                if (
+                  latestItem.lane === "proposed-update" &&
+                  rejectedPublishedEventId
+                ) {
+                  const currentCandidate = await currentPublishedEventCandidate(
+                    catalogStore,
+                    input.cityId,
+                    rejectedPublishedEventId,
+                    observation.normalizedCandidate,
+                  );
+                  reviewItemInput = toPublishedEventUpdateInput(
+                    candidate,
+                    rejectedPublishedEventId,
+                    currentCandidate,
+                  );
+                }
+                if (
+                  reviewItemInput.lane === "proposed-update" &&
+                  Object.keys(reviewItemInput.fieldDiffs ?? {}).length === 0
+                ) {
+                  await transactionStore.updateSourceEventObservation(
+                    observation.id,
+                    {
+                      matchFingerprint: candidate.matchFingerprint,
+                      materialContentHash: candidate.materialContentHash,
+                      normalizedCandidate: candidate.normalizedDraft,
+                      lastSeenAt: fetchedAt,
+                      lastChangedAt: fetchedAt,
+                      publishedEventId: rejectedPublishedEventId,
+                      parserVersion: candidate.parserVersion,
+                    },
+                  );
+                  return null;
+                }
+                const reopenedItem = await transactionStore.createReviewItem(
+                  reviewItemInput,
+                );
+                await transactionStore.updateSourceEventObservation(
+                  observation.id,
+                  {
+                    matchFingerprint: candidate.matchFingerprint,
+                    materialContentHash: candidate.materialContentHash,
+                    normalizedCandidate: candidate.normalizedDraft,
+                    lastSeenAt: fetchedAt,
+                    lastChangedAt: fetchedAt,
+                    latestReviewItemId: reopenedItem.id,
+                    publishedEventId: rejectedPublishedEventId,
+                    parserVersion: candidate.parserVersion,
+                  },
+                );
+                return reopenedItem;
+              }
               throw new Error(
                 `Material change handling is not implemented for source event ${candidate.sourceEventKey}`,
               );
