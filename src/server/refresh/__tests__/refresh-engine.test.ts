@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createSeedCatalogStore } from "../../catalog/catalog-store";
 import { runManualRefresh, listRefreshRunsWithReconciliation } from "../engine";
+import { approveReviewItem } from "../review-operations";
 import { createSeedRefreshStore } from "../store";
 import type { RefreshStore } from "../refresh-store";
 import type { CatalogStore } from "../../catalog/catalog-store";
@@ -51,10 +52,10 @@ async function createRssObservationFixture(store: RefreshStore) {
     refreshCadence: "manual",
     notes: "",
   });
-  const fetcher = async () => ({
+  const fetcherForTitle = (title: string) => async () => ({
     body: `<?xml version="1.0"?><rss><channel><item>
       <guid>smartbar-event-42</guid>
-      <title>Queen! with Derrick Carter</title>
+      <title>${title}</title>
       <link>https://smartbarchicago.com/event/queen-derrick-carter/</link>
       <description><![CDATA[
         <p>Sunday, June 28, 2026</p>
@@ -65,7 +66,11 @@ async function createRssObservationFixture(store: RefreshStore) {
     status: 200,
   });
 
-  return { target, fetcher };
+  return {
+    target,
+    fetcher: fetcherForTitle("Queen! with Derrick Carter"),
+    fetcherForTitle,
+  };
 }
 
 function createCatalogWithPastEvent(
@@ -575,6 +580,232 @@ describe("refresh engine", () => {
       lastSeenAt: seenAgainAt.toISOString(),
       lastChangedAt: firstSeenAt.toISOString(),
       latestReviewItemId: firstResult.reviewItems[0].id,
+    });
+  });
+
+  it("updates the existing pending review item when observed material changes", async () => {
+    const store = createSeedRefreshStore();
+    const { target, fetcher, fetcherForTitle } =
+      await createRssObservationFixture(store);
+    const firstSeenAt = new Date("2026-06-20T12:00:00.000Z");
+    const changedAt = new Date("2026-06-20T13:00:00.000Z");
+
+    const firstResult = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: firstSeenAt,
+      fetcher,
+    });
+    const firstItem = firstResult.reviewItems[0];
+    const firstObservation = await store.getSourceEventObservation(
+      target.id,
+      "smartbar-event-42",
+    );
+
+    const changedResult = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: changedAt,
+      fetcher: fetcherForTitle("Queen! with Derrick Carter and Honey Dijon"),
+    });
+
+    expect(changedResult.run.status).toBe("succeeded");
+    expect(changedResult.run.draftsCreated).toBe(0);
+    expect(changedResult.reviewItems).toEqual([]);
+
+    const items = await store.listReviewItems("city_chicago");
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      id: firstItem.id,
+      status: "pending",
+      normalizedDraft: {
+        title: "Queen! with Derrick Carter and Honey Dijon",
+      },
+      fetchTimestamp: changedAt.toISOString(),
+    });
+
+    const observation = await store.getSourceEventObservation(
+      target.id,
+      "smartbar-event-42",
+    );
+    expect(observation).toMatchObject({
+      normalizedCandidate: items[0].normalizedDraft,
+      firstSeenAt: firstSeenAt.toISOString(),
+      lastSeenAt: changedAt.toISOString(),
+      lastChangedAt: changedAt.toISOString(),
+      latestReviewItemId: firstItem.id,
+    });
+    expect(observation!.materialContentHash).not.toBe(
+      firstObservation!.materialContentHash,
+    );
+  });
+
+  it("creates a field-level proposed update for a changed published event", async () => {
+    const refreshStore = createSeedRefreshStore();
+    const catalogStore = createSeedCatalogStore({
+      cities: [
+        {
+          id: "city_chicago",
+          name: "Chicago",
+          slug: "chicago",
+          timeZone: "America/Chicago",
+        },
+      ],
+      venues: [],
+      artists: [],
+      events: [],
+    });
+    const { target, fetcher, fetcherForTitle } =
+      await createRssObservationFixture(refreshStore);
+    const firstSeenAt = new Date("2026-06-20T12:00:00.000Z");
+    const changedAt = new Date("2026-06-20T13:00:00.000Z");
+
+    const firstResult = await runManualRefresh(refreshStore, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: firstSeenAt,
+      fetcher,
+    });
+    const approval = await approveReviewItem(
+      refreshStore,
+      catalogStore,
+      firstResult.reviewItems[0].id,
+      "admin-secret",
+      {
+        editedDraft: {
+          ...firstResult.reviewItems[0].normalizedDraft,
+          title: "Admin Curated Queen!",
+        },
+      },
+    );
+
+    const changedResult = await runManualRefresh(
+      refreshStore,
+      {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+        now: changedAt,
+        fetcher: fetcherForTitle("Queen! with Derrick Carter and Honey Dijon"),
+      },
+      catalogStore,
+    );
+
+    expect(changedResult.run.status).toBe("succeeded");
+    expect(changedResult.run.updatesProposed).toBe(1);
+    expect(changedResult.reviewItems).toHaveLength(1);
+    const proposedUpdate = changedResult.reviewItems[0];
+    expect(proposedUpdate).toMatchObject({
+      lane: "proposed-update",
+      status: "pending",
+      targetEntityType: "event",
+      targetEntityId: approval.publishedEntityId,
+      normalizedDraft: {
+        title: "Queen! with Derrick Carter and Honey Dijon",
+      },
+      fieldDiffs: {
+        title: {
+          current: "Admin Curated Queen!",
+          proposed: "Queen! with Derrick Carter and Honey Dijon",
+        },
+      },
+    });
+    expect(Object.keys(proposedUpdate.fieldDiffs!)).toEqual(["title"]);
+
+    const observation = await refreshStore.getSourceEventObservation(
+      target.id,
+      "smartbar-event-42",
+    );
+    expect(observation).toMatchObject({
+      normalizedCandidate: proposedUpdate.normalizedDraft,
+      lastSeenAt: changedAt.toISOString(),
+      lastChangedAt: changedAt.toISOString(),
+      latestReviewItemId: proposedUpdate.id,
+      publishedEventId: approval.publishedEntityId,
+    });
+  });
+
+  it("keeps a changed pending proposal linked to its published event", async () => {
+    const refreshStore = createSeedRefreshStore();
+    const catalogStore = createSeedCatalogStore({
+      cities: [
+        {
+          id: "city_chicago",
+          name: "Chicago",
+          slug: "chicago",
+          timeZone: "America/Chicago",
+        },
+      ],
+      venues: [],
+      artists: [],
+      events: [],
+    });
+    const { target, fetcher, fetcherForTitle } =
+      await createRssObservationFixture(refreshStore);
+
+    const firstResult = await runManualRefresh(refreshStore, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: new Date("2026-06-20T12:00:00.000Z"),
+      fetcher,
+    });
+    const approval = await approveReviewItem(
+      refreshStore,
+      catalogStore,
+      firstResult.reviewItems[0].id,
+      "admin-secret",
+    );
+    const firstChange = await runManualRefresh(
+      refreshStore,
+      {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+        now: new Date("2026-06-20T13:00:00.000Z"),
+        fetcher: fetcherForTitle("Queen! with Derrick Carter and Honey Dijon"),
+      },
+      catalogStore,
+    );
+    const proposalId = firstChange.reviewItems[0].id;
+
+    const secondChange = await runManualRefresh(
+      refreshStore,
+      {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+        now: new Date("2026-06-20T14:00:00.000Z"),
+        fetcher: fetcherForTitle("Queen! with Derrick Carter and DJ Heather"),
+      },
+      catalogStore,
+    );
+
+    expect(secondChange.run.status).toBe("succeeded");
+    expect(secondChange.reviewItems).toEqual([]);
+    const items = await refreshStore.listReviewItems("city_chicago");
+    expect(items).toHaveLength(2);
+    expect(items[1]).toMatchObject({
+      id: proposalId,
+      lane: "proposed-update",
+      status: "pending",
+      targetEntityType: "event",
+      targetEntityId: approval.publishedEntityId,
+      normalizedDraft: {
+        title: "Queen! with Derrick Carter and DJ Heather",
+      },
+      fieldDiffs: {
+        title: {
+          current: "Queen! with Derrick Carter",
+          proposed: "Queen! with Derrick Carter and DJ Heather",
+        },
+      },
+    });
+
+    const observation = await refreshStore.getSourceEventObservation(
+      target.id,
+      "smartbar-event-42",
+    );
+    expect(observation).toMatchObject({
+      latestReviewItemId: proposalId,
+      publishedEventId: approval.publishedEntityId,
+      lastChangedAt: "2026-06-20T14:00:00.000Z",
     });
   });
 

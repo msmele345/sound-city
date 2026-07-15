@@ -10,6 +10,7 @@ import type {
   ReviewItemRecord,
   RunStatus,
   SourceTargetRecord,
+  UpdateReviewItemInput,
 } from "./types";
 import { parseVenueCalendarTarget } from "./venue-calendar-parser";
 
@@ -108,6 +109,99 @@ function toReviewItemInput(candidate: ParserCandidate): CreateReviewItemInput {
   void sourceEventKey;
   void materialContentHash;
   return input;
+}
+
+function toPendingReviewItemUpdate(
+  input: CreateReviewItemInput,
+): UpdateReviewItemInput {
+  const { cityId, runId, sourceTargetId, ...update } = input;
+  void cityId;
+  void runId;
+  void sourceTargetId;
+  return update;
+}
+
+function fieldDiffs(
+  current: Record<string, unknown>,
+  proposed: Record<string, unknown>,
+): Record<string, { current: unknown; proposed: unknown }> {
+  return Object.fromEntries(
+    [...new Set([...Object.keys(current), ...Object.keys(proposed)])]
+      .sort()
+      .filter(
+        (field) =>
+          JSON.stringify(current[field]) !== JSON.stringify(proposed[field]),
+      )
+      .map((field) => [
+        field,
+        {
+          current: current[field] ?? null,
+          proposed: proposed[field] ?? null,
+        },
+      ]),
+  );
+}
+
+async function currentPublishedEventCandidate(
+  catalogStore: CatalogReader | undefined,
+  cityId: string,
+  publishedEventId: string,
+  fallback: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  if (!catalogStore) {
+    throw new Error(
+      "Catalog access is required to create a published event update",
+    );
+  }
+  const city = (await catalogStore.listCities()).find(
+    (candidate) => candidate.id === cityId,
+  );
+  if (!city) {
+    throw new Error(`City ${cityId} was not found in the catalog`);
+  }
+  const event = (await catalogStore.listEvents(city.slug)).find(
+    (candidate) => candidate.id === publishedEventId,
+  );
+  if (!event) {
+    throw new Error(`Published event ${publishedEventId} was not found`);
+  }
+
+  // Keep last-observed values for source-only material fields that the catalog
+  // does not persist yet, then replace every field the published event owns.
+  const current: Record<string, unknown> = {
+    ...fallback,
+    title: event.title,
+    startsAt: event.startsAt,
+    venueName: event.venue.name,
+    styles: event.styles,
+  };
+  if ("artists" in fallback) {
+    current.artists = event.artists.map((artist) => artist.name);
+  }
+  if ("lineup" in fallback) {
+    current.lineup = event.artists.map((artist) => artist.name);
+  }
+  if ("ticketUrl" in fallback) {
+    current.ticketUrl = event.source.url;
+  }
+  if ("canonicalUrl" in fallback) {
+    current.canonicalUrl = event.source.url;
+  }
+  return current;
+}
+
+function toPublishedEventUpdateInput(
+  candidate: ParserCandidate,
+  publishedEventId: string,
+  currentCandidate: Record<string, unknown>,
+): CreateReviewItemInput {
+  return {
+    ...toReviewItemInput(candidate),
+    lane: "proposed-update",
+    targetEntityType: "event",
+    targetEntityId: publishedEventId,
+    fieldDiffs: fieldDiffs(currentCandidate, candidate.normalizedDraft),
+  };
 }
 
 async function log(
@@ -282,6 +376,88 @@ export async function runManualRefresh(
               return null;
             }
             if (observation) {
+              const latestItem = observation.latestReviewItemId
+                ? await transactionStore.getReviewItem(
+                    observation.latestReviewItemId,
+                  )
+                : null;
+              if (latestItem?.status === "pending") {
+                let reviewItemInput = toReviewItemInput(candidate);
+                if (
+                  latestItem.lane === "proposed-update" &&
+                  latestItem.targetEntityId
+                ) {
+                  const currentCandidate =
+                    await currentPublishedEventCandidate(
+                      catalogStore,
+                      input.cityId,
+                      latestItem.targetEntityId,
+                      observation.normalizedCandidate,
+                    );
+                  reviewItemInput = toPublishedEventUpdateInput(
+                    candidate,
+                    latestItem.targetEntityId,
+                    currentCandidate,
+                  );
+                }
+                await transactionStore.updateReviewItem(
+                  latestItem.id,
+                  toPendingReviewItemUpdate(reviewItemInput),
+                );
+                await transactionStore.updateSourceEventObservation(
+                  observation.id,
+                  {
+                    matchFingerprint: candidate.matchFingerprint,
+                    materialContentHash: candidate.materialContentHash,
+                    normalizedCandidate: candidate.normalizedDraft,
+                    lastSeenAt: fetchedAt,
+                    lastChangedAt: fetchedAt,
+                    publishedEventId:
+                      latestItem.lane === "proposed-update"
+                        ? latestItem.targetEntityId
+                        : observation.publishedEventId,
+                    parserVersion: candidate.parserVersion,
+                  },
+                );
+                return null;
+              }
+              const publishedEventId =
+                observation.publishedEventId ?? latestItem?.publishedEntityId;
+              if (
+                latestItem?.status === "approved" &&
+                (latestItem.lane === "new-event" ||
+                  latestItem.lane === "proposed-update") &&
+                publishedEventId
+              ) {
+                const currentCandidate = await currentPublishedEventCandidate(
+                  catalogStore,
+                  input.cityId,
+                  publishedEventId,
+                  observation.normalizedCandidate,
+                );
+                const proposedUpdate =
+                  await transactionStore.createReviewItem(
+                    toPublishedEventUpdateInput(
+                      candidate,
+                      publishedEventId,
+                      currentCandidate,
+                    ),
+                  );
+                await transactionStore.updateSourceEventObservation(
+                  observation.id,
+                  {
+                    matchFingerprint: candidate.matchFingerprint,
+                    materialContentHash: candidate.materialContentHash,
+                    normalizedCandidate: candidate.normalizedDraft,
+                    lastSeenAt: fetchedAt,
+                    lastChangedAt: fetchedAt,
+                    latestReviewItemId: proposedUpdate.id,
+                    publishedEventId,
+                    parserVersion: candidate.parserVersion,
+                  },
+                );
+                return proposedUpdate;
+              }
               throw new Error(
                 `Material change handling is not implemented for source event ${candidate.sourceEventKey}`,
               );
