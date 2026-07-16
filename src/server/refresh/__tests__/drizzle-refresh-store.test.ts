@@ -10,7 +10,8 @@ function table<T>(rows: T[]) {
   };
 }
 
-function createMockDb() {
+function createMockDb(onExecute: () => void = () => {}) {
+  let lockTail = Promise.resolve();
   const data: Record<string, Record<string, unknown>[]> = {};
   const tables = [
     "source_owners",
@@ -39,7 +40,7 @@ function createMockDb() {
     where: () => {},
   });
 
-  return {
+  const base = {
     query: {
       sourceOwners: table([]),
       sourceTargets: table([]),
@@ -52,6 +53,29 @@ function createMockDb() {
     insert,
     update,
     delete: del,
+  };
+
+  return {
+    ...base,
+    async transaction(fn: (tx: unknown) => Promise<unknown>) {
+      let releaseLock = () => {};
+      try {
+        return await fn({
+          ...base,
+          async execute() {
+            onExecute();
+            const previous = lockTail;
+            const current = new Promise<void>((resolve) => {
+              releaseLock = resolve;
+            });
+            lockTail = current;
+            await previous;
+          },
+        });
+      } finally {
+        releaseLock();
+      }
+    },
   } as unknown as Parameters<typeof createDrizzleRefreshStore>[0];
 }
 
@@ -204,6 +228,47 @@ describe("drizzle refresh store", () => {
         lastSeenAt: "2026-07-11T12:00:00.000Z",
         lastChangedAt: "2026-07-11T12:00:00.000Z",
       });
+    });
+
+    it("acquires the database transaction lock before classifying an observation", async () => {
+      const events: string[] = [];
+      const transactionStore = createDrizzleRefreshStore(
+        createMockDb(() => events.push("locked")),
+      );
+
+      await transactionStore.withSourceEventObservationTransaction(
+        "target_1",
+        "event-42",
+        async () => {
+          events.push("classified");
+        },
+      );
+
+      expect(events).toEqual(["locked", "classified"]);
+    });
+
+    it("serializes racing observation classifications in the database adapter", async () => {
+      const transactionStore = createDrizzleRefreshStore(createMockDb());
+      let activeClassifications = 0;
+      let maximumActiveClassifications = 0;
+      const classify = () =>
+        transactionStore.withSourceEventObservationTransaction(
+          "target_1",
+          "event-42",
+          async () => {
+            activeClassifications += 1;
+            maximumActiveClassifications = Math.max(
+              maximumActiveClassifications,
+              activeClassifications,
+            );
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            activeClassifications -= 1;
+          },
+        );
+
+      await Promise.all([classify(), classify()]);
+
+      expect(maximumActiveClassifications).toBe(1);
     });
   });
 });

@@ -43,7 +43,7 @@ Extend the parser candidate contract with stable source identity and normalized 
 - [x] A material change after publication creates a field-level proposed update linked to the published event.
 - [x] A rejected observation remains suppressed until its material hash changes.
 - [x] Evidence-only changes do not reopen review work.
-- [ ] Observation classification and review-item writes are atomic under concurrent attempts.
+- [x] Observation classification and review-item writes are atomic under concurrent attempts.
 - [ ] Parser-version changes alone do not flood the review queue.
 - [ ] Engine integration tests demonstrate the complete behavior through the manual refresh seam.
 

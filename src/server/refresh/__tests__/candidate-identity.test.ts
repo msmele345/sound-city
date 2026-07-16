@@ -27,4 +27,19 @@ describe("candidate identity", () => {
       buildMaterialContentHash(baseline),
     );
   });
+
+  it("ignores ordering changes for set-like normalized styles", () => {
+    const baseline = {
+      title: "Warehouse Night",
+      startsAt: "2026-07-12T03:00:00.000Z",
+      styles: ["hard", "groovy"],
+    };
+
+    expect(
+      buildMaterialContentHash({
+        ...baseline,
+        styles: ["groovy", "hard"],
+      }),
+    ).toBe(buildMaterialContentHash(baseline));
+  });
 });

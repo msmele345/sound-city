@@ -590,6 +590,47 @@ describe("refresh engine", () => {
     });
   });
 
+  it("classifies concurrent first sightings atomically without duplicate review work", async () => {
+    const store = createSeedRefreshStore();
+    const { target, fetcher } = await createRssObservationFixture(store);
+
+    const results = await Promise.all([
+      runManualRefresh(store, {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret-a",
+        now: new Date("2026-07-11T12:00:00.000Z"),
+        fetcher,
+      }),
+      runManualRefresh(store, {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret-b",
+        now: new Date("2026-07-11T12:00:00.000Z"),
+        fetcher,
+      }),
+    ]);
+
+    expect(results.map(({ run }) => run.status)).toEqual([
+      "succeeded",
+      "succeeded",
+    ]);
+    expect(new Set(results.map(({ run }) => run.id)).size).toBe(2);
+    expect(
+      results.reduce(
+        (total, result) => total + result.reviewItems.length,
+        0,
+      ),
+    ).toBe(1);
+
+    const items = await store.listReviewItems("city_chicago");
+    expect(items).toHaveLength(1);
+    await expect(
+      store.getSourceEventObservation(target.id, "smartbar-event-42"),
+    ).resolves.toMatchObject({
+      latestReviewItemId: items[0].id,
+      lastSeenAt: "2026-07-11T12:00:00.000Z",
+    });
+  });
+
   it("updates the existing pending review item when observed material changes", async () => {
     const store = createSeedRefreshStore();
     const { target, fetcher, fetcherForTitle } =
@@ -770,7 +811,14 @@ describe("refresh engine", () => {
     expect(repeatedResult.run.draftsCreated).toBe(0);
     expect(repeatedResult.reviewItems).toEqual([]);
     expect(await store.listReviewItems("city_chicago")).toMatchObject([
-      { id: rejectedItem.id, status: "rejected" },
+      {
+        id: rejectedItem.id,
+        status: "rejected",
+        evidence: {
+          excerpts: [expect.stringContaining("formatting was updated")],
+        },
+        fetchTimestamp: evidenceChangedAt.toISOString(),
+      },
     ]);
 
     const observation = await store.getSourceEventObservation(
