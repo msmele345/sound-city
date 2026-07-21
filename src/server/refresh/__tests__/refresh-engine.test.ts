@@ -590,6 +590,70 @@ describe("refresh engine", () => {
     });
   });
 
+  it("records a parser upgrade without creating new review work", async () => {
+    const store = createSeedRefreshStore();
+    const { target, fetcher } = await createRssObservationFixture(store);
+    const firstSeenAt = new Date("2026-07-11T12:00:00.000Z");
+    const upgradedAt = new Date("2026-07-11T13:00:00.000Z");
+
+    const firstResult = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: firstSeenAt,
+      fetcher,
+    });
+    const reviewItem = firstResult.reviewItems[0];
+    const observation = await store.getSourceEventObservation(
+      target.id,
+      "smartbar-event-42",
+    );
+    await store.updateReviewItem(reviewItem.id, {
+      evidence: {
+        ...reviewItem.evidence,
+        contentHashes: reviewItem.evidence.contentHashes.map((hash) =>
+          hash.replace("rss-event-feed@1", "rss-event-feed@0"),
+        ),
+      },
+      parserVersion: "rss-event-feed@0",
+    });
+    await store.updateSourceEventObservation(observation!.id, {
+      parserVersion: "rss-event-feed@0",
+    });
+
+    const upgradedResult = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: upgradedAt,
+      fetcher,
+    });
+
+    expect(upgradedResult.run.status).toBe("succeeded");
+    expect(upgradedResult.run.draftsCreated).toBe(0);
+    expect(upgradedResult.reviewItems).toEqual([]);
+    expect(await store.listReviewItems("city_chicago")).toMatchObject([
+      {
+        id: reviewItem.id,
+        evidence: {
+          contentHashes: [expect.stringContaining("rss-event-feed@1")],
+        },
+        parserVersion: "rss-event-feed@1",
+      },
+    ]);
+    expect(
+      await store.getSourceEventObservation(
+        target.id,
+        "smartbar-event-42",
+      ),
+    ).toMatchObject({
+      materialContentHash: observation!.materialContentHash,
+      firstSeenAt: firstSeenAt.toISOString(),
+      lastSeenAt: upgradedAt.toISOString(),
+      lastChangedAt: firstSeenAt.toISOString(),
+      latestReviewItemId: reviewItem.id,
+      parserVersion: "rss-event-feed@1",
+    });
+  });
+
   it("classifies concurrent first sightings atomically without duplicate review work", async () => {
     const store = createSeedRefreshStore();
     const { target, fetcher } = await createRssObservationFixture(store);
