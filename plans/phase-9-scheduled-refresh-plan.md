@@ -59,10 +59,10 @@ Persist one structured outcome for every target attempted during a refresh, aggr
 
 ### Acceptance criteria
 
-- [ ] Each attempted target receives one outcome unique to its run and target.
-- [ ] Outcomes record status, start/finish timestamps, candidate counts, created/updated/unchanged counts, warning count, error details, and request telemetry.
-- [ ] Target outcome status supports `running`, `succeeded`, `failed`, `skipped`, and `unchanged`.
-- [ ] Run status is `succeeded` when all attempted targets succeed or are unchanged, `partial` when outcomes are mixed, and `failed` when all attempted targets fail.
+- [x] Each attempted target receives one outcome unique to its run and target.
+- [x] Outcomes record status, start/finish timestamps, candidate counts, created/updated/unchanged counts, warning count, error details, and request telemetry.
+- [x] Target outcome status supports `running`, `succeeded`, `failed`, `skipped`, and `unchanged`.
+- [x] Run status is `succeeded` when all attempted targets succeed or are unchanged, `partial` when outcomes are mixed, and `failed` when all attempted targets fail.
 - [ ] Admin summarizes partial results in source terms, such as “2 of 3 sources succeeded.”
 - [ ] Admin exposes the failed target and compact error without requiring log inspection.
 - [ ] Valid feed items are retained when sibling items are malformed.

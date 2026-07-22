@@ -5,6 +5,7 @@ import type { RefreshStore } from "./refresh-store";
 import type {
   RefreshRunLogRecord,
   RefreshRunRecord,
+  RefreshTargetOutcomeRecord,
   ReviewDecisionRecord,
   ReviewItemRecord,
   SourceEventObservationRecord,
@@ -83,6 +84,26 @@ type RefreshRunLogRow = {
   createdAt: string | Date;
 };
 
+type RefreshTargetOutcomeRow = {
+  id: string;
+  runId: string;
+  sourceTargetId: string;
+  status: string;
+  startedAt: string | Date;
+  finishedAt: string | Date | null;
+  candidateCount: number;
+  createdCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  warningCount: number;
+  errorDetails: string | null;
+  requestDurationMs: number | null;
+  responseStatus: number | null;
+  responseSizeBytes: number | null;
+  retryCount: number;
+  finalUrl: string | null;
+};
+
 type ReviewItemRow = {
   id: string;
   cityId: string;
@@ -146,6 +167,7 @@ export type RefreshDbReader = {
     sourceOwners: FindManyTable<SourceOwnerRow>;
     sourceTargets: FindManyTable<SourceTargetRow>;
     refreshRuns: FindManyTable<RefreshRunRow>;
+    refreshTargetOutcomes: FindManyTable<RefreshTargetOutcomeRow>;
     refreshRunLogs: FindManyTable<RefreshRunLogRow>;
     reviewItems: FindManyTable<ReviewItemRow>;
     sourceEventObservations: FindManyTable<SourceEventObservationRow>;
@@ -240,6 +262,18 @@ function toRunLog(row: RefreshRunLogRow): RefreshRunLogRecord {
     level: row.level as RefreshRunLogRecord["level"],
     metadata: parseJsonOrNull(row.metadata),
     createdAt: normalizeDate(row.createdAt),
+  };
+}
+
+function toRefreshTargetOutcome(
+  row: RefreshTargetOutcomeRow,
+): RefreshTargetOutcomeRecord {
+  return {
+    ...row,
+    status: row.status as RefreshTargetOutcomeRecord["status"],
+    startedAt: normalizeDate(row.startedAt),
+    finishedAt: normalizeDateOrNull(row.finishedAt),
+    errorDetails: parseJsonOrNull(row.errorDetails),
   };
 }
 
@@ -495,6 +529,75 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
       const row = rows.find((r) => r.id === id);
       if (!row) throw new Error("Refresh run not found");
       return toRefreshRun(row);
+    },
+
+    // ── Refresh Target Outcomes ────────────────────────────────
+    async listRefreshTargetOutcomes(runId) {
+      const rows = await db.query.refreshTargetOutcomes.findMany();
+      return rows
+        .filter((row) => row.runId === runId)
+        .map(toRefreshTargetOutcome);
+    },
+
+    async createRefreshTargetOutcome(input) {
+      const writer = requireWriter(db);
+      const id = uniqueId(`refresh_target_outcome_${input.runId}`);
+      await writer.insert(schema.refreshTargetOutcomes).values({
+        id,
+        runId: input.runId,
+        sourceTargetId: input.sourceTargetId,
+        status: "running",
+        startedAt: input.startedAt,
+        finishedAt: null,
+        candidateCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
+        unchangedCount: 0,
+        warningCount: 0,
+        errorDetails: null,
+        requestDurationMs: null,
+        responseStatus: null,
+        responseSizeBytes: null,
+        retryCount: 0,
+        finalUrl: null,
+      });
+      return {
+        ...input,
+        id,
+        status: "running",
+        finishedAt: null,
+        candidateCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
+        unchangedCount: 0,
+        warningCount: 0,
+        errorDetails: null,
+        requestDurationMs: null,
+        responseStatus: null,
+        responseSizeBytes: null,
+        retryCount: 0,
+        finalUrl: null,
+      };
+    },
+
+    async updateRefreshTargetOutcome(id, updates) {
+      const writer = requireWriter(db);
+      await writer
+        .update(schema.refreshTargetOutcomes)
+        .set({
+          ...updates,
+          errorDetails:
+            updates.errorDetails === undefined
+              ? undefined
+              : updates.errorDetails
+                ? JSON.stringify(updates.errorDetails)
+                : null,
+        })
+        .where(eq(schema.refreshTargetOutcomes.id, id));
+      const rows = await db.query.refreshTargetOutcomes.findMany();
+      const row = rows.find((candidate) => candidate.id === id);
+      if (!row) throw new Error("Refresh target outcome not found");
+      return toRefreshTargetOutcome(row);
     },
 
     // ── Run Logs ───────────────────────────────────────────────

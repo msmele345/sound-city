@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createSeedCatalogStore } from "../../catalog/catalog-store";
 import { runManualRefresh, listRefreshRunsWithReconciliation } from "../engine";
@@ -133,6 +133,10 @@ function createCatalogWithPastEvent(
 }
 
 describe("refresh engine", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("runs the dev parser and creates durable review lanes with metrics", async () => {
     const store = createSeedRefreshStore();
     const target = await createDevTarget(store);
@@ -172,6 +176,219 @@ describe("refresh engine", () => {
     );
   });
 
+  it("persists one target outcome for each attempted source", async () => {
+    const store = createSeedRefreshStore();
+    const target = await createDevTarget(store);
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    const outcomes = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcomes).toEqual([
+      expect.objectContaining({
+        runId: result.run.id,
+        sourceTargetId: target.id,
+        status: "succeeded",
+      }),
+    ]);
+  });
+
+  it("records counts, timestamps, errors, and request telemetry for a successful target", async () => {
+    const store = createSeedRefreshStore();
+    const { target, fetcher } = await createRssObservationFixture(store);
+    const now = new Date("2026-06-20T12:00:00.000Z");
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now,
+      fetcher,
+    });
+
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "succeeded",
+      startedAt: now.toISOString(),
+      finishedAt: now.toISOString(),
+      candidateCount: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      unchangedCount: 0,
+      warningCount: 0,
+      errorDetails: null,
+      responseStatus: 200,
+      retryCount: 0,
+      finalUrl: target.url,
+    });
+    expect(outcome.requestDurationMs).toBeGreaterThanOrEqual(0);
+    expect(outcome.responseSizeBytes).toBeGreaterThan(0);
+  });
+
+  it("records the final response URL after a production fetch redirect", async () => {
+    const store = createSeedRefreshStore();
+    const { fetcher } = await createRssObservationFixture(store);
+    const fetched = await fetcher();
+    const finalUrl = "https://feeds.smartbarchicago.com/events.xml";
+    vi.stubGlobal("fetch", async () => ({
+      text: async () => fetched.body,
+      headers: { get: () => fetched.contentType },
+      status: fetched.status,
+      url: finalUrl,
+    }));
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome.finalUrl).toBe(finalUrl);
+  });
+
+  it("counts a material change to pending review work as an update", async () => {
+    const store = createSeedRefreshStore();
+    const { fetcher, fetcherForTitle } =
+      await createRssObservationFixture(store);
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    const changed = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: fetcherForTitle("Queen! with Derrick Carter and Honey Dijon"),
+    });
+
+    const [outcome] = await store.listRefreshTargetOutcomes(changed.run.id);
+    expect(outcome).toMatchObject({
+      candidateCount: 1,
+      createdCount: 0,
+      updatedCount: 1,
+      unchangedCount: 0,
+    });
+  });
+
+  it("records an unchanged target status when every candidate is unchanged", async () => {
+    const store = createSeedRefreshStore();
+    const { fetcher } = await createRssObservationFixture(store);
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    const repeated = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    const [outcome] = await store.listRefreshTargetOutcomes(repeated.run.id);
+    expect(outcome).toMatchObject({
+      status: "unchanged",
+      candidateCount: 1,
+      createdCount: 0,
+      updatedCount: 0,
+      unchangedCount: 1,
+    });
+  });
+
+  it("aggregates mixed successful and failed target outcomes into a partial run", async () => {
+    const store = createSeedRefreshStore();
+    await createDevTarget(store);
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Unsupported Source",
+      slug: "unsupported-source",
+      kind: "venue",
+      notes: "",
+    });
+    await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://unsupported.test/events",
+      sourceType: "other",
+      parserStrategy: "artist-social",
+      trustLevel: "experimental",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "manual",
+      notes: "",
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    expect(result.run.status).toBe("partial");
+    const outcomes = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual([
+      "failed",
+      "succeeded",
+    ]);
+  });
+
+  it("aggregates succeeded and unchanged target outcomes into a succeeded run", async () => {
+    const store = createSeedRefreshStore();
+    const { fetcher } = await createRssObservationFixture(store);
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    await createDevTarget(store);
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(result.run.status).toBe("succeeded");
+    const outcomes = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual([
+      "succeeded",
+      "unchanged",
+    ]);
+  });
+
+  it("keeps completed candidate counts when a later candidate fails", async () => {
+    const store = createSeedRefreshStore();
+    const target = await createDevTarget(store);
+    await store.createSourceEventObservation({
+      sourceTargetId: target.id,
+      sourceEventKey: "fixture-update-bunker-signal",
+      matchFingerprint: "fixture-update-bunker-signal",
+      materialContentHash: "stale-material-hash",
+      normalizedCandidate: { title: "Older fixture state" },
+      seenAt: "2026-07-22T12:00:00.000Z",
+      latestReviewItemId: null,
+      publishedEventId: null,
+      parserVersion: "dev-static@0",
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    expect(result.run.status).toBe("failed");
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "failed",
+      candidateCount: 4,
+      createdCount: 1,
+      updatedCount: 0,
+      unchangedCount: 0,
+    });
+  });
+
   it("marks unsupported enabled targets as partial and records visible errors", async () => {
     const store = createSeedRefreshStore();
     const owner = await store.createSourceOwner({
@@ -204,6 +421,15 @@ describe("refresh engine", () => {
     expect(result.run.sourceTargetsChecked).toBe(1);
     expect(result.run.sourceTargetsFailed).toBe(1);
     expect(result.run.errorSummary).toMatch(/no parser is available/i);
+
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "failed",
+      errorDetails: {
+        code: null,
+        message: expect.stringMatching(/no parser is available/i),
+      },
+    });
 
     const logs = await store.listRunLogs(result.run.id);
     expect(logs).toEqual(
@@ -1336,6 +1562,15 @@ describe("refresh engine", () => {
 
     expect(result.run.status).toBe("failed");
     expect(result.run.errorSummary).toMatch(/status 404/i);
+
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "failed",
+      responseStatus: 404,
+      retryCount: 0,
+      finalUrl: target.url,
+    });
+    expect(outcome.responseSizeBytes).toBeGreaterThan(0);
 
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.failureCount).toBe(1);

@@ -123,6 +123,35 @@ describe("refresh run store", () => {
     expect(updated.sourceTargetsFailed).toBe(1);
   });
 
+  it.each(["succeeded", "failed", "skipped", "unchanged"] as const)(
+    "persists the %s target outcome status",
+    async (status) => {
+      const outcome = await store.createRefreshTargetOutcome({
+        runId: `run_${status}`,
+        sourceTargetId: `target_${status}`,
+        startedAt: "2026-07-22T12:00:00.000Z",
+      });
+
+      expect(outcome.status).toBe("running");
+      await expect(
+        store.updateRefreshTargetOutcome(outcome.id, { status }),
+      ).resolves.toMatchObject({ status });
+    },
+  );
+
+  it("rejects a second outcome for the same run and target", async () => {
+    const input = {
+      runId: "run_unique",
+      sourceTargetId: "target_unique",
+      startedAt: "2026-07-22T12:00:00.000Z",
+    };
+    await store.createRefreshTargetOutcome(input);
+
+    await expect(store.createRefreshTargetOutcome(input)).rejects.toThrow(
+      /already exists/i,
+    );
+  });
+
   it("lists runs in order by createdAt descending", async () => {
     // Runs are stored in insertion order; latest first
     const first = await store.createRefreshRun(makeRun());
