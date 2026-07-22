@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import type { RefreshStore } from "./refresh-store";
 import type {
@@ -653,6 +653,21 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
       const row = rows.find((observation) => observation.id === id);
       if (!row) throw new Error("Source event observation not found");
       return toSourceEventObservation(row);
+    },
+
+    async withSourceEventObservationTransaction(
+      sourceTargetId,
+      sourceEventKey,
+      fn,
+    ) {
+      const writer = requireWriter(db);
+      const lockKey = JSON.stringify([sourceTargetId, sourceEventKey]);
+      return writer.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+        );
+        return fn(createDrizzleRefreshStore(tx));
+      });
     },
 
     // ── Decision History ────────────────────────────────────────

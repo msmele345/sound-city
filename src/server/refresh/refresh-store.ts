@@ -86,6 +86,15 @@ export type RefreshStore = {
     id: string,
     input: UpdateSourceEventObservationInput,
   ): Promise<SourceEventObservationRecord>;
+  /**
+   * Serializes classification for one source event and commits its observation
+   * and review-item writes atomically.
+   */
+  withSourceEventObservationTransaction<T>(
+    sourceTargetId: string,
+    sourceEventKey: string,
+    fn: (store: RefreshStore) => Promise<T>,
+  ): Promise<T>;
 
   // ── Decision History ─────────────────────────────────────────
   listDecisionHistory(reviewItemId: string): Promise<ReviewDecisionRecord[]>;

@@ -354,131 +354,204 @@ export async function runManualRefresh(
 
         const targetReviewItems: ReviewItemRecord[] = [];
         for (const candidate of candidates) {
-          const item = await store.withTransaction(async (transactionStore) => {
-            const observation =
-              await transactionStore.getSourceEventObservation(
-                target.id,
-                candidate.sourceEventKey,
-              );
-            if (
-              observation?.materialContentHash ===
-              candidate.materialContentHash
-            ) {
-              await transactionStore.updateSourceEventObservation(
-                observation.id,
-                {
-                  matchFingerprint: candidate.matchFingerprint,
-                  normalizedCandidate: candidate.normalizedDraft,
-                  lastSeenAt: fetchedAt,
-                  parserVersion: candidate.parserVersion,
-                },
-              );
-              return null;
-            }
-            if (observation) {
-              const latestItem = observation.latestReviewItemId
-                ? await transactionStore.getReviewItem(
+          const item = await store.withSourceEventObservationTransaction(
+            target.id,
+            candidate.sourceEventKey,
+            async (transactionStore) => {
+              const observation =
+                await transactionStore.getSourceEventObservation(
+                  target.id,
+                  candidate.sourceEventKey,
+                );
+              if (
+                observation?.materialContentHash ===
+                candidate.materialContentHash
+              ) {
+                if (observation.latestReviewItemId) {
+                  await transactionStore.updateReviewItem(
                     observation.latestReviewItemId,
-                  )
-                : null;
-              if (latestItem?.status === "pending") {
-                let reviewItemInput = toReviewItemInput(candidate);
-                if (
-                  latestItem.lane === "proposed-update" &&
-                  latestItem.targetEntityId
-                ) {
-                  const currentCandidate =
-                    await currentPublishedEventCandidate(
-                      catalogStore,
-                      input.cityId,
-                      latestItem.targetEntityId,
-                      observation.normalizedCandidate,
-                    );
-                  reviewItemInput = toPublishedEventUpdateInput(
-                    candidate,
-                    latestItem.targetEntityId,
-                    currentCandidate,
+                    {
+                      evidence: candidate.evidence,
+                      fetchTimestamp: candidate.fetchTimestamp,
+                      parserVersion: candidate.parserVersion,
+                    },
                   );
                 }
-                await transactionStore.updateReviewItem(
-                  latestItem.id,
-                  toPendingReviewItemUpdate(reviewItemInput),
-                );
                 await transactionStore.updateSourceEventObservation(
                   observation.id,
                   {
                     matchFingerprint: candidate.matchFingerprint,
-                    materialContentHash: candidate.materialContentHash,
                     normalizedCandidate: candidate.normalizedDraft,
                     lastSeenAt: fetchedAt,
-                    lastChangedAt: fetchedAt,
-                    publishedEventId:
-                      latestItem.lane === "proposed-update"
-                        ? latestItem.targetEntityId
-                        : observation.publishedEventId,
                     parserVersion: candidate.parserVersion,
                   },
                 );
                 return null;
               }
-              const publishedEventId =
-                observation.publishedEventId ?? latestItem?.publishedEntityId;
-              if (
-                latestItem?.status === "approved" &&
-                (latestItem.lane === "new-event" ||
-                  latestItem.lane === "proposed-update") &&
-                publishedEventId
-              ) {
-                const currentCandidate = await currentPublishedEventCandidate(
-                  catalogStore,
-                  input.cityId,
-                  publishedEventId,
-                  observation.normalizedCandidate,
-                );
-                const proposedUpdate =
-                  await transactionStore.createReviewItem(
-                    toPublishedEventUpdateInput(
+              if (observation) {
+                const latestItem = observation.latestReviewItemId
+                  ? await transactionStore.getReviewItem(
+                      observation.latestReviewItemId,
+                    )
+                  : null;
+                if (latestItem?.status === "pending") {
+                  let reviewItemInput = toReviewItemInput(candidate);
+                  if (
+                    latestItem.lane === "proposed-update" &&
+                    latestItem.targetEntityId
+                  ) {
+                    const currentCandidate =
+                      await currentPublishedEventCandidate(
+                        catalogStore,
+                        input.cityId,
+                        latestItem.targetEntityId,
+                        observation.normalizedCandidate,
+                      );
+                    reviewItemInput = toPublishedEventUpdateInput(
                       candidate,
-                      publishedEventId,
+                      latestItem.targetEntityId,
                       currentCandidate,
-                    ),
+                    );
+                  }
+                  await transactionStore.updateReviewItem(
+                    latestItem.id,
+                    toPendingReviewItemUpdate(reviewItemInput),
                   );
-                await transactionStore.updateSourceEventObservation(
-                  observation.id,
-                  {
-                    matchFingerprint: candidate.matchFingerprint,
-                    materialContentHash: candidate.materialContentHash,
-                    normalizedCandidate: candidate.normalizedDraft,
-                    lastSeenAt: fetchedAt,
-                    lastChangedAt: fetchedAt,
-                    latestReviewItemId: proposedUpdate.id,
+                  await transactionStore.updateSourceEventObservation(
+                    observation.id,
+                    {
+                      matchFingerprint: candidate.matchFingerprint,
+                      materialContentHash: candidate.materialContentHash,
+                      normalizedCandidate: candidate.normalizedDraft,
+                      lastSeenAt: fetchedAt,
+                      lastChangedAt: fetchedAt,
+                      publishedEventId:
+                        latestItem.lane === "proposed-update"
+                          ? latestItem.targetEntityId
+                          : observation.publishedEventId,
+                      parserVersion: candidate.parserVersion,
+                    },
+                  );
+                  return null;
+                }
+                const publishedEventId =
+                  observation.publishedEventId ?? latestItem?.publishedEntityId;
+                if (
+                  latestItem?.status === "approved" &&
+                  (latestItem.lane === "new-event" ||
+                    latestItem.lane === "proposed-update") &&
+                  publishedEventId
+                ) {
+                  const currentCandidate = await currentPublishedEventCandidate(
+                    catalogStore,
+                    input.cityId,
                     publishedEventId,
-                    parserVersion: candidate.parserVersion,
-                  },
+                    observation.normalizedCandidate,
+                  );
+                  const proposedUpdate =
+                    await transactionStore.createReviewItem(
+                      toPublishedEventUpdateInput(
+                        candidate,
+                        publishedEventId,
+                        currentCandidate,
+                      ),
+                    );
+                  await transactionStore.updateSourceEventObservation(
+                    observation.id,
+                    {
+                      matchFingerprint: candidate.matchFingerprint,
+                      materialContentHash: candidate.materialContentHash,
+                      normalizedCandidate: candidate.normalizedDraft,
+                      lastSeenAt: fetchedAt,
+                      lastChangedAt: fetchedAt,
+                      latestReviewItemId: proposedUpdate.id,
+                      publishedEventId,
+                      parserVersion: candidate.parserVersion,
+                    },
+                  );
+                  return proposedUpdate;
+                }
+                if (latestItem?.status === "rejected") {
+                  let reviewItemInput = toReviewItemInput(candidate);
+                  const rejectedPublishedEventId =
+                    observation.publishedEventId ??
+                    (latestItem.lane === "proposed-update"
+                      ? latestItem.targetEntityId
+                      : null);
+                  if (
+                    latestItem.lane === "proposed-update" &&
+                    rejectedPublishedEventId
+                  ) {
+                    const currentCandidate = await currentPublishedEventCandidate(
+                      catalogStore,
+                      input.cityId,
+                      rejectedPublishedEventId,
+                      observation.normalizedCandidate,
+                    );
+                    reviewItemInput = toPublishedEventUpdateInput(
+                      candidate,
+                      rejectedPublishedEventId,
+                      currentCandidate,
+                    );
+                  }
+                  if (
+                    reviewItemInput.lane === "proposed-update" &&
+                    Object.keys(reviewItemInput.fieldDiffs ?? {}).length === 0
+                  ) {
+                    await transactionStore.updateSourceEventObservation(
+                      observation.id,
+                      {
+                        matchFingerprint: candidate.matchFingerprint,
+                        materialContentHash: candidate.materialContentHash,
+                        normalizedCandidate: candidate.normalizedDraft,
+                        lastSeenAt: fetchedAt,
+                        lastChangedAt: fetchedAt,
+                        publishedEventId: rejectedPublishedEventId,
+                        parserVersion: candidate.parserVersion,
+                      },
+                    );
+                    return null;
+                  }
+                  const reopenedItem = await transactionStore.createReviewItem(
+                    reviewItemInput,
+                  );
+                  await transactionStore.updateSourceEventObservation(
+                    observation.id,
+                    {
+                      matchFingerprint: candidate.matchFingerprint,
+                      materialContentHash: candidate.materialContentHash,
+                      normalizedCandidate: candidate.normalizedDraft,
+                      lastSeenAt: fetchedAt,
+                      lastChangedAt: fetchedAt,
+                      latestReviewItemId: reopenedItem.id,
+                      publishedEventId: rejectedPublishedEventId,
+                      parserVersion: candidate.parserVersion,
+                    },
+                  );
+                  return reopenedItem;
+                }
+                throw new Error(
+                  `Material change handling is not implemented for source event ${candidate.sourceEventKey}`,
                 );
-                return proposedUpdate;
               }
-              throw new Error(
-                `Material change handling is not implemented for source event ${candidate.sourceEventKey}`,
-              );
-            }
 
-            const createdItem = await transactionStore.createReviewItem(
-              toReviewItemInput(candidate),
-            );
-            await transactionStore.createSourceEventObservation({
-              sourceTargetId: target.id,
-              sourceEventKey: candidate.sourceEventKey,
-              matchFingerprint: candidate.matchFingerprint,
-              materialContentHash: candidate.materialContentHash,
-              normalizedCandidate: candidate.normalizedDraft,
-              seenAt: fetchedAt,
-              latestReviewItemId: createdItem.id,
-              publishedEventId: null,
-              parserVersion: candidate.parserVersion,
-            });
-            return createdItem;
-          });
+              const createdItem = await transactionStore.createReviewItem(
+                toReviewItemInput(candidate),
+              );
+              await transactionStore.createSourceEventObservation({
+                sourceTargetId: target.id,
+                sourceEventKey: candidate.sourceEventKey,
+                matchFingerprint: candidate.matchFingerprint,
+                materialContentHash: candidate.materialContentHash,
+                normalizedCandidate: candidate.normalizedDraft,
+                seenAt: fetchedAt,
+                latestReviewItemId: createdItem.id,
+                publishedEventId: null,
+                parserVersion: candidate.parserVersion,
+              });
+              return createdItem;
+            },
+          );
           if (!item) {
             continue;
           }

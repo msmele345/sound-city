@@ -57,6 +57,26 @@ export function canonicalizeSourceUrl(value: string): string {
   }
 }
 
+function canonicalizeMaterialValue(
+  field: (typeof materialFields)[number],
+  value: unknown,
+): unknown {
+  if (
+    (field === "canonicalUrl" || field === "ticketUrl") &&
+    typeof value === "string"
+  ) {
+    return canonicalizeSourceUrl(value);
+  }
+  if (field === "styles" && Array.isArray(value)) {
+    return value
+      .map(canonicalize)
+      .toSorted((left, right) =>
+        JSON.stringify(left).localeCompare(JSON.stringify(right)),
+      );
+  }
+  return value;
+}
+
 export function buildMatchFingerprint(
   normalizedDraft: Record<string, unknown>,
 ): string {
@@ -78,10 +98,7 @@ export function buildMaterialContentHash(
       .filter((field) => normalizedDraft[field] !== undefined)
       .map((field) => [
         field,
-        (field === "canonicalUrl" || field === "ticketUrl") &&
-        typeof normalizedDraft[field] === "string"
-          ? canonicalizeSourceUrl(normalizedDraft[field])
-          : normalizedDraft[field],
+        canonicalizeMaterialValue(field, normalizedDraft[field]),
       ]),
   );
   const canonical = JSON.stringify(canonicalize(materialCandidate));

@@ -27,8 +27,9 @@ export function createSeedRefreshStore(
   initialSnapshot?: RefreshSnapshot,
 ): RefreshStore {
   const snapshot = cloneSnapshot(initialSnapshot ?? emptySnapshot);
+  let observationTransactionTail = Promise.resolve();
 
-  return {
+  const store: RefreshStore = {
     // ── Source Owners ──────────────────────────────────────────
     async listSourceOwners(cityId) {
       return snapshot.sourceOwners.filter((o) => o.cityId === cityId);
@@ -130,7 +131,10 @@ export function createSeedRefreshStore(
     },
 
     async createRefreshRun(input) {
-      const id = makeId("refresh_run", `${input.cityId}_${Date.now()}`);
+      const id = makeId(
+        "refresh_run",
+        `${input.cityId}_${Date.now()}_${snapshot.refreshRuns.length}`,
+      );
       const timestamp = now();
       const run = {
         ...input,
@@ -269,6 +273,33 @@ export function createSeedRefreshStore(
       return updated;
     },
 
+    async withSourceEventObservationTransaction(
+      _sourceTargetId,
+      _sourceEventKey,
+      fn,
+    ) {
+      const previous = observationTransactionTail;
+      let release = () => {};
+      const current = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      observationTransactionTail = current;
+      await previous;
+
+      const before = cloneSnapshot(snapshot);
+      try {
+        return await fn(store);
+      } catch (error) {
+        Object.assign(snapshot, before);
+        throw error;
+      } finally {
+        release();
+        if (observationTransactionTail === current) {
+          observationTransactionTail = Promise.resolve();
+        }
+      }
+    },
+
     // ── Decision History ────────────────────────────────────────
     async listDecisionHistory(reviewItemId) {
       return snapshot.decisionHistory.filter((d) => d.reviewItemId === reviewItemId);
@@ -288,4 +319,6 @@ export function createSeedRefreshStore(
       return fn(this);
     },
   };
+
+  return store;
 }

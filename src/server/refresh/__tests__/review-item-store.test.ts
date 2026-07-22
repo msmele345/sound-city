@@ -82,6 +82,35 @@ describe("review item store", () => {
     expect(created.confidence).toBe(0.9);
   });
 
+  it("rolls back observation and review-item writes when classification fails", async () => {
+    await expect(
+      store.withSourceEventObservationTransaction(
+        "st_1",
+        "event-42",
+        async (transactionStore) => {
+          const item = await transactionStore.createReviewItem(makeItem({}));
+          await transactionStore.createSourceEventObservation({
+            sourceTargetId: "st_1",
+            sourceEventKey: "event-42",
+            matchFingerprint: item.matchFingerprint,
+            materialContentHash: "a".repeat(64),
+            normalizedCandidate: item.normalizedDraft,
+            seenAt: item.fetchTimestamp,
+            latestReviewItemId: item.id,
+            publishedEventId: null,
+            parserVersion: item.parserVersion,
+          });
+          throw new Error("classification failed");
+        },
+      ),
+    ).rejects.toThrow("classification failed");
+
+    await expect(store.listReviewItems("city_chicago")).resolves.toEqual([]);
+    await expect(
+      store.getSourceEventObservation("st_1", "event-42"),
+    ).resolves.toBeNull();
+  });
+
   it("lists review items by city", async () => {
     await store.createReviewItem(makeItem({ cityId: "city_chicago" }));
     await store.createReviewItem(makeItem({ cityId: "city_new_york", matchFingerprint: "other" }));
