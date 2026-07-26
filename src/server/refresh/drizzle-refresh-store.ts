@@ -539,6 +539,13 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         .map(toRefreshTargetOutcome);
     },
 
+    async listSourceTargetOutcomes(sourceTargetId) {
+      const rows = await db.query.refreshTargetOutcomes.findMany();
+      return rows
+        .filter((row) => row.sourceTargetId === sourceTargetId)
+        .map(toRefreshTargetOutcome);
+    },
+
     async createRefreshTargetOutcome(input) {
       const writer = requireWriter(db);
       const id = uniqueId(`refresh_target_outcome_${input.runId}`);

@@ -448,6 +448,50 @@ describe("AdminSourceTargets", () => {
     expect(failedTarget).toHaveTextContent(/request timed out after 15 seconds/i);
   });
 
+  it("shows an operational warning after one consecutive source failure", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/admin/source-targets?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ...refreshSnapshot,
+            healthByTarget: {
+              source_target_smartbar_calendar: {
+                status: "healthy",
+                consecutiveFailures: 1,
+                consecutiveSuccesses: 0,
+                warning: "1 consecutive source failure",
+              },
+            },
+          }),
+        });
+      }
+      if (url === "/api/admin/refresh-runs?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            runs: [],
+            outcomesByRun: {},
+            logsByRun: {},
+            reviewItems: [],
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(<AdminSourceTargets allowDevParser={false} />);
+
+    expect(
+      await screen.findByRole("status", {
+        name: /smartbarchicago\.com\/calendar health warning/i,
+      }),
+    ).toHaveTextContent(/warning.*1 consecutive source failure/i);
+    expect(
+      screen.getByText(/does not change enablement, trust, or confidence/i),
+    ).toBeInTheDocument();
+  });
+
   it("shows target outcomes immediately after a manual refresh", async () => {
     const user = userEvent.setup();
     let refreshHistoryReads = 0;

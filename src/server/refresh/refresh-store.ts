@@ -64,6 +64,9 @@ export type RefreshStore = {
   listRefreshTargetOutcomes(
     runId: string,
   ): Promise<RefreshTargetOutcomeRecord[]>;
+  listSourceTargetOutcomes(
+    sourceTargetId: string,
+  ): Promise<RefreshTargetOutcomeRecord[]>;
   createRefreshTargetOutcome(
     input: CreateRefreshTargetOutcomeInput,
   ): Promise<RefreshTargetOutcomeRecord>;

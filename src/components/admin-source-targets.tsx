@@ -62,6 +62,14 @@ type SourceTargetRecord = {
 type SourceSnapshot = {
   owners: SourceOwnerRecord[];
   targets: SourceTargetRecord[];
+  healthByTarget: Record<string, SourceTargetHealthSummary>;
+};
+
+type SourceTargetHealthSummary = {
+  status: Exclude<HealthStatus, "disabled">;
+  consecutiveFailures: number;
+  consecutiveSuccesses: number;
+  warning: string | null;
 };
 
 type RefreshRunRecord = {
@@ -764,6 +772,7 @@ export function AdminSourceTargets({
   const [snapshot, setSnapshot] = useState<SourceSnapshot>({
     owners: [],
     targets: [],
+    healthByTarget: {},
   });
   const [refreshSnapshot, setRefreshSnapshot] = useState<RefreshRunSnapshot>({
     runs: [],
@@ -838,7 +847,11 @@ export function AdminSourceTargets({
       try {
         const body = await readSources(secret);
         const refreshes = await readRefreshRuns(secret);
-        setSnapshot({ owners: body.owners, targets: body.targets });
+        setSnapshot({
+          owners: body.owners,
+          targets: body.targets,
+          healthByTarget: body.healthByTarget ?? {},
+        });
         setRefreshSnapshot(refreshes);
         setStatus("Source targets ready");
         setRequiresSecret(false);
@@ -858,7 +871,11 @@ export function AdminSourceTargets({
     void Promise.all([readSources(adminSecret), readRefreshRuns(adminSecret)])
       .then(([body, refreshes]) => {
         if (active) {
-          setSnapshot({ owners: body.owners, targets: body.targets });
+          setSnapshot({
+            owners: body.owners,
+            targets: body.targets,
+            healthByTarget: body.healthByTarget ?? {},
+          });
           setRefreshSnapshot(refreshes);
           setStatus("Source targets ready");
           setRequiresSecret(false);
@@ -1304,6 +1321,10 @@ export function AdminSourceTargets({
               <h3 className="font-display text-2xl uppercase leading-none text-ink">
                 Source Health
               </h3>
+              <p className="mt-2 text-sm text-ink-dim">
+                Operational health is derived from target outcomes and does not
+                change enablement, trust, or confidence.
+              </p>
               {(() => {
                 const { coverage, approvalRate } = healthMetrics(
                   refreshSnapshot.runs,
@@ -1431,6 +1452,16 @@ export function AdminSourceTargets({
                               {target.rejectionCount} / duplicates{" "}
                               {target.duplicateCount}
                             </p>
+                            {snapshot.healthByTarget[target.id]?.warning ? (
+                              <p
+                                role="status"
+                                aria-label={`${target.url} health warning`}
+                                className="mt-1 border-l-2 border-rule-strong pl-2 font-mono text-[0.6rem] uppercase tracking-[0.12em] text-ink"
+                              >
+                                Warning /{" "}
+                                {snapshot.healthByTarget[target.id].warning}
+                              </p>
+                            ) : null}
                           </div>
                           <div className="flex gap-2">
                             <RowButton onClick={() => toggleEnabled(target)}>

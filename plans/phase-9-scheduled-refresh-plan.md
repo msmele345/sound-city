@@ -66,12 +66,12 @@ Persist one structured outcome for every target attempted during a refresh, aggr
 - [x] Admin summarizes partial results in source terms, such as “2 of 3 sources succeeded.”
 - [x] Admin exposes the failed target and compact error without requiring log inspection.
 - [x] Valid feed items are retained when sibling items are malformed.
-- [ ] Repeated malformed items do not create duplicate persistent warnings.
-- [ ] One failure produces a warning, two consecutive failures derive `degraded`, and four derive `failing`.
-- [ ] One success moves `failing` to `degraded`; two consecutive successes restore `healthy`.
-- [ ] Successful unchanged outcomes count as successes; skipped outcomes do not affect health.
-- [ ] Derived health never disables a target or changes trust/confidence settings.
-- [ ] Engine, persistence, API, and Admin tests cover target outcomes and health transitions end to end.
+- [x] Repeated malformed items do not create duplicate persistent warnings.
+- [x] One failure produces a warning, two consecutive failures derive `degraded`, and four derive `failing`.
+- [x] One success moves `failing` to `degraded`; two consecutive successes restore `healthy`.
+- [x] Successful unchanged outcomes count as successes; skipped outcomes do not affect health.
+- [x] Derived health never disables a target or changes trust/confidence settings.
+- [x] Engine, persistence, API, and Admin tests cover target outcomes and health transitions end to end.
 
 ---
 

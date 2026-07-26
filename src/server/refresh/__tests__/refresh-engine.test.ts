@@ -442,6 +442,87 @@ describe("refresh engine", () => {
     );
   });
 
+  it("derives failure and gradual recovery health without changing source configuration", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Health Transition Source",
+      slug: "health-transition-source",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://health-transition.test/events",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "artist-social",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 7,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    expect(await store.getSourceTarget(target.id)).toMatchObject({
+      healthStatus: "healthy",
+      enabled: true,
+      trustLevel: "primary",
+      confidenceAdjustment: 7,
+    });
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    expect((await store.getSourceTarget(target.id))?.healthStatus).toBe(
+      "degraded",
+    );
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    expect((await store.getSourceTarget(target.id))?.healthStatus).toBe(
+      "failing",
+    );
+
+    await store.updateSourceTarget(target.id, {
+      parserStrategy: "dev-static",
+    });
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    expect((await store.getSourceTarget(target.id))?.healthStatus).toBe(
+      "degraded",
+    );
+
+    const recovered = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    const [recoveryOutcome] = await store.listRefreshTargetOutcomes(
+      recovered.run.id,
+    );
+    expect(recoveryOutcome.status).toBe("unchanged");
+    expect(await store.getSourceTarget(target.id)).toMatchObject({
+      healthStatus: "healthy",
+      enabled: true,
+      trustLevel: "primary",
+      confidenceAdjustment: 7,
+    });
+  });
+
   it("reconciles orphaned running runs when run history is read", async () => {
     const store = createSeedRefreshStore();
     const run = await store.createRefreshRun({
@@ -677,7 +758,7 @@ describe("refresh engine", () => {
     expect(updated!.failureCount).toBe(0);
   });
 
-  it("retains valid ICS events when a sibling event is malformed", async () => {
+  it("retains valid ICS events and persists malformed sibling warnings once", async () => {
     const store = createSeedRefreshStore();
     const owner = await store.createSourceOwner({
       cityId: "city_chicago",
@@ -731,16 +812,144 @@ describe("refresh engine", () => {
 
     expect(result.run.status).toBe("succeeded");
     expect(result.run.draftsCreated).toBe(1);
-    expect(result.reviewItems).toHaveLength(1);
-    expect(result.reviewItems[0]).toMatchObject({
-      sourceTargetId: target.id,
-      normalizedDraft: { title: "Valid Warehouse Session" },
-    });
+    expect(result.reviewItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          lane: "new-event",
+          normalizedDraft: expect.objectContaining({
+            title: "Valid Warehouse Session",
+          }),
+        }),
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          lane: "source-health",
+          normalizedDraft: expect.objectContaining({
+            issue: "ics-event-missing-uid",
+          }),
+        }),
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          lane: "source-health",
+          normalizedDraft: expect.objectContaining({
+            issue: "ics-event-invalid-date",
+          }),
+        }),
+      ]),
+    );
     const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
     expect(outcome).toMatchObject({
       status: "succeeded",
       candidateCount: 1,
       createdCount: 1,
+      warningCount: 2,
+    });
+
+    const reformattedIcsBody = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "SUMMARY:Malformed Event Without Identity",
+      "DTSTART:20260726T220000Z",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "SUMMARY:Malformed Event Date",
+      "DTSTART:20261340T220000Z",
+      "UID:malformed-date@sound-city.test",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "LOCATION:Smartbar",
+      "SUMMARY:Valid Warehouse Session",
+      "DTSTART:20260727T020000Z",
+      "UID:valid-sibling@sound-city.test",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const repeated = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: async () => ({
+        body: reformattedIcsBody,
+        contentType: "text/calendar",
+        status: 200,
+      }),
+    });
+    const warningItems = (await store.listReviewItems("city_chicago")).filter(
+      (item) => item.lane === "source-health",
+    );
+    expect(warningItems).toHaveLength(2);
+    expect(repeated.reviewItems).toHaveLength(0);
+    const [repeatedOutcome] = await store.listRefreshTargetOutcomes(
+      repeated.run.id,
+    );
+    expect(repeatedOutcome).toMatchObject({
+      status: "unchanged",
+      candidateCount: 1,
+      createdCount: 0,
+      unchangedCount: 1,
+      warningCount: 2,
+    });
+  });
+
+  it("fails an all-malformed feed after persisting its warnings", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Malformed Calendar",
+      slug: "malformed-calendar",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://malformed-calendar.test/events.ics",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: async () => ({
+        body: [
+          "BEGIN:VCALENDAR",
+          "BEGIN:VEVENT",
+          "DTSTART:20260726T220000Z",
+          "SUMMARY:Missing Identity",
+          "END:VEVENT",
+          "BEGIN:VEVENT",
+          "UID:invalid-date@sound-city.test",
+          "DTSTART:20261340T220000Z",
+          "SUMMARY:Invalid Date",
+          "END:VEVENT",
+          "END:VCALENDAR",
+        ].join("\r\n"),
+        contentType: "text/calendar",
+        status: 200,
+      }),
+    });
+
+    expect(result.run.status).toBe("failed");
+    expect(
+      (await store.listReviewItems("city_chicago")).filter(
+        (item) => item.lane === "source-health",
+      ),
+    ).toHaveLength(2);
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      sourceTargetId: target.id,
+      status: "failed",
+      candidateCount: 0,
+      createdCount: 0,
+      warningCount: 2,
+      errorDetails: {
+        message: expect.stringMatching(/no reliably interpretable events/i),
+      },
     });
   });
 

@@ -172,6 +172,12 @@ export function createSeedRefreshStore(
       );
     },
 
+    async listSourceTargetOutcomes(sourceTargetId) {
+      return snapshot.refreshTargetOutcomes.filter(
+        (outcome) => outcome.sourceTargetId === sourceTargetId,
+      );
+    },
+
     async createRefreshTargetOutcome(input) {
       const duplicate = snapshot.refreshTargetOutcomes.some(
         (outcome) =>

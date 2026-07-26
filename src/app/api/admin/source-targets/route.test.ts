@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { DELETE, GET, PATCH, POST } from "./route";
+import { getRefreshStore } from "@/server/refresh/refresh-store";
 
 function requestFor(
   path: string,
@@ -231,6 +232,57 @@ describe("admin source-targets route handlers", () => {
       parserStrategy: "rss-event-feed",
       sourceType: "official-venue-calendar",
       enabled: true,
+    });
+  });
+
+  it("returns outcome-derived health warnings for source targets", async () => {
+    const store = getRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Health API Source",
+      slug: `health-api-source-${Date.now()}`,
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: `https://health-api.test/${Date.now()}`,
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+    const run = await store.createRefreshRun({
+      cityId: "city_chicago",
+      trigger: "manual",
+      triggeredBy: "admin-secret",
+    });
+    const persisted = await store.createRefreshTargetOutcome({
+      runId: run.id,
+      sourceTargetId: target.id,
+      startedAt: "2026-07-26T12:00:00.000Z",
+    });
+    await store.updateRefreshTargetOutcome(persisted.id, {
+      status: "failed",
+      finishedAt: "2026-07-26T12:00:01.000Z",
+    });
+
+    const response = await GET(
+      requestFor("/api/admin/source-targets?city=chicago"),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.healthByTarget[target.id]).toMatchObject({
+      status: "healthy",
+      consecutiveFailures: 1,
+      consecutiveSuccesses: 0,
+      warning: "1 consecutive source failure",
     });
   });
 

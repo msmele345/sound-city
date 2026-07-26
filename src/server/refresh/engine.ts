@@ -1,5 +1,6 @@
 import type { CatalogReader } from "../catalog/catalog-store";
 import { parseDevStaticTarget } from "./dev-parser";
+import { deriveSourceTargetHealth } from "./health";
 import type { RefreshStore } from "./refresh-store";
 import { parseRssEventFeedTarget } from "./rss-event-feed-parser";
 import type {
@@ -138,6 +139,14 @@ function applyItemMetrics(metrics: Metrics, item: ReviewItemRecord) {
     case "source-health":
       break;
   }
+}
+
+async function updateOperationalHealth(
+  store: RefreshStore,
+  sourceTargetId: string,
+) {
+  const outcomes = await store.listSourceTargetOutcomes(sourceTargetId);
+  return deriveSourceTargetHealth(outcomes);
 }
 
 function toReviewItemInput(candidate: ParserCandidate): CreateReviewItemInput {
@@ -365,6 +374,7 @@ export async function runManualRefresh(
       });
       let requestTelemetry = { ...emptyRequestTelemetry };
       let candidateCount = 0;
+      let warningCount = 0;
       const targetClassificationCounts = {
         createdCount: 0,
         updatedCount: 0,
@@ -423,7 +433,10 @@ export async function runManualRefresh(
         } else {
           throw new Error(unsupportedParserMessage(target));
         }
-        candidateCount = candidates.length;
+        warningCount = candidates.filter(
+          (candidate) => candidate.lane === "source-health",
+        ).length;
+        candidateCount = candidates.length - warningCount;
 
         const targetReviewItems: ReviewItemRecord[] = [];
         for (const candidate of candidates) {
@@ -626,7 +639,9 @@ export async function runManualRefresh(
               return { kind: "created", item: createdItem };
             },
           );
-          targetClassificationCounts[`${classification.kind}Count`] += 1;
+          if (candidate.lane !== "source-health") {
+            targetClassificationCounts[`${classification.kind}Count`] += 1;
+          }
           const item = classification.item;
           if (!item) {
             continue;
@@ -634,6 +649,12 @@ export async function runManualRefresh(
           reviewItems.push(item);
           targetReviewItems.push(item);
           applyItemMetrics(metrics, item);
+        }
+
+        if (candidateCount === 0) {
+          throw new Error(
+            "Source produced no reliably interpretable events",
+          );
         }
 
         const duplicateCount = targetReviewItems.filter(
@@ -645,16 +666,6 @@ export async function runManualRefresh(
           });
         }
 
-        await store.updateSourceTarget(target.id, {
-          lastSuccessfulRunAt: fetchedAt,
-        });
-
-        await log(store, run.id, {
-          sourceTargetId: target.id,
-          level: "info",
-          message: `${target.parserStrategy} parser created ${targetReviewItems.length} review items`,
-          metadata: { parserStrategy: target.parserStrategy },
-        });
         await store.updateRefreshTargetOutcome(outcome.id, {
           status:
             candidateCount > 0 &&
@@ -664,8 +675,20 @@ export async function runManualRefresh(
           finishedAt: isoNow(input.now),
           candidateCount,
           ...targetClassificationCounts,
-          warningCount: 0,
+          warningCount,
           ...requestTelemetry,
+        });
+        const health = await updateOperationalHealth(store, target.id);
+        await store.updateSourceTarget(target.id, {
+          healthStatus: health.status,
+          lastSuccessfulRunAt: fetchedAt,
+        });
+
+        await log(store, run.id, {
+          sourceTargetId: target.id,
+          level: "info",
+          message: `${target.parserStrategy} parser created ${targetReviewItems.length} review items`,
+          metadata: { parserStrategy: target.parserStrategy },
         });
       } catch (error) {
         metrics.sourceTargetsFailed += 1;
@@ -677,15 +700,17 @@ export async function runManualRefresh(
           finishedAt: isoNow(input.now),
           candidateCount,
           ...targetClassificationCounts,
-          warningCount: 0,
+          warningCount,
           errorDetails: { code: null, message },
           ...requestTelemetry,
         });
 
+        const health = await updateOperationalHealth(store, target.id);
         await store.incrementSourceTargetCounters(target.id, {
           failureCount: 1,
         });
         await store.updateSourceTarget(target.id, {
+          healthStatus: health.status,
           lastFailureAt: fetchedAt,
           lastFailureReason: message,
         });

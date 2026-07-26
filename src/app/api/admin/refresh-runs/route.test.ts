@@ -1,7 +1,11 @@
 import { NextRequest } from "next/server";
 
 import { GET, POST } from "./route";
-import { POST as POSTSourceTargets } from "../source-targets/route";
+import {
+  GET as GETSourceTargets,
+  PATCH as PATCHSourceTargets,
+  POST as POSTSourceTargets,
+} from "../source-targets/route";
 
 function requestFor(
   path: string,
@@ -178,5 +182,119 @@ describe("admin refresh-runs route handlers", () => {
     expect(listedBody.outcomesByRun[createdBody.run.id]).toEqual(
       createdBody.outcomes,
     );
+  });
+
+  it("exposes persisted failure and recovery health transitions end to end", async () => {
+    const citySlug = `health-route-${Date.now()}`;
+    const cityId = `city_${citySlug.replaceAll("-", "_")}`;
+    const ownerResponse = await POSTSourceTargets(
+      requestFor("/api/admin/source-targets", {
+        method: "POST",
+        body: JSON.stringify({
+          entity: "sourceOwner",
+          input: {
+            cityId,
+            name: "Route Health Source",
+            slug: citySlug,
+            kind: "venue",
+            notes: "",
+          },
+        }),
+      }),
+    );
+    const owner = (await ownerResponse.json()).owner;
+    const targetResponse = await POSTSourceTargets(
+      requestFor("/api/admin/source-targets", {
+        method: "POST",
+        body: JSON.stringify({
+          entity: "sourceTarget",
+          input: {
+            cityId,
+            ownerId: owner.id,
+            url: `https://route-health.test/${citySlug}`,
+            sourceType: "official-venue-calendar",
+            parserStrategy: "artist-social",
+            trustLevel: "primary",
+            enabled: true,
+            confidenceAdjustment: 9,
+            healthStatus: "healthy",
+            refreshCadence: "daily",
+            notes: "",
+          },
+        }),
+      }),
+    );
+    const target = (await targetResponse.json()).target;
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const failed = await POST(
+        requestFor(`/api/admin/refresh-runs?city=${citySlug}`, {
+          method: "POST",
+        }),
+      );
+      expect((await failed.json()).run.status).toBe("failed");
+    }
+
+    let sources = await GETSourceTargets(
+      requestFor(`/api/admin/source-targets?city=${citySlug}`),
+    );
+    let sourceBody = await sources.json();
+    expect(sourceBody.targets[0]).toMatchObject({
+      id: target.id,
+      healthStatus: "failing",
+      enabled: true,
+      trustLevel: "primary",
+      confidenceAdjustment: 9,
+    });
+    expect(sourceBody.healthByTarget[target.id]).toMatchObject({
+      status: "failing",
+      consecutiveFailures: 4,
+    });
+
+    await PATCHSourceTargets(
+      requestFor("/api/admin/source-targets", {
+        method: "PATCH",
+        body: JSON.stringify({
+          entity: "sourceTarget",
+          id: target.id,
+          input: { parserStrategy: "dev-static" },
+        }),
+      }),
+    );
+    const firstRecovery = await POST(
+      requestFor(`/api/admin/refresh-runs?city=${citySlug}`, {
+        method: "POST",
+      }),
+    );
+    expect((await firstRecovery.json()).outcomes[0].status).toBe("succeeded");
+
+    sources = await GETSourceTargets(
+      requestFor(`/api/admin/source-targets?city=${citySlug}`),
+    );
+    sourceBody = await sources.json();
+    expect(sourceBody.targets[0].healthStatus).toBe("degraded");
+
+    const secondRecovery = await POST(
+      requestFor(`/api/admin/refresh-runs?city=${citySlug}`, {
+        method: "POST",
+      }),
+    );
+    expect((await secondRecovery.json()).outcomes[0].status).toBe("unchanged");
+
+    sources = await GETSourceTargets(
+      requestFor(`/api/admin/source-targets?city=${citySlug}`),
+    );
+    sourceBody = await sources.json();
+    expect(sourceBody.targets[0]).toMatchObject({
+      healthStatus: "healthy",
+      enabled: true,
+      trustLevel: "primary",
+      confidenceAdjustment: 9,
+    });
+    expect(sourceBody.healthByTarget[target.id]).toMatchObject({
+      status: "healthy",
+      consecutiveFailures: 0,
+      consecutiveSuccesses: 2,
+    });
   });
 });
