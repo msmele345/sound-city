@@ -3,12 +3,14 @@ import { createDrizzleRefreshStore } from "./drizzle-refresh-store";
 import { createSeedRefreshStore } from "./store";
 import type {
   CreateRefreshRunInput,
+  CreateRefreshTargetOutcomeInput,
   CreateReviewItemInput,
   CreateSourceEventObservationInput,
   CreateSourceOwnerInput,
   CreateSourceTargetInput,
   RefreshRunLogRecord,
   RefreshRunRecord,
+  RefreshTargetOutcomeRecord,
   ReviewDecisionRecord,
   ReviewItemRecord,
   ReviewLane,
@@ -57,6 +59,21 @@ export type RefreshStore = {
     id: string,
     updates: Partial<RefreshRunRecord>,
   ): Promise<RefreshRunRecord>;
+
+  // ── Refresh Target Outcomes ─────────────────────────────────
+  listRefreshTargetOutcomes(
+    runId: string,
+  ): Promise<RefreshTargetOutcomeRecord[]>;
+  listSourceTargetOutcomes(
+    sourceTargetId: string,
+  ): Promise<RefreshTargetOutcomeRecord[]>;
+  createRefreshTargetOutcome(
+    input: CreateRefreshTargetOutcomeInput,
+  ): Promise<RefreshTargetOutcomeRecord>;
+  updateRefreshTargetOutcome(
+    id: string,
+    updates: Partial<RefreshTargetOutcomeRecord>,
+  ): Promise<RefreshTargetOutcomeRecord>;
 
   // ── Run Logs ─────────────────────────────────────────────────
   listRunLogs(runId: string): Promise<RefreshRunLogRecord[]>;

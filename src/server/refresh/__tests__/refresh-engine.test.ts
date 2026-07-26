@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createSeedCatalogStore } from "../../catalog/catalog-store";
 import { runManualRefresh, listRefreshRunsWithReconciliation } from "../engine";
@@ -133,6 +133,10 @@ function createCatalogWithPastEvent(
 }
 
 describe("refresh engine", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("runs the dev parser and creates durable review lanes with metrics", async () => {
     const store = createSeedRefreshStore();
     const target = await createDevTarget(store);
@@ -172,6 +176,219 @@ describe("refresh engine", () => {
     );
   });
 
+  it("persists one target outcome for each attempted source", async () => {
+    const store = createSeedRefreshStore();
+    const target = await createDevTarget(store);
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    const outcomes = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcomes).toEqual([
+      expect.objectContaining({
+        runId: result.run.id,
+        sourceTargetId: target.id,
+        status: "succeeded",
+      }),
+    ]);
+  });
+
+  it("records counts, timestamps, errors, and request telemetry for a successful target", async () => {
+    const store = createSeedRefreshStore();
+    const { target, fetcher } = await createRssObservationFixture(store);
+    const now = new Date("2026-06-20T12:00:00.000Z");
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now,
+      fetcher,
+    });
+
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "succeeded",
+      startedAt: now.toISOString(),
+      finishedAt: now.toISOString(),
+      candidateCount: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      unchangedCount: 0,
+      warningCount: 0,
+      errorDetails: null,
+      responseStatus: 200,
+      retryCount: 0,
+      finalUrl: target.url,
+    });
+    expect(outcome.requestDurationMs).toBeGreaterThanOrEqual(0);
+    expect(outcome.responseSizeBytes).toBeGreaterThan(0);
+  });
+
+  it("records the final response URL after a production fetch redirect", async () => {
+    const store = createSeedRefreshStore();
+    const { fetcher } = await createRssObservationFixture(store);
+    const fetched = await fetcher();
+    const finalUrl = "https://feeds.smartbarchicago.com/events.xml";
+    vi.stubGlobal("fetch", async () => ({
+      text: async () => fetched.body,
+      headers: { get: () => fetched.contentType },
+      status: fetched.status,
+      url: finalUrl,
+    }));
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome.finalUrl).toBe(finalUrl);
+  });
+
+  it("counts a material change to pending review work as an update", async () => {
+    const store = createSeedRefreshStore();
+    const { fetcher, fetcherForTitle } =
+      await createRssObservationFixture(store);
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    const changed = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: fetcherForTitle("Queen! with Derrick Carter and Honey Dijon"),
+    });
+
+    const [outcome] = await store.listRefreshTargetOutcomes(changed.run.id);
+    expect(outcome).toMatchObject({
+      candidateCount: 1,
+      createdCount: 0,
+      updatedCount: 1,
+      unchangedCount: 0,
+    });
+  });
+
+  it("records an unchanged target status when every candidate is unchanged", async () => {
+    const store = createSeedRefreshStore();
+    const { fetcher } = await createRssObservationFixture(store);
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    const repeated = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    const [outcome] = await store.listRefreshTargetOutcomes(repeated.run.id);
+    expect(outcome).toMatchObject({
+      status: "unchanged",
+      candidateCount: 1,
+      createdCount: 0,
+      updatedCount: 0,
+      unchangedCount: 1,
+    });
+  });
+
+  it("aggregates mixed successful and failed target outcomes into a partial run", async () => {
+    const store = createSeedRefreshStore();
+    await createDevTarget(store);
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Unsupported Source",
+      slug: "unsupported-source",
+      kind: "venue",
+      notes: "",
+    });
+    await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://unsupported.test/events",
+      sourceType: "other",
+      parserStrategy: "artist-social",
+      trustLevel: "experimental",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "manual",
+      notes: "",
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    expect(result.run.status).toBe("partial");
+    const outcomes = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual([
+      "failed",
+      "succeeded",
+    ]);
+  });
+
+  it("aggregates succeeded and unchanged target outcomes into a succeeded run", async () => {
+    const store = createSeedRefreshStore();
+    const { fetcher } = await createRssObservationFixture(store);
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    await createDevTarget(store);
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(result.run.status).toBe("succeeded");
+    const outcomes = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcomes.map((outcome) => outcome.status).sort()).toEqual([
+      "succeeded",
+      "unchanged",
+    ]);
+  });
+
+  it("keeps completed candidate counts when a later candidate fails", async () => {
+    const store = createSeedRefreshStore();
+    const target = await createDevTarget(store);
+    await store.createSourceEventObservation({
+      sourceTargetId: target.id,
+      sourceEventKey: "fixture-update-bunker-signal",
+      matchFingerprint: "fixture-update-bunker-signal",
+      materialContentHash: "stale-material-hash",
+      normalizedCandidate: { title: "Older fixture state" },
+      seenAt: "2026-07-22T12:00:00.000Z",
+      latestReviewItemId: null,
+      publishedEventId: null,
+      parserVersion: "dev-static@0",
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+
+    expect(result.run.status).toBe("failed");
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "failed",
+      candidateCount: 4,
+      createdCount: 1,
+      updatedCount: 0,
+      unchangedCount: 0,
+    });
+  });
+
   it("marks unsupported enabled targets as partial and records visible errors", async () => {
     const store = createSeedRefreshStore();
     const owner = await store.createSourceOwner({
@@ -205,6 +422,15 @@ describe("refresh engine", () => {
     expect(result.run.sourceTargetsFailed).toBe(1);
     expect(result.run.errorSummary).toMatch(/no parser is available/i);
 
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "failed",
+      errorDetails: {
+        code: null,
+        message: expect.stringMatching(/no parser is available/i),
+      },
+    });
+
     const logs = await store.listRunLogs(result.run.id);
     expect(logs).toEqual(
       expect.arrayContaining([
@@ -214,6 +440,87 @@ describe("refresh engine", () => {
         }),
       ]),
     );
+  });
+
+  it("derives failure and gradual recovery health without changing source configuration", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Health Transition Source",
+      slug: "health-transition-source",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://health-transition.test/events",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "artist-social",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 7,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    expect(await store.getSourceTarget(target.id)).toMatchObject({
+      healthStatus: "healthy",
+      enabled: true,
+      trustLevel: "primary",
+      confidenceAdjustment: 7,
+    });
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    expect((await store.getSourceTarget(target.id))?.healthStatus).toBe(
+      "degraded",
+    );
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    expect((await store.getSourceTarget(target.id))?.healthStatus).toBe(
+      "failing",
+    );
+
+    await store.updateSourceTarget(target.id, {
+      parserStrategy: "dev-static",
+    });
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    expect((await store.getSourceTarget(target.id))?.healthStatus).toBe(
+      "degraded",
+    );
+
+    const recovered = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+    });
+    const [recoveryOutcome] = await store.listRefreshTargetOutcomes(
+      recovered.run.id,
+    );
+    expect(recoveryOutcome.status).toBe("unchanged");
+    expect(await store.getSourceTarget(target.id)).toMatchObject({
+      healthStatus: "healthy",
+      enabled: true,
+      trustLevel: "primary",
+      confidenceAdjustment: 7,
+    });
   });
 
   it("reconciles orphaned running runs when run history is read", async () => {
@@ -449,6 +756,201 @@ describe("refresh engine", () => {
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.lastSuccessfulRunAt).not.toBeNull();
     expect(updated!.failureCount).toBe(0);
+  });
+
+  it("retains valid ICS events and persists malformed sibling warnings once", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Smartbar",
+      slug: "smartbar-malformed-sibling",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://smartbarchicago.com/calendar.ics",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+    const icsBody = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "DTSTART:20260726T220000Z",
+      "SUMMARY:Malformed Event Without Identity",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:malformed-date@sound-city.test",
+      "DTSTART:20261340T220000Z",
+      "SUMMARY:Malformed Event Date",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:valid-sibling@sound-city.test",
+      "DTSTART:20260727T020000Z",
+      "SUMMARY:Valid Warehouse Session",
+      "LOCATION:Smartbar",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: async () => ({
+        body: icsBody,
+        contentType: "text/calendar",
+        status: 200,
+      }),
+    });
+
+    expect(result.run.status).toBe("succeeded");
+    expect(result.run.draftsCreated).toBe(1);
+    expect(result.reviewItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          lane: "new-event",
+          normalizedDraft: expect.objectContaining({
+            title: "Valid Warehouse Session",
+          }),
+        }),
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          lane: "source-health",
+          normalizedDraft: expect.objectContaining({
+            issue: "ics-event-missing-uid",
+          }),
+        }),
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          lane: "source-health",
+          normalizedDraft: expect.objectContaining({
+            issue: "ics-event-invalid-date",
+          }),
+        }),
+      ]),
+    );
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "succeeded",
+      candidateCount: 1,
+      createdCount: 1,
+      warningCount: 2,
+    });
+
+    const reformattedIcsBody = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "SUMMARY:Malformed Event Without Identity",
+      "DTSTART:20260726T220000Z",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "SUMMARY:Malformed Event Date",
+      "DTSTART:20261340T220000Z",
+      "UID:malformed-date@sound-city.test",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "LOCATION:Smartbar",
+      "SUMMARY:Valid Warehouse Session",
+      "DTSTART:20260727T020000Z",
+      "UID:valid-sibling@sound-city.test",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const repeated = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: async () => ({
+        body: reformattedIcsBody,
+        contentType: "text/calendar",
+        status: 200,
+      }),
+    });
+    const warningItems = (await store.listReviewItems("city_chicago")).filter(
+      (item) => item.lane === "source-health",
+    );
+    expect(warningItems).toHaveLength(2);
+    expect(repeated.reviewItems).toHaveLength(0);
+    const [repeatedOutcome] = await store.listRefreshTargetOutcomes(
+      repeated.run.id,
+    );
+    expect(repeatedOutcome).toMatchObject({
+      status: "unchanged",
+      candidateCount: 1,
+      createdCount: 0,
+      unchangedCount: 1,
+      warningCount: 2,
+    });
+  });
+
+  it("fails an all-malformed feed after persisting its warnings", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Malformed Calendar",
+      slug: "malformed-calendar",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://malformed-calendar.test/events.ics",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: async () => ({
+        body: [
+          "BEGIN:VCALENDAR",
+          "BEGIN:VEVENT",
+          "DTSTART:20260726T220000Z",
+          "SUMMARY:Missing Identity",
+          "END:VEVENT",
+          "BEGIN:VEVENT",
+          "UID:invalid-date@sound-city.test",
+          "DTSTART:20261340T220000Z",
+          "SUMMARY:Invalid Date",
+          "END:VEVENT",
+          "END:VCALENDAR",
+        ].join("\r\n"),
+        contentType: "text/calendar",
+        status: 200,
+      }),
+    });
+
+    expect(result.run.status).toBe("failed");
+    expect(
+      (await store.listReviewItems("city_chicago")).filter(
+        (item) => item.lane === "source-health",
+      ),
+    ).toHaveLength(2);
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      sourceTargetId: target.id,
+      status: "failed",
+      candidateCount: 0,
+      createdCount: 0,
+      warningCount: 2,
+      errorDetails: {
+        message: expect.stringMatching(/no reliably interpretable events/i),
+      },
+    });
   });
 
   it("runs the RSS event feed parser and creates review items from XML", async () => {
@@ -1336,6 +1838,15 @@ describe("refresh engine", () => {
 
     expect(result.run.status).toBe("failed");
     expect(result.run.errorSummary).toMatch(/status 404/i);
+
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "failed",
+      responseStatus: 404,
+      retryCount: 0,
+      finalUrl: target.url,
+    });
+    expect(outcome.responseSizeBytes).toBeGreaterThan(0);
 
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.failureCount).toBe(1);

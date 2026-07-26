@@ -10,13 +10,17 @@ function table<T>(rows: T[]) {
   };
 }
 
-function createMockDb(onExecute: () => void = () => {}) {
+function createMockDb(
+  onExecute: () => void = () => {},
+  refreshTargetOutcomeRows: Record<string, unknown>[] = [],
+) {
   let lockTail = Promise.resolve();
   const data: Record<string, Record<string, unknown>[]> = {};
   const tables = [
     "source_owners",
     "source_targets",
     "refresh_runs",
+    "refresh_target_outcomes",
     "refresh_run_logs",
     "review_items",
     "source_event_observations",
@@ -45,6 +49,7 @@ function createMockDb(onExecute: () => void = () => {}) {
       sourceOwners: table([]),
       sourceTargets: table([]),
       refreshRuns: table([]),
+      refreshTargetOutcomes: table(refreshTargetOutcomeRows),
       refreshRunLogs: table([]),
       reviewItems: table([]),
       sourceEventObservations: table([]),
@@ -147,6 +152,56 @@ describe("drizzle refresh store", () => {
 
       expect(run.status).toBe("pending");
       expect(run.sourceTargetsChecked).toBe(0);
+    });
+
+    it("lists persisted outcome history for one source target", async () => {
+      const outcomeRow = {
+        id: "outcome_1",
+        runId: "run_1",
+        sourceTargetId: "target_1",
+        status: "failed",
+        startedAt: "2026-07-26T12:00:00.000Z",
+        finishedAt: "2026-07-26T12:00:01.000Z",
+        candidateCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
+        unchangedCount: 0,
+        warningCount: 0,
+        errorDetails: JSON.stringify({
+          code: null,
+          message: "Source failed",
+        }),
+        requestDurationMs: 100,
+        responseStatus: 500,
+        responseSizeBytes: 0,
+        retryCount: 0,
+        finalUrl: "https://source.test/events",
+      };
+      const historyStore = createDrizzleRefreshStore(
+        createMockDb(() => {}, [
+          outcomeRow,
+          {
+            ...outcomeRow,
+            id: "outcome_2",
+            runId: "run_2",
+            sourceTargetId: "target_2",
+          },
+        ]),
+      );
+
+      await expect(
+        historyStore.listSourceTargetOutcomes("target_1"),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          id: "outcome_1",
+          sourceTargetId: "target_1",
+          status: "failed",
+          errorDetails: {
+            code: null,
+            message: "Source failed",
+          },
+        }),
+      ]);
     });
   });
 

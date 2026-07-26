@@ -68,6 +68,7 @@ describe.skipIf(!connectionString)(
           review_decision_history,
           review_items,
           refresh_run_logs,
+          refresh_target_outcomes,
           refresh_runs,
           source_targets,
           source_owners
@@ -164,6 +165,44 @@ describe.skipIf(!connectionString)(
       await expect(
         stores[0].getSourceEventObservation(target.id, "event-42"),
       ).resolves.toMatchObject({ latestReviewItemId: items[0].id });
+    });
+
+    it("persists one target outcome per run and source target", async () => {
+      const { target, runs } = await createTargetAndRuns();
+      const input = {
+        runId: runs[0].id,
+        sourceTargetId: target.id,
+        startedAt: "2026-07-22T12:00:00.000Z",
+      };
+
+      const created = await stores[0].createRefreshTargetOutcome(input);
+      await stores[0].updateRefreshTargetOutcome(created.id, {
+        status: "succeeded",
+        finishedAt: "2026-07-22T12:00:01.000Z",
+        candidateCount: 2,
+        createdCount: 1,
+        unchangedCount: 1,
+        requestDurationMs: 120,
+        responseStatus: 200,
+        responseSizeBytes: 2048,
+        finalUrl: target.url,
+      });
+
+      await expect(
+        stores[0].listRefreshTargetOutcomes(runs[0].id),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          status: "succeeded",
+          candidateCount: 2,
+          createdCount: 1,
+          unchangedCount: 1,
+          responseStatus: 200,
+          finalUrl: target.url,
+        }),
+      ]);
+      await expect(
+        stores[1].createRefreshTargetOutcome(input),
+      ).rejects.toBeDefined();
     });
 
     it("rolls back review-item and observation writes together", async () => {

@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export type IcsEvent = {
   uid: string;
   summary: string;
@@ -8,6 +10,31 @@ export type IcsEvent = {
   categories: string[];
   url: string | null;
 };
+
+export type IcsParseWarning = {
+  sourceEventKey: string;
+  issue:
+    | "ics-event-missing-uid"
+    | "ics-event-missing-summary"
+    | "ics-event-missing-start"
+    | "ics-event-invalid-date";
+  message: string;
+  summary: string | null;
+};
+
+export type IcsParseResult = {
+  events: IcsEvent[];
+  warnings: IcsParseWarning[];
+};
+
+class IcsEventParseError extends Error {
+  constructor(
+    readonly issue: IcsParseWarning["issue"],
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 function unfoldLines(text: string): string[] {
   const raw = text.split(/\r?\n/);
@@ -234,15 +261,33 @@ function parseVEventBlock(
     }
   }
 
+  const uid = properties.get("UID")?.value.trim();
   const summary = properties.get("SUMMARY")?.value;
   const dtStart = properties.get("DTSTART");
 
-  if (!summary || !dtStart) return null;
+  if (!uid) {
+    throw new IcsEventParseError(
+      "ics-event-missing-uid",
+      "ICS event is missing UID",
+    );
+  }
+  if (!summary) {
+    throw new IcsEventParseError(
+      "ics-event-missing-summary",
+      "ICS event is missing SUMMARY",
+    );
+  }
+  if (!dtStart) {
+    throw new IcsEventParseError(
+      "ics-event-missing-start",
+      "ICS event is missing DTSTART",
+    );
+  }
 
   const dtEnd = properties.get("DTEND");
 
   return {
-    uid: properties.get("UID")?.value ?? "",
+    uid,
     summary: unescapeIcsText(summary.trim()),
     dtStart: parseIcsDate(
       dtStart.value.trim(),
@@ -271,18 +316,71 @@ function parseVEventBlock(
   };
 }
 
-export function parseIcs(text: string): IcsEvent[] {
-  if (!text.trim()) return [];
+function warningForBlock(
+  block: string[],
+  error: unknown,
+): IcsParseWarning {
+  const properties = new Map<string, ParsedProperty>();
+  for (const line of block) {
+    const property = parsePropertyLine(line);
+    if (property && !properties.has(property.name)) {
+      properties.set(property.name, property);
+    }
+  }
+  const uid = properties.get("UID")?.value.trim();
+  const summary = properties.get("SUMMARY")?.value.trim() || null;
+  const semanticIdentity = [
+    "SUMMARY",
+    "DTSTART",
+    "DTEND",
+    "LOCATION",
+    "URL",
+  ].map((name) => {
+    const property = properties.get(name);
+    return {
+      name,
+      value: property?.value.trim().replace(/\s+/g, " ") ?? null,
+      tzid: property?.params.tzid ?? null,
+    };
+  });
+  const fallbackKey = createHash("sha256")
+    .update(JSON.stringify(semanticIdentity))
+    .digest("hex")
+    .slice(0, 24);
+
+  return {
+    sourceEventKey: uid || `malformed-${fallbackKey}`,
+    issue:
+      error instanceof IcsEventParseError
+        ? error.issue
+        : "ics-event-invalid-date",
+    message:
+      error instanceof Error ? error.message : "ICS event could not be parsed",
+    summary,
+  };
+}
+
+export function parseIcsDocument(text: string): IcsParseResult {
+  if (!text.trim()) return { events: [], warnings: [] };
 
   const lines = unfoldLines(text);
   const blocks = extractVEventBlocks(lines);
   const calendarTimeZone = extractCalendarTimeZone(lines);
   const events: IcsEvent[] = [];
+  const warnings: IcsParseWarning[] = [];
 
   for (const block of blocks) {
-    const event = parseVEventBlock(block, calendarTimeZone);
-    if (event) events.push(event);
+    try {
+      const event = parseVEventBlock(block, calendarTimeZone);
+      if (event) events.push(event);
+    } catch (error) {
+      warnings.push(warningForBlock(block, error));
+    }
   }
 
-  return events;
+  return { events, warnings };
+}
+
+export function parseIcs(text: string): IcsEvent[] {
+  return parseIcsDocument(text).events;
 }

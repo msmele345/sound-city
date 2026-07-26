@@ -123,6 +123,62 @@ describe("refresh run store", () => {
     expect(updated.sourceTargetsFailed).toBe(1);
   });
 
+  it.each(["succeeded", "failed", "skipped", "unchanged"] as const)(
+    "persists the %s target outcome status",
+    async (status) => {
+      const outcome = await store.createRefreshTargetOutcome({
+        runId: `run_${status}`,
+        sourceTargetId: `target_${status}`,
+        startedAt: "2026-07-22T12:00:00.000Z",
+      });
+
+      expect(outcome.status).toBe("running");
+      await expect(
+        store.updateRefreshTargetOutcome(outcome.id, { status }),
+      ).resolves.toMatchObject({ status });
+    },
+  );
+
+  it("rejects a second outcome for the same run and target", async () => {
+    const input = {
+      runId: "run_unique",
+      sourceTargetId: "target_unique",
+      startedAt: "2026-07-22T12:00:00.000Z",
+    };
+    await store.createRefreshTargetOutcome(input);
+
+    await expect(store.createRefreshTargetOutcome(input)).rejects.toThrow(
+      /already exists/i,
+    );
+  });
+
+  it("lists durable outcome history for one source target", async () => {
+    const targetOutcome = await store.createRefreshTargetOutcome({
+      runId: "run_target_history",
+      sourceTargetId: "target_history",
+      startedAt: "2026-07-22T12:00:00.000Z",
+    });
+    await store.updateRefreshTargetOutcome(targetOutcome.id, {
+      status: "failed",
+      finishedAt: "2026-07-22T12:00:01.000Z",
+    });
+    await store.createRefreshTargetOutcome({
+      runId: "run_other_target",
+      sourceTargetId: "target_other",
+      startedAt: "2026-07-22T12:00:02.000Z",
+    });
+
+    await expect(
+      store.listSourceTargetOutcomes("target_history"),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        runId: "run_target_history",
+        sourceTargetId: "target_history",
+        status: "failed",
+      }),
+    ]);
+  });
+
   it("lists runs in order by createdAt descending", async () => {
     // Runs are stored in insertion order; latest first
     const first = await store.createRefreshRun(makeRun());

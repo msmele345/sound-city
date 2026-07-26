@@ -170,6 +170,39 @@ export const refreshRuns = pgTable("refresh_runs", {
   createdAt: timestamp("created_at", { mode: "string" }).notNull(),
 });
 
+export const refreshTargetOutcomes = pgTable(
+  "refresh_target_outcomes",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => refreshRuns.id),
+    sourceTargetId: text("source_target_id")
+      .notNull()
+      .references(() => sourceTargets.id),
+    status: text("status").notNull(),
+    startedAt: timestamp("started_at", { mode: "string" }).notNull(),
+    finishedAt: timestamp("finished_at", { mode: "string" }),
+    candidateCount: integer("candidate_count").notNull().default(0),
+    createdCount: integer("created_count").notNull().default(0),
+    updatedCount: integer("updated_count").notNull().default(0),
+    unchangedCount: integer("unchanged_count").notNull().default(0),
+    warningCount: integer("warning_count").notNull().default(0),
+    errorDetails: text("error_details"),
+    requestDurationMs: integer("request_duration_ms"),
+    responseStatus: integer("response_status"),
+    responseSizeBytes: integer("response_size_bytes"),
+    retryCount: integer("retry_count").notNull().default(0),
+    finalUrl: text("final_url"),
+  },
+  (table) => [
+    uniqueIndex("refresh_target_outcomes_run_target_unique").on(
+      table.runId,
+      table.sourceTargetId,
+    ),
+  ],
+);
+
 export const refreshRunLogs = pgTable("refresh_run_logs", {
   id: text("id").primaryKey(),
   runId: text("run_id")

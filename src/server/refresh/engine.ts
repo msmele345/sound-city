@@ -1,12 +1,15 @@
 import type { CatalogReader } from "../catalog/catalog-store";
 import { parseDevStaticTarget } from "./dev-parser";
+import { deriveSourceTargetHealth } from "./health";
 import type { RefreshStore } from "./refresh-store";
 import { parseRssEventFeedTarget } from "./rss-event-feed-parser";
 import type {
   CreateReviewItemInput,
+  FetchResult,
   Fetcher,
   ParserCandidate,
   RefreshRunRecord,
+  RefreshTargetOutcomeRecord,
   ReviewItemRecord,
   RunStatus,
   SourceTargetRecord,
@@ -31,6 +34,11 @@ type RefreshRunResult = {
 type ReconciliationOptions = {
   now?: Date;
   maxRunAgeMs?: number;
+};
+
+type CandidateClassification = {
+  kind: "created" | "updated" | "unchanged";
+  item: ReviewItemRecord | null;
 };
 
 type Metrics = Pick<
@@ -64,22 +72,51 @@ function unsupportedParserMessage(target: SourceTargetRecord) {
   return `No parser is available for strategy: ${target.parserStrategy}`;
 }
 
+type RequestTelemetry = Pick<
+  RefreshTargetOutcomeRecord,
+  | "requestDurationMs"
+  | "responseStatus"
+  | "responseSizeBytes"
+  | "retryCount"
+  | "finalUrl"
+>;
+
+const emptyRequestTelemetry: RequestTelemetry = {
+  requestDurationMs: null,
+  responseStatus: null,
+  responseSizeBytes: null,
+  retryCount: 0,
+  finalUrl: null,
+};
+
 async function defaultFetcher(
   url: string,
-): Promise<{ body: string; contentType: string; status: number }> {
+): Promise<FetchResult> {
   const response = await fetch(url);
   return {
     body: await response.text(),
     contentType: response.headers.get("content-type") ?? "",
     status: response.status,
+    finalUrl: response.url,
   };
 }
 
-function terminalStatus(metrics: Metrics): RunStatus {
-  if (metrics.sourceTargetsFailed === 0) {
+function terminalStatus(
+  outcomes: RefreshTargetOutcomeRecord[],
+  hasRunError: boolean,
+): RunStatus {
+  if (outcomes.length === 0) {
+    return hasRunError ? "failed" : "succeeded";
+  }
+  if (
+    outcomes.every(
+      (outcome) =>
+        outcome.status === "succeeded" || outcome.status === "unchanged",
+    )
+  ) {
     return "succeeded";
   }
-  if (metrics.sourceTargetsChecked === metrics.sourceTargetsFailed) {
+  if (outcomes.every((outcome) => outcome.status === "failed")) {
     return "failed";
   }
   return "partial";
@@ -102,6 +139,14 @@ function applyItemMetrics(metrics: Metrics, item: ReviewItemRecord) {
     case "source-health":
       break;
   }
+}
+
+async function updateOperationalHealth(
+  store: RefreshStore,
+  sourceTargetId: string,
+) {
+  const outcomes = await store.listSourceTargetOutcomes(sourceTargetId);
+  return deriveSourceTargetHealth(outcomes);
 }
 
 function toReviewItemInput(candidate: ParserCandidate): CreateReviewItemInput {
@@ -322,12 +367,49 @@ export async function runManualRefresh(
       metrics.sourceTargetsChecked += 1;
       const fetchedAt = isoNow(input.now);
 
-      await store.updateSourceTarget(target.id, {
-        lastFetchedAt: fetchedAt,
+      const outcome = await store.createRefreshTargetOutcome({
+        runId: run.id,
+        sourceTargetId: target.id,
+        startedAt: fetchedAt,
       });
+      let requestTelemetry = { ...emptyRequestTelemetry };
+      let candidateCount = 0;
+      let warningCount = 0;
+      const targetClassificationCounts = {
+        createdCount: 0,
+        updatedCount: 0,
+        unchangedCount: 0,
+      };
 
       try {
-        const fetcher = input.fetcher ?? defaultFetcher;
+        await store.updateSourceTarget(target.id, {
+          lastFetchedAt: fetchedAt,
+        });
+        const fetcher: Fetcher = input.fetcher ?? defaultFetcher;
+        const recordingFetcher: Fetcher = async (url) => {
+          const requestStartedAt = Date.now();
+          try {
+            const result = await fetcher(url);
+            requestTelemetry = {
+              requestDurationMs:
+                result.durationMs ?? Date.now() - requestStartedAt,
+              responseStatus: result.status,
+              responseSizeBytes:
+                result.responseSizeBytes ??
+                new TextEncoder().encode(result.body).byteLength,
+              retryCount: result.retryCount ?? 0,
+              finalUrl: result.finalUrl ?? url,
+            };
+            return result;
+          } catch (error) {
+            requestTelemetry = {
+              ...emptyRequestTelemetry,
+              requestDurationMs: Date.now() - requestStartedAt,
+              finalUrl: url,
+            };
+            throw error;
+          }
+        };
         let candidates: ParserCandidate[];
 
         if (target.parserStrategy === "dev-static") {
@@ -337,7 +419,7 @@ export async function runManualRefresh(
             target,
             run.id,
             fetchedAt,
-            fetcher,
+            recordingFetcher,
           );
         } else if (target.parserStrategy === "rss-event-feed") {
           const owner = await store.getSourceOwner(target.ownerId);
@@ -345,16 +427,21 @@ export async function runManualRefresh(
             target,
             run.id,
             fetchedAt,
-            fetcher,
+            recordingFetcher,
             { owner },
           );
         } else {
           throw new Error(unsupportedParserMessage(target));
         }
+        warningCount = candidates.filter(
+          (candidate) => candidate.lane === "source-health",
+        ).length;
+        candidateCount = candidates.length - warningCount;
 
         const targetReviewItems: ReviewItemRecord[] = [];
         for (const candidate of candidates) {
-          const item = await store.withSourceEventObservationTransaction(
+          const classification =
+            await store.withSourceEventObservationTransaction<CandidateClassification>(
             target.id,
             candidate.sourceEventKey,
             async (transactionStore) => {
@@ -386,7 +473,7 @@ export async function runManualRefresh(
                     parserVersion: candidate.parserVersion,
                   },
                 );
-                return null;
+                return { kind: "unchanged", item: null };
               }
               if (observation) {
                 const latestItem = observation.latestReviewItemId
@@ -432,7 +519,7 @@ export async function runManualRefresh(
                       parserVersion: candidate.parserVersion,
                     },
                   );
-                  return null;
+                  return { kind: "updated", item: null };
                 }
                 const publishedEventId =
                   observation.publishedEventId ?? latestItem?.publishedEntityId;
@@ -469,7 +556,7 @@ export async function runManualRefresh(
                       parserVersion: candidate.parserVersion,
                     },
                   );
-                  return proposedUpdate;
+                  return { kind: "created", item: proposedUpdate };
                 }
                 if (latestItem?.status === "rejected") {
                   let reviewItemInput = toReviewItemInput(candidate);
@@ -510,7 +597,7 @@ export async function runManualRefresh(
                         parserVersion: candidate.parserVersion,
                       },
                     );
-                    return null;
+                    return { kind: "updated", item: null };
                   }
                   const reopenedItem = await transactionStore.createReviewItem(
                     reviewItemInput,
@@ -528,7 +615,7 @@ export async function runManualRefresh(
                       parserVersion: candidate.parserVersion,
                     },
                   );
-                  return reopenedItem;
+                  return { kind: "created", item: reopenedItem };
                 }
                 throw new Error(
                   `Material change handling is not implemented for source event ${candidate.sourceEventKey}`,
@@ -549,15 +636,25 @@ export async function runManualRefresh(
                 publishedEventId: null,
                 parserVersion: candidate.parserVersion,
               });
-              return createdItem;
+              return { kind: "created", item: createdItem };
             },
           );
+          if (candidate.lane !== "source-health") {
+            targetClassificationCounts[`${classification.kind}Count`] += 1;
+          }
+          const item = classification.item;
           if (!item) {
             continue;
           }
           reviewItems.push(item);
           targetReviewItems.push(item);
           applyItemMetrics(metrics, item);
+        }
+
+        if (candidateCount === 0) {
+          throw new Error(
+            "Source produced no reliably interpretable events",
+          );
         }
 
         const duplicateCount = targetReviewItems.filter(
@@ -569,7 +666,21 @@ export async function runManualRefresh(
           });
         }
 
+        await store.updateRefreshTargetOutcome(outcome.id, {
+          status:
+            candidateCount > 0 &&
+            targetClassificationCounts.unchangedCount === candidateCount
+              ? "unchanged"
+              : "succeeded",
+          finishedAt: isoNow(input.now),
+          candidateCount,
+          ...targetClassificationCounts,
+          warningCount,
+          ...requestTelemetry,
+        });
+        const health = await updateOperationalHealth(store, target.id);
         await store.updateSourceTarget(target.id, {
+          healthStatus: health.status,
           lastSuccessfulRunAt: fetchedAt,
         });
 
@@ -584,10 +695,22 @@ export async function runManualRefresh(
         const message = errorMessage(error);
         errorSummary = errorSummary ? `${errorSummary}; ${message}` : message;
 
+        await store.updateRefreshTargetOutcome(outcome.id, {
+          status: "failed",
+          finishedAt: isoNow(input.now),
+          candidateCount,
+          ...targetClassificationCounts,
+          warningCount,
+          errorDetails: { code: null, message },
+          ...requestTelemetry,
+        });
+
+        const health = await updateOperationalHealth(store, target.id);
         await store.incrementSourceTargetCounters(target.id, {
           failureCount: 1,
         });
         await store.updateSourceTarget(target.id, {
+          healthStatus: health.status,
           lastFailureAt: fetchedAt,
           lastFailureReason: message,
         });
@@ -639,8 +762,9 @@ export async function runManualRefresh(
       message: errorSummary,
     });
   } finally {
+    const outcomes = await store.listRefreshTargetOutcomes(run.id);
     run = await store.updateRefreshRun(run.id, {
-      status: terminalStatus(metrics),
+      status: terminalStatus(outcomes, errorSummary !== null),
       finishedAt: isoNow(),
       ...metrics,
       errorSummary,

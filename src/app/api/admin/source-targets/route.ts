@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getRefreshStore } from "@/server/refresh/refresh-store";
+import { deriveSourceTargetHealth } from "@/server/refresh/health";
 import {
   createSourceOwner,
   createSourceTarget,
@@ -105,9 +106,17 @@ export async function GET(request: NextRequest) {
     store.listSourceOwners(cityId),
     store.listSourceTargets(cityId),
   ]);
+  const healthEntries = await Promise.all(
+    targets.map(async (target) => [
+      target.id,
+      deriveSourceTargetHealth(
+        await store.listSourceTargetOutcomes(target.id),
+      ),
+    ] as const),
+  );
 
   return NextResponse.json(
-    { owners, targets },
+    { owners, targets, healthByTarget: Object.fromEntries(healthEntries) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

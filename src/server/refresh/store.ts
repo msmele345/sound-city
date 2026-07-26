@@ -9,6 +9,7 @@ const emptySnapshot: RefreshSnapshot = {
   sourceOwners: [],
   sourceTargets: [],
   refreshRuns: [],
+  refreshTargetOutcomes: [],
   runLogs: [],
   reviewItems: [],
   sourceEventObservations: [],
@@ -161,6 +162,62 @@ export function createSeedRefreshStore(
       const current = snapshot.refreshRuns[index];
       const updated = { ...current, ...updates };
       snapshot.refreshRuns[index] = updated;
+      return updated;
+    },
+
+    // ── Refresh Target Outcomes ────────────────────────────────
+    async listRefreshTargetOutcomes(runId) {
+      return snapshot.refreshTargetOutcomes.filter(
+        (outcome) => outcome.runId === runId,
+      );
+    },
+
+    async listSourceTargetOutcomes(sourceTargetId) {
+      return snapshot.refreshTargetOutcomes.filter(
+        (outcome) => outcome.sourceTargetId === sourceTargetId,
+      );
+    },
+
+    async createRefreshTargetOutcome(input) {
+      const duplicate = snapshot.refreshTargetOutcomes.some(
+        (outcome) =>
+          outcome.runId === input.runId &&
+          outcome.sourceTargetId === input.sourceTargetId,
+      );
+      if (duplicate) {
+        throw new Error("Refresh target outcome already exists");
+      }
+      const outcome = {
+        ...input,
+        id: makeId(
+          "refresh_target_outcome",
+          `${input.runId}_${input.sourceTargetId}`,
+        ),
+        status: "running" as const,
+        finishedAt: null,
+        candidateCount: 0,
+        createdCount: 0,
+        updatedCount: 0,
+        unchangedCount: 0,
+        warningCount: 0,
+        errorDetails: null,
+        requestDurationMs: null,
+        responseStatus: null,
+        responseSizeBytes: null,
+        retryCount: 0,
+        finalUrl: null,
+      };
+      snapshot.refreshTargetOutcomes.push(outcome);
+      return outcome;
+    },
+
+    async updateRefreshTargetOutcome(id, updates) {
+      const index = snapshot.refreshTargetOutcomes.findIndex(
+        (outcome) => outcome.id === id,
+      );
+      if (index === -1) throw new Error("Refresh target outcome not found");
+      const updated = { ...snapshot.refreshTargetOutcomes[index], ...updates };
+      snapshot.refreshTargetOutcomes[index] = updated;
       return updated;
     },
 

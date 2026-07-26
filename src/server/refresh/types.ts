@@ -15,6 +15,10 @@ export type FetchResult = {
   body: string;
   contentType: string;
   status: number;
+  durationMs?: number;
+  responseSizeBytes?: number;
+  retryCount?: number;
+  finalUrl?: string;
 };
 
 export type Fetcher = (url: string) => Promise<FetchResult>;
@@ -137,6 +141,40 @@ export type CreateRefreshRunInput = {
   trigger: RunTrigger;
   triggeredBy: string;
 };
+
+// ─── Refresh Target Outcome ──────────────────────────────────────
+
+export type RefreshTargetOutcomeStatus =
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "skipped"
+  | "unchanged";
+
+export type RefreshTargetOutcomeRecord = {
+  id: string;
+  runId: string;
+  sourceTargetId: string;
+  status: RefreshTargetOutcomeStatus;
+  startedAt: string;
+  finishedAt: string | null;
+  candidateCount: number;
+  createdCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  warningCount: number;
+  errorDetails: { code: string | null; message: string } | null;
+  requestDurationMs: number | null;
+  responseStatus: number | null;
+  responseSizeBytes: number | null;
+  retryCount: number;
+  finalUrl: string | null;
+};
+
+export type CreateRefreshTargetOutcomeInput = Pick<
+  RefreshTargetOutcomeRecord,
+  "runId" | "sourceTargetId" | "startedAt"
+>;
 
 // ─── Refresh Run Log ──────────────────────────────────────────────
 
@@ -322,6 +360,7 @@ export type RefreshSnapshot = {
   sourceOwners: SourceOwnerRecord[];
   sourceTargets: SourceTargetRecord[];
   refreshRuns: RefreshRunRecord[];
+  refreshTargetOutcomes: RefreshTargetOutcomeRecord[];
   runLogs: RefreshRunLogRecord[];
   reviewItems: ReviewItemRecord[];
   sourceEventObservations: SourceEventObservationRecord[];
