@@ -63,9 +63,9 @@ Persist one structured outcome for every target attempted during a refresh, aggr
 - [x] Outcomes record status, start/finish timestamps, candidate counts, created/updated/unchanged counts, warning count, error details, and request telemetry.
 - [x] Target outcome status supports `running`, `succeeded`, `failed`, `skipped`, and `unchanged`.
 - [x] Run status is `succeeded` when all attempted targets succeed or are unchanged, `partial` when outcomes are mixed, and `failed` when all attempted targets fail.
-- [ ] Admin summarizes partial results in source terms, such as “2 of 3 sources succeeded.”
-- [ ] Admin exposes the failed target and compact error without requiring log inspection.
-- [ ] Valid feed items are retained when sibling items are malformed.
+- [x] Admin summarizes partial results in source terms, such as “2 of 3 sources succeeded.”
+- [x] Admin exposes the failed target and compact error without requiring log inspection.
+- [x] Valid feed items are retained when sibling items are malformed.
 - [ ] Repeated malformed items do not create duplicate persistent warnings.
 - [ ] One failure produces a warning, two consecutive failures derive `degraded`, and four derive `failing`.
 - [ ] One success moves `failing` to `degraded`; two consecutive successes restore `healthy`.

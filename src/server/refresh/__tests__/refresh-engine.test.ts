@@ -677,6 +677,73 @@ describe("refresh engine", () => {
     expect(updated!.failureCount).toBe(0);
   });
 
+  it("retains valid ICS events when a sibling event is malformed", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Smartbar",
+      slug: "smartbar-malformed-sibling",
+      kind: "venue",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://smartbarchicago.com/calendar.ics",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "daily",
+      notes: "",
+    });
+    const icsBody = [
+      "BEGIN:VCALENDAR",
+      "BEGIN:VEVENT",
+      "DTSTART:20260726T220000Z",
+      "SUMMARY:Malformed Event Without Identity",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:malformed-date@sound-city.test",
+      "DTSTART:20261340T220000Z",
+      "SUMMARY:Malformed Event Date",
+      "END:VEVENT",
+      "BEGIN:VEVENT",
+      "UID:valid-sibling@sound-city.test",
+      "DTSTART:20260727T020000Z",
+      "SUMMARY:Valid Warehouse Session",
+      "LOCATION:Smartbar",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher: async () => ({
+        body: icsBody,
+        contentType: "text/calendar",
+        status: 200,
+      }),
+    });
+
+    expect(result.run.status).toBe("succeeded");
+    expect(result.run.draftsCreated).toBe(1);
+    expect(result.reviewItems).toHaveLength(1);
+    expect(result.reviewItems[0]).toMatchObject({
+      sourceTargetId: target.id,
+      normalizedDraft: { title: "Valid Warehouse Session" },
+    });
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "succeeded",
+      candidateCount: 1,
+      createdCount: 1,
+    });
+  });
+
   it("runs the RSS event feed parser and creates review items from XML", async () => {
     const store = createSeedRefreshStore();
     const owner = await store.createSourceOwner({

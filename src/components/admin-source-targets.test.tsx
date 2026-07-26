@@ -314,6 +314,221 @@ describe("AdminSourceTargets", () => {
     expect(screen.getByText(/bunker signal/i)).toBeInTheDocument();
   });
 
+  it("summarizes partial refresh runs in source terms", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/admin/source-targets?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            ...refreshSnapshot,
+            targets: [
+              refreshSnapshot.targets[0],
+              {
+                ...refreshSnapshot.targets[0],
+                id: "source_target_radius_feed",
+                url: "https://radius-chicago.com/feed/",
+              },
+              {
+                ...refreshSnapshot.targets[0],
+                id: "source_target_calendar",
+                url: "https://calendar.test/chicago.ics",
+              },
+            ],
+          }),
+        });
+      }
+      if (url === "/api/admin/refresh-runs?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            runs: [
+              {
+                id: "refresh_run_partial",
+                status: "partial",
+                startedAt: "2026-07-26T10:00:00.000Z",
+                finishedAt: "2026-07-26T10:00:03.000Z",
+                sourceTargetsChecked: 3,
+                sourceTargetsFailed: 1,
+                draftsCreated: 1,
+                updatesProposed: 0,
+                duplicatesFlagged: 0,
+                staleTasksCreated: 0,
+                errorSummary: "Calendar fetch timed out",
+              },
+            ],
+            outcomesByRun: {
+              refresh_run_partial: [
+                {
+                  sourceTargetId: "source_target_smartbar_calendar",
+                  status: "succeeded",
+                  errorDetails: null,
+                },
+                {
+                  sourceTargetId: "source_target_radius_feed",
+                  status: "unchanged",
+                  errorDetails: null,
+                },
+                {
+                  sourceTargetId: "source_target_calendar",
+                  status: "failed",
+                  errorDetails: {
+                    code: null,
+                    message: "Calendar fetch timed out",
+                  },
+                },
+              ],
+            },
+            logsByRun: {},
+            reviewItems: [],
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(<AdminSourceTargets allowDevParser={false} />);
+
+    const runHistory = await screen.findByRole("region", {
+      name: /refresh run history/i,
+    });
+    expect(
+      within(runHistory).getByText(/2 of 3 sources succeeded/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the failed source target and its compact error", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/admin/source-targets?city=chicago") {
+        return Promise.resolve({ ok: true, json: async () => refreshSnapshot });
+      }
+      if (url === "/api/admin/refresh-runs?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            runs: [
+              {
+                id: "refresh_run_failed_target",
+                status: "partial",
+                startedAt: "2026-07-26T10:00:00.000Z",
+                finishedAt: "2026-07-26T10:00:03.000Z",
+                sourceTargetsChecked: 1,
+                sourceTargetsFailed: 1,
+                draftsCreated: 0,
+                updatesProposed: 0,
+                duplicatesFlagged: 0,
+                staleTasksCreated: 0,
+                errorSummary: "1 source failed",
+              },
+            ],
+            outcomesByRun: {
+              refresh_run_failed_target: [
+                {
+                  sourceTargetId: "source_target_smartbar_calendar",
+                  status: "failed",
+                  errorDetails: {
+                    code: "FETCH_TIMEOUT",
+                    message: "Request timed out after 15 seconds",
+                  },
+                },
+              ],
+            },
+            logsByRun: {},
+            reviewItems: [],
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(<AdminSourceTargets allowDevParser={false} />);
+
+    const failedTarget = await screen.findByRole("listitem", {
+      name: /smartbarchicago\.com\/calendar failed target/i,
+    });
+    expect(failedTarget).toHaveTextContent(/request timed out after 15 seconds/i);
+  });
+
+  it("shows target outcomes immediately after a manual refresh", async () => {
+    const user = userEvent.setup();
+    let refreshHistoryReads = 0;
+    const run = {
+      id: "refresh_run_manual_partial",
+      status: "partial",
+      startedAt: "2026-07-26T10:00:00.000Z",
+      finishedAt: "2026-07-26T10:00:03.000Z",
+      sourceTargetsChecked: 1,
+      sourceTargetsFailed: 1,
+      draftsCreated: 0,
+      updatesProposed: 0,
+      duplicatesFlagged: 0,
+      staleTasksCreated: 0,
+      errorSummary: "1 source failed",
+    };
+    const outcomes = [
+      {
+        sourceTargetId: "source_target_smartbar_calendar",
+        status: "failed",
+        errorDetails: {
+          code: "FETCH_TIMEOUT",
+          message: "Request timed out after 15 seconds",
+        },
+      },
+    ];
+
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/admin/source-targets?city=chicago") {
+        return Promise.resolve({ ok: true, json: async () => refreshSnapshot });
+      }
+      if (
+        url === "/api/admin/refresh-runs?city=chicago" &&
+        init?.method === "POST"
+      ) {
+        return Promise.resolve({
+          ok: true,
+          status: 201,
+          json: async () => ({ run, outcomes, logs: [], reviewItems: [] }),
+        });
+      }
+      if (url === "/api/admin/refresh-runs?city=chicago") {
+        refreshHistoryReads += 1;
+        if (refreshHistoryReads === 1) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              runs: [],
+              outcomesByRun: {},
+              logsByRun: {},
+              reviewItems: [],
+            }),
+          });
+        }
+        return Promise.resolve({
+          ok: false,
+          status: 503,
+          json: async () => ({ error: "Refresh history reload unavailable" }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(<AdminSourceTargets allowDevParser={false} />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /run refresh/i }),
+    );
+
+    const runHistory = screen.getByRole("region", {
+      name: /refresh run history/i,
+    });
+    expect(
+      within(runHistory).getByText(/0 of 1 sources succeeded/i),
+    ).toBeInTheDocument();
+    const failedTarget = within(runHistory).getByRole("listitem", {
+      name: /smartbarchicago\.com\/calendar failed target/i,
+    });
+    expect(failedTarget).toHaveTextContent(/request timed out after 15 seconds/i);
+  });
+
   it("approves edits from the current draft form values", async () => {
     const user = userEvent.setup();
     const reviewItem = {

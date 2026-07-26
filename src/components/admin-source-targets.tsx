@@ -86,6 +86,12 @@ type RefreshRunLogRecord = {
   createdAt: string;
 };
 
+type RefreshTargetOutcomeRecord = {
+  sourceTargetId: string;
+  status: "running" | "succeeded" | "failed" | "skipped" | "unchanged";
+  errorDetails: { code: string | null; message: string } | null;
+};
+
 type ReviewLane =
   | "new-event"
   | "proposed-update"
@@ -114,6 +120,7 @@ type ReviewItemRecord = {
 type RefreshRunSnapshot = {
   runs: RefreshRunRecord[];
   logsByRun: Record<string, RefreshRunLogRecord[]>;
+  outcomesByRun: Record<string, RefreshTargetOutcomeRecord[]>;
   reviewItems: ReviewItemRecord[];
 };
 
@@ -304,6 +311,75 @@ function metricLine(run: RefreshRunRecord) {
     `${run.duplicatesFlagged} dupe`,
     `${run.staleTasksCreated} stale`,
   ].join(" / ");
+}
+
+function sourceResultSummary(outcomes: RefreshTargetOutcomeRecord[]) {
+  if (outcomes.length === 0) return null;
+
+  const succeeded = outcomes.filter(
+    (outcome) =>
+      outcome.status === "succeeded" || outcome.status === "unchanged",
+  ).length;
+  return `${succeeded} of ${outcomes.length} sources succeeded`;
+}
+
+function sourceTargetLabel(
+  sourceTargetId: string,
+  targets: SourceTargetRecord[],
+) {
+  return (
+    targets.find((target) => target.id === sourceTargetId)?.url ??
+    sourceTargetId
+  );
+}
+
+function RefreshTargetOutcomeSummary({
+  runId,
+  outcomes,
+  targets,
+}: {
+  runId: string;
+  outcomes: RefreshTargetOutcomeRecord[];
+  targets: SourceTargetRecord[];
+}) {
+  const sourceSummary = sourceResultSummary(outcomes);
+  const failures = outcomes.filter((outcome) => outcome.status === "failed");
+
+  return (
+    <>
+      {sourceSummary ? (
+        <p className="mb-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink">
+          {sourceSummary}
+        </p>
+      ) : null}
+      {failures.length > 0 ? (
+        <ol
+          aria-label={`Failed sources for run ${runId}`}
+          className="mb-3 space-y-2 border-l-2 border-rule-strong pl-3"
+        >
+          {failures.map((outcome) => {
+            const targetLabel = sourceTargetLabel(
+              outcome.sourceTargetId,
+              targets,
+            );
+            return (
+              <li
+                key={outcome.sourceTargetId}
+                aria-label={`${targetLabel} failed target`}
+              >
+                <p className="truncate font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink">
+                  {targetLabel}
+                </p>
+                <p className="text-sm text-ink-dim">
+                  {outcome.errorDetails?.message ?? "Source refresh failed"}
+                </p>
+              </li>
+            );
+          })}
+        </ol>
+      ) : null}
+    </>
+  );
 }
 
 function healthMetrics(
@@ -692,6 +768,7 @@ export function AdminSourceTargets({
   const [refreshSnapshot, setRefreshSnapshot] = useState<RefreshRunSnapshot>({
     runs: [],
     logsByRun: {},
+    outcomesByRun: {},
     reviewItems: [],
   });
   const [status, setStatus] = useState("Loading source targets");
@@ -749,6 +826,7 @@ export function AdminSourceTargets({
       return {
         runs: body.runs ?? [],
         logsByRun: body.logsByRun ?? {},
+        outcomesByRun: body.outcomesByRun ?? {},
         reviewItems: body.reviewItems ?? [],
       };
     },
@@ -872,6 +950,7 @@ export function AdminSourceTargets({
       const body = (await response.json()) as {
         run?: RefreshRunRecord;
         logs?: RefreshRunLogRecord[];
+        outcomes?: RefreshTargetOutcomeRecord[];
         reviewItems?: ReviewItemRecord[];
         error?: string;
       };
@@ -890,6 +969,10 @@ export function AdminSourceTargets({
         logsByRun: {
           ...current.logsByRun,
           [body.run!.id]: body.logs ?? [],
+        },
+        outcomesByRun: {
+          ...current.outcomesByRun,
+          [body.run!.id]: body.outcomes ?? [],
         },
         reviewItems: [
           ...(body.reviewItems ?? []),
@@ -1183,6 +1266,13 @@ export function AdminSourceTargets({
                 <ol>
                   {refreshSnapshot.runs.slice(0, 3).map((run) => (
                     <li key={run.id} className="border-t border-rule py-4 first:border-t-0 first:pt-0">
+                      <RefreshTargetOutcomeSummary
+                        runId={run.id}
+                        outcomes={
+                          refreshSnapshot.outcomesByRun[run.id] ?? []
+                        }
+                        targets={snapshot.targets}
+                      />
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <p className="font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-faint">
                           {run.status} / {metricLine(run)}

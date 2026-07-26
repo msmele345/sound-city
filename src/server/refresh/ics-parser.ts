@@ -234,15 +234,16 @@ function parseVEventBlock(
     }
   }
 
+  const uid = properties.get("UID")?.value.trim();
   const summary = properties.get("SUMMARY")?.value;
   const dtStart = properties.get("DTSTART");
 
-  if (!summary || !dtStart) return null;
+  if (!uid || !summary || !dtStart) return null;
 
   const dtEnd = properties.get("DTEND");
 
   return {
-    uid: properties.get("UID")?.value ?? "",
+    uid,
     summary: unescapeIcsText(summary.trim()),
     dtStart: parseIcsDate(
       dtStart.value.trim(),
@@ -280,8 +281,12 @@ export function parseIcs(text: string): IcsEvent[] {
   const events: IcsEvent[] = [];
 
   for (const block of blocks) {
-    const event = parseVEventBlock(block, calendarTimeZone);
-    if (event) events.push(event);
+    try {
+      const event = parseVEventBlock(block, calendarTimeZone);
+      if (event) events.push(event);
+    } catch {
+      // A malformed VEVENT must not prevent valid sibling events from parsing.
+    }
   }
 
   return events;

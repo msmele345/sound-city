@@ -6,7 +6,10 @@ import {
   runManualRefresh,
 } from "@/server/refresh/engine";
 import { getRefreshStore } from "@/server/refresh/refresh-store";
-import type { RefreshRunLogRecord } from "@/server/refresh/types";
+import type {
+  RefreshRunLogRecord,
+  RefreshTargetOutcomeRecord,
+} from "@/server/refresh/types";
 
 const adminSecretHeader = "x-sound-city-admin-secret";
 
@@ -54,6 +57,23 @@ async function logsByRunId(
   return Object.fromEntries(entries) as Record<string, RefreshRunLogRecord[]>;
 }
 
+async function outcomesByRunId(
+  store: ReturnType<typeof getRefreshStore>,
+  runIds: string[],
+) {
+  const entries = await Promise.all(
+    runIds.map(async (runId) => {
+      const outcomes = await store.listRefreshTargetOutcomes(runId);
+      return [runId, outcomes] as const;
+    }),
+  );
+
+  return Object.fromEntries(entries) as Record<
+    string,
+    RefreshTargetOutcomeRecord[]
+  >;
+}
+
 export async function GET(request: NextRequest) {
   const protection = adminProtectionResponse(request);
   if (protection) {
@@ -65,13 +85,14 @@ export async function GET(request: NextRequest) {
   const store = getRefreshStore();
   const runs = await listRefreshRunsWithReconciliation(store, cityId);
   const reviewItems = await store.listReviewItems(cityId);
-  const logs = await logsByRunId(
-    store,
-    runs.map((run) => run.id),
-  );
+  const runIds = runs.map((run) => run.id);
+  const [logs, outcomes] = await Promise.all([
+    logsByRunId(store, runIds),
+    outcomesByRunId(store, runIds),
+  ]);
 
   return NextResponse.json(
-    { runs, logsByRun: logs, reviewItems },
+    { runs, logsByRun: logs, outcomesByRun: outcomes, reviewItems },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
@@ -95,9 +116,10 @@ export async function POST(request: NextRequest) {
     catalogStore,
   );
   const logs = await store.listRunLogs(result.run.id);
+  const outcomes = await store.listRefreshTargetOutcomes(result.run.id);
 
   return NextResponse.json(
-    { run: result.run, logs, reviewItems: result.reviewItems },
+    { run: result.run, logs, outcomes, reviewItems: result.reviewItems },
     { status: 201, headers: { "Cache-Control": "no-store" } },
   );
 }

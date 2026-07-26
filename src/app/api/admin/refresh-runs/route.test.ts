@@ -128,7 +128,6 @@ describe("admin refresh-runs route handlers", () => {
         }),
       ]),
     );
-
     const listed = await GET(
       requestFor("/api/admin/refresh-runs?city=chicago"),
     );
@@ -151,6 +150,33 @@ describe("admin refresh-runs route handlers", () => {
       expect.arrayContaining([
         expect.objectContaining({ runId: createdBody.run.id }),
       ]),
+    );
+  });
+
+  it("exposes target outcomes for a manual run and run history", async () => {
+    await createDevSourceTarget();
+
+    const created = await POST(
+      requestFor("/api/admin/refresh-runs", { method: "POST" }),
+    );
+    const createdBody = await created.json();
+
+    expect(createdBody.outcomes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          runId: createdBody.run.id,
+          status: expect.stringMatching(/succeeded|unchanged/),
+        }),
+      ]),
+    );
+
+    const listed = await GET(
+      requestFor("/api/admin/refresh-runs?city=chicago"),
+    );
+    const listedBody = await listed.json();
+
+    expect(listedBody.outcomesByRun[createdBody.run.id]).toEqual(
+      createdBody.outcomes,
     );
   });
 });
