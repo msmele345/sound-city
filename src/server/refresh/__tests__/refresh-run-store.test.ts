@@ -188,4 +188,29 @@ describe("refresh run store", () => {
 
     expect(runs).toHaveLength(2);
   });
+
+  it("grants the city refresh lease to only one concurrent run", async () => {
+    const attempts = await Promise.all([
+      store.acquireRefreshLease({
+        ...makeRun({ triggeredBy: "admin-a" }),
+        acquiredAt: "2026-07-27T12:00:00.000Z",
+      }),
+      store.acquireRefreshLease({
+        ...makeRun({ triggeredBy: "admin-b" }),
+        acquiredAt: "2026-07-27T12:00:00.000Z",
+      }),
+    ]);
+
+    const acquired = attempts.filter((attempt) => attempt.acquired);
+    const blocked = attempts.filter((attempt) => !attempt.acquired);
+
+    expect(acquired).toHaveLength(1);
+    expect(blocked).toEqual([
+      {
+        acquired: false,
+        activeRunId: acquired[0].run.id,
+      },
+    ]);
+    await expect(store.listRefreshRuns("city_chicago")).resolves.toHaveLength(1);
+  });
 });

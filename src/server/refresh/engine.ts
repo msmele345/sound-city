@@ -11,6 +11,7 @@ import type {
   RefreshRunRecord,
   RefreshTargetOutcomeRecord,
   ReviewItemRecord,
+  RunTrigger,
   RunStatus,
   SourceTargetRecord,
   UpdateReviewItemInput,
@@ -24,6 +25,10 @@ type RunManualRefreshInput = {
   triggeredBy: string;
   now?: Date;
   fetcher?: Fetcher;
+};
+
+type RunRefreshInput = RunManualRefreshInput & {
+  trigger: RunTrigger;
 };
 
 type RefreshRunResult = {
@@ -66,6 +71,13 @@ function isoNow(date = new Date()) {
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Refresh failed";
+}
+
+export class RefreshLeaseConflictError extends Error {
+  constructor(public readonly activeRunId: string) {
+    super(`Refresh already active: ${activeRunId}`);
+    this.name = "RefreshLeaseConflictError";
+  }
 }
 
 function unsupportedParserMessage(target: SourceTargetRecord) {
@@ -333,17 +345,62 @@ async function createStaleTasksForPastEvents(
   return items;
 }
 
-export async function runManualRefresh(
+async function runRefresh(
   store: RefreshStore,
-  input: RunManualRefreshInput,
+  input: RunRefreshInput,
   catalogStore?: CatalogReader,
 ): Promise<RefreshRunResult> {
-  const created = await store.createRefreshRun({
-    cityId: input.cityId,
-    trigger: "manual",
-    triggeredBy: input.triggeredBy,
-  });
   const startedAt = isoNow(input.now);
+  const acquisition = await store.acquireRefreshLease({
+    cityId: input.cityId,
+    trigger: input.trigger,
+    triggeredBy: input.triggeredBy,
+    acquiredAt: startedAt,
+  });
+  if (!acquisition.acquired) {
+    if (input.trigger === "manual") {
+      throw new RefreshLeaseConflictError(acquisition.activeRunId);
+    }
+
+    const created = await store.createRefreshRun({
+      cityId: input.cityId,
+      trigger: input.trigger,
+      triggeredBy: input.triggeredBy,
+    });
+    const skipped = await store.updateRefreshRun(created.id, {
+      status: "skipped",
+      blockedByRunId: acquisition.activeRunId,
+      finishedAt: startedAt,
+    });
+    await log(store, skipped.id, {
+      level: "info",
+      message: "Refresh run skipped because another run is active",
+      metadata: { activeRunId: acquisition.activeRunId },
+    });
+    return { run: skipped, reviewItems: [] };
+  }
+
+  const created = acquisition.run;
+  try {
+    return await executeRefresh(
+      store,
+      input,
+      catalogStore,
+      created,
+      startedAt,
+    );
+  } finally {
+    await store.releaseRefreshLease(input.cityId, created.id);
+  }
+}
+
+async function executeRefresh(
+  store: RefreshStore,
+  input: RunRefreshInput,
+  catalogStore: CatalogReader | undefined,
+  created: RefreshRunRecord,
+  startedAt: string,
+): Promise<RefreshRunResult> {
   let metrics = { ...emptyMetrics };
   let errorSummary: string | null = null;
   const reviewItems: ReviewItemRecord[] = [];
@@ -777,6 +834,22 @@ export async function runManualRefresh(
   }
 
   return { run, reviewItems };
+}
+
+export function runManualRefresh(
+  store: RefreshStore,
+  input: RunManualRefreshInput,
+  catalogStore?: CatalogReader,
+): Promise<RefreshRunResult> {
+  return runRefresh(store, { ...input, trigger: "manual" }, catalogStore);
+}
+
+export function runScheduledRefresh(
+  store: RefreshStore,
+  input: RunManualRefreshInput,
+  catalogStore?: CatalogReader,
+): Promise<RefreshRunResult> {
+  return runRefresh(store, { ...input, trigger: "scheduled" }, catalogStore);
 }
 
 export async function listRefreshRunsWithReconciliation(

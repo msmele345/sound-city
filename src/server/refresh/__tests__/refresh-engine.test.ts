@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createSeedCatalogStore } from "../../catalog/catalog-store";
-import { runManualRefresh, listRefreshRunsWithReconciliation } from "../engine";
+import {
+  listRefreshRunsWithReconciliation,
+  RefreshLeaseConflictError,
+  runManualRefresh,
+  runScheduledRefresh,
+} from "../engine";
 import { approveReviewItem, rejectReviewItem } from "../review-operations";
 import { createSeedRefreshStore } from "../store";
 import type { RefreshStore } from "../refresh-store";
@@ -1156,11 +1161,79 @@ describe("refresh engine", () => {
     });
   });
 
-  it("classifies concurrent first sightings atomically without duplicate review work", async () => {
+  it("records a scheduled overlap as skipped without fetching sources", async () => {
+    const store = createSeedRefreshStore();
+    await createRssObservationFixture(store);
+    const active = await store.acquireRefreshLease({
+      cityId: "city_chicago",
+      trigger: "manual",
+      triggeredBy: "admin-secret",
+      acquiredAt: "2026-07-27T12:00:00.000Z",
+    });
+    expect(active.acquired).toBe(true);
+    if (!active.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+    const fetcher = vi.fn();
+
+    const result = await runScheduledRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "vercel-cron",
+      now: new Date("2026-07-27T12:00:01.000Z"),
+      fetcher,
+    });
+
+    expect(result.run).toMatchObject({
+      trigger: "scheduled",
+      status: "skipped",
+      blockedByRunId: active.run.id,
+      startedAt: null,
+      finishedAt: "2026-07-27T12:00:01.000Z",
+      sourceTargetsChecked: 0,
+    });
+    expect(result.reviewItems).toEqual([]);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects a manual overlap with the active run and no source fetch", async () => {
+    const store = createSeedRefreshStore();
+    await createRssObservationFixture(store);
+    const active = await store.acquireRefreshLease({
+      cityId: "city_chicago",
+      trigger: "scheduled",
+      triggeredBy: "vercel-cron",
+      acquiredAt: "2026-07-27T12:00:00.000Z",
+    });
+    expect(active.acquired).toBe(true);
+    if (!active.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+    const fetcher = vi.fn();
+
+    await expect(
+      runManualRefresh(store, {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+        now: new Date("2026-07-27T12:00:01.000Z"),
+        fetcher,
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<RefreshLeaseConflictError>>({
+        name: "RefreshLeaseConflictError",
+        activeRunId: active.run.id,
+      }),
+    );
+    expect(fetcher).not.toHaveBeenCalled();
+    await expect(store.listRefreshRuns("city_chicago")).resolves.toEqual([
+      expect.objectContaining({ id: active.run.id }),
+    ]);
+  });
+
+  it("single-flights concurrent first sightings without duplicate review work", async () => {
     const store = createSeedRefreshStore();
     const { target, fetcher } = await createRssObservationFixture(store);
 
-    const results = await Promise.all([
+    const attempts = await Promise.allSettled([
       runManualRefresh(store, {
         cityId: "city_chicago",
         triggeredBy: "admin-secret-a",
@@ -1174,18 +1247,23 @@ describe("refresh engine", () => {
         fetcher,
       }),
     ]);
+    const completed = attempts.filter(
+      (attempt) => attempt.status === "fulfilled",
+    );
+    const conflicted = attempts.filter(
+      (attempt) => attempt.status === "rejected",
+    );
 
-    expect(results.map(({ run }) => run.status)).toEqual([
-      "succeeded",
-      "succeeded",
-    ]);
-    expect(new Set(results.map(({ run }) => run.id)).size).toBe(2);
-    expect(
-      results.reduce(
-        (total, result) => total + result.reviewItems.length,
-        0,
-      ),
-    ).toBe(1);
+    expect(completed).toHaveLength(1);
+    expect(completed[0].value.run.status).toBe("succeeded");
+    expect(completed[0].value.reviewItems).toHaveLength(1);
+    expect(conflicted).toHaveLength(1);
+    expect(conflicted[0].reason).toEqual(
+      expect.objectContaining({
+        name: "RefreshLeaseConflictError",
+        activeRunId: completed[0].value.run.id,
+      }),
+    );
 
     const items = await store.listReviewItems("city_chicago");
     expect(items).toHaveLength(1);

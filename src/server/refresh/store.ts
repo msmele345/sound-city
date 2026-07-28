@@ -9,6 +9,7 @@ const emptySnapshot: RefreshSnapshot = {
   sourceOwners: [],
   sourceTargets: [],
   refreshRuns: [],
+  refreshLeases: [],
   refreshTargetOutcomes: [],
   runLogs: [],
   reviewItems: [],
@@ -29,6 +30,7 @@ export function createSeedRefreshStore(
 ): RefreshStore {
   const snapshot = cloneSnapshot(initialSnapshot ?? emptySnapshot);
   let observationTransactionTail = Promise.resolve();
+  let refreshLeaseAcquisitionTail = Promise.resolve();
 
   const store: RefreshStore = {
     // ── Source Owners ──────────────────────────────────────────
@@ -141,6 +143,7 @@ export function createSeedRefreshStore(
         ...input,
         id,
         status: "pending" as const,
+        blockedByRunId: null,
         startedAt: null,
         finishedAt: null,
         sourceTargetsChecked: 0,
@@ -163,6 +166,52 @@ export function createSeedRefreshStore(
       const updated = { ...current, ...updates };
       snapshot.refreshRuns[index] = updated;
       return updated;
+    },
+
+    async acquireRefreshLease(input) {
+      const previous = refreshLeaseAcquisitionTail;
+      let release = () => {};
+      const current = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      refreshLeaseAcquisitionTail = current;
+      await previous;
+
+      try {
+        const activeLease = snapshot.refreshLeases.find(
+          (lease) => lease.cityId === input.cityId,
+        );
+        if (activeLease) {
+          return {
+            acquired: false,
+            activeRunId: activeLease.activeRunId,
+          };
+        }
+
+        const { acquiredAt, ...runInput } = input;
+        const run = await store.createRefreshRun(runInput);
+        snapshot.refreshLeases.push({
+          cityId: input.cityId,
+          activeRunId: run.id,
+          acquiredAt,
+        });
+        return { acquired: true, run };
+      } finally {
+        release();
+        if (refreshLeaseAcquisitionTail === current) {
+          refreshLeaseAcquisitionTail = Promise.resolve();
+        }
+      }
+    },
+
+    async releaseRefreshLease(cityId, runId) {
+      const index = snapshot.refreshLeases.findIndex(
+        (lease) =>
+          lease.cityId === cityId && lease.activeRunId === runId,
+      );
+      if (index !== -1) {
+        snapshot.refreshLeases.splice(index, 1);
+      }
     },
 
     // ── Refresh Target Outcomes ────────────────────────────────

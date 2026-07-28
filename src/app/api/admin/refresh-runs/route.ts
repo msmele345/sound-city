@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getCatalogStore } from "@/server/catalog/catalog-store";
 import {
   listRefreshRunsWithReconciliation,
+  RefreshLeaseConflictError,
   runManualRefresh,
 } from "@/server/refresh/engine";
 import { getRefreshStore } from "@/server/refresh/refresh-store";
@@ -107,14 +108,31 @@ export async function POST(request: NextRequest) {
   const cityId = cityIdFromSlug(citySlug);
   const store = getRefreshStore();
   const catalogStore = getCatalogStore();
-  const result = await runManualRefresh(
-    store,
-    {
-      cityId,
-      triggeredBy: "admin-secret",
-    },
-    catalogStore,
-  );
+  let result;
+  try {
+    result = await runManualRefresh(
+      store,
+      {
+        cityId,
+        triggeredBy: "admin-secret",
+      },
+      catalogStore,
+    );
+  } catch (error) {
+    if (error instanceof RefreshLeaseConflictError) {
+      return NextResponse.json(
+        {
+          error: "Refresh already active",
+          activeRunId: error.activeRunId,
+        },
+        {
+          status: 409,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
+    }
+    throw error;
+  }
   const logs = await store.listRunLogs(result.run.id);
   const outcomes = await store.listRefreshTargetOutcomes(result.run.id);
 

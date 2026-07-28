@@ -2,6 +2,8 @@ import { createDb } from "../db/client";
 import { createDrizzleRefreshStore } from "./drizzle-refresh-store";
 import { createSeedRefreshStore } from "./store";
 import type {
+  AcquireRefreshLeaseInput,
+  AcquireRefreshLeaseResult,
   CreateRefreshRunInput,
   CreateRefreshTargetOutcomeInput,
   CreateReviewItemInput,
@@ -59,6 +61,10 @@ export type RefreshStore = {
     id: string,
     updates: Partial<RefreshRunRecord>,
   ): Promise<RefreshRunRecord>;
+  acquireRefreshLease(
+    input: AcquireRefreshLeaseInput,
+  ): Promise<AcquireRefreshLeaseResult>;
+  releaseRefreshLease(cityId: string, runId: string): Promise<void>;
 
   // ── Refresh Target Outcomes ─────────────────────────────────
   listRefreshTargetOutcomes(

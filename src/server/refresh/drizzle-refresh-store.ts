@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { RefreshStore } from "./refresh-store";
 import type {
@@ -62,6 +62,7 @@ type RefreshRunRow = {
   trigger: string;
   status: string;
   triggeredBy: string;
+  blockedByRunId: string | null;
   startedAt: string | Date | null;
   finishedAt: string | Date | null;
   sourceTargetsChecked: number;
@@ -491,6 +492,7 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         trigger: input.trigger,
         status: "pending",
         triggeredBy: input.triggeredBy,
+        blockedByRunId: null,
         startedAt: null,
         finishedAt: null,
         sourceTargetsChecked: 0,
@@ -506,6 +508,7 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         ...input,
         id,
         status: "pending",
+        blockedByRunId: null,
         startedAt: null,
         finishedAt: null,
         sourceTargetsChecked: 0,
@@ -529,6 +532,54 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
       const row = rows.find((r) => r.id === id);
       if (!row) throw new Error("Refresh run not found");
       return toRefreshRun(row);
+    },
+
+    async acquireRefreshLease(input) {
+      const writer = requireWriter(db);
+      const { acquiredAt, ...runInput } = input;
+      return writer.transaction(async (tx) => {
+        const transactionStore = createDrizzleRefreshStore(tx);
+        const run = await transactionStore.createRefreshRun(runInput);
+        const [lease] = await tx
+          .insert(schema.refreshLeases)
+          .values({
+            cityId: input.cityId,
+            activeRunId: run.id,
+            acquiredAt,
+          })
+          .onConflictDoUpdate({
+            target: schema.refreshLeases.cityId,
+            set: {
+              activeRunId: sql`${schema.refreshLeases.activeRunId}`,
+              acquiredAt: sql`${schema.refreshLeases.acquiredAt}`,
+            },
+          })
+          .returning({ activeRunId: schema.refreshLeases.activeRunId });
+
+        if (lease.activeRunId === run.id) {
+          return { acquired: true, run };
+        }
+
+        await tx
+          .delete(schema.refreshRuns)
+          .where(eq(schema.refreshRuns.id, run.id));
+        return {
+          acquired: false,
+          activeRunId: lease.activeRunId,
+        };
+      });
+    },
+
+    async releaseRefreshLease(cityId, runId) {
+      const writer = requireWriter(db);
+      await writer
+        .delete(schema.refreshLeases)
+        .where(
+          and(
+            eq(schema.refreshLeases.cityId, cityId),
+            eq(schema.refreshLeases.activeRunId, runId),
+          ),
+        );
     },
 
     // ── Refresh Target Outcomes ────────────────────────────────

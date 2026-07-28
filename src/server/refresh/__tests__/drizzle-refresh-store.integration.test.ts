@@ -64,6 +64,7 @@ describe.skipIf(!connectionString)(
     beforeEach(async () => {
       await clients[0].unsafe(`
         TRUNCATE TABLE
+          refresh_leases,
           source_event_observations,
           review_decision_history,
           review_items,
@@ -117,6 +118,33 @@ describe.skipIf(!connectionString)(
       );
       return { target, runs };
     }
+
+    it("atomically grants one city lease across database connections", async () => {
+      const attempts = await Promise.all(
+        stores.map((store, index) =>
+          store.acquireRefreshLease({
+            cityId: "city_chicago",
+            trigger: "manual",
+            triggeredBy: `admin-secret-${index}`,
+            acquiredAt: "2026-07-27T12:00:00.000Z",
+          }),
+        ),
+      );
+
+      const acquired = attempts.filter((attempt) => attempt.acquired);
+      const blocked = attempts.filter((attempt) => !attempt.acquired);
+
+      expect(acquired).toHaveLength(1);
+      expect(blocked).toEqual([
+        {
+          acquired: false,
+          activeRunId: acquired[0].run.id,
+        },
+      ]);
+      await expect(
+        stores[0].listRefreshRuns("city_chicago"),
+      ).resolves.toHaveLength(1);
+    });
 
     it("serializes concurrent classification and creates one review item", async () => {
       const { target, runs } = await createTargetAndRuns();

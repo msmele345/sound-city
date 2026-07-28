@@ -116,7 +116,13 @@ export type SourceTargetCounterDelta = Partial<
 // ─── Refresh Run ──────────────────────────────────────────────────
 
 export type RunTrigger = "manual" | "scheduled";
-export type RunStatus = "pending" | "running" | "succeeded" | "failed" | "partial";
+export type RunStatus =
+  | "pending"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "partial"
+  | "skipped";
 
 export type RefreshRunRecord = {
   id: string;
@@ -124,6 +130,7 @@ export type RefreshRunRecord = {
   trigger: RunTrigger;
   status: RunStatus;
   triggeredBy: string;
+  blockedByRunId: string | null;
   startedAt: string | null;
   finishedAt: string | null;
   sourceTargetsChecked: number;
@@ -141,6 +148,26 @@ export type CreateRefreshRunInput = {
   trigger: RunTrigger;
   triggeredBy: string;
 };
+
+export type RefreshLeaseRecord = {
+  cityId: string;
+  activeRunId: string;
+  acquiredAt: string;
+};
+
+export type AcquireRefreshLeaseInput = CreateRefreshRunInput & {
+  acquiredAt: string;
+};
+
+export type AcquireRefreshLeaseResult =
+  | {
+      acquired: true;
+      run: RefreshRunRecord;
+    }
+  | {
+      acquired: false;
+      activeRunId: string;
+    };
 
 // ─── Refresh Target Outcome ──────────────────────────────────────
 
@@ -360,6 +387,7 @@ export type RefreshSnapshot = {
   sourceOwners: SourceOwnerRecord[];
   sourceTargets: SourceTargetRecord[];
   refreshRuns: RefreshRunRecord[];
+  refreshLeases: RefreshLeaseRecord[];
   refreshTargetOutcomes: RefreshTargetOutcomeRecord[];
   runLogs: RefreshRunLogRecord[];
   reviewItems: ReviewItemRecord[];

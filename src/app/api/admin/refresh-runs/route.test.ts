@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { GET, POST } from "./route";
+import { getRefreshStore } from "@/server/refresh/refresh-store";
 import {
   GET as GETSourceTargets,
   PATCH as PATCHSourceTargets,
@@ -99,6 +100,38 @@ describe("admin refresh-runs route handlers", () => {
     expect(await blocked.json()).toMatchObject({
       error: expect.stringMatching(/admin secret/i),
     });
+  });
+
+  it("returns conflict with the active run when a manual refresh overlaps", async () => {
+    const citySlug = `refresh-conflict-${Date.now()}`;
+    const cityId = `city_${citySlug.replaceAll("-", "_")}`;
+    const store = getRefreshStore();
+    const active = await store.acquireRefreshLease({
+      cityId,
+      trigger: "scheduled",
+      triggeredBy: "vercel-cron",
+      acquiredAt: "2026-07-27T12:00:00.000Z",
+    });
+    expect(active.acquired).toBe(true);
+    if (!active.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+
+    try {
+      const response = await POST(
+        requestFor(`/api/admin/refresh-runs?city=${citySlug}`, {
+          method: "POST",
+        }),
+      );
+
+      expect(response.status).toBe(409);
+      expect(await response.json()).toEqual({
+        error: "Refresh already active",
+        activeRunId: active.run.id,
+      });
+    } finally {
+      await store.releaseRefreshLease(cityId, active.run.id);
+    }
   });
 
   it("runs a manual dev refresh and reads durable review lanes and logs", async () => {

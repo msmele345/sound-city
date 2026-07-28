@@ -1,5 +1,6 @@
 import {
   boolean,
+  foreignKey,
   integer,
   pgTable,
   primaryKey,
@@ -150,24 +151,45 @@ export const sourceTargets = pgTable("source_targets", {
   updatedAt: timestamp("updated_at", { mode: "string" }).notNull(),
 });
 
-export const refreshRuns = pgTable("refresh_runs", {
-  id: text("id").primaryKey(),
+export const refreshRuns = pgTable(
+  "refresh_runs",
+  {
+    id: text("id").primaryKey(),
+    cityId: text("city_id")
+      .notNull()
+      .references(() => cities.id),
+    trigger: text("trigger").notNull(),
+    status: text("status").notNull(),
+    triggeredBy: text("triggered_by").notNull(),
+    blockedByRunId: text("blocked_by_run_id"),
+    startedAt: timestamp("started_at", { mode: "string" }),
+    finishedAt: timestamp("finished_at", { mode: "string" }),
+    sourceTargetsChecked: integer("source_targets_checked").notNull().default(0),
+    sourceTargetsFailed: integer("source_targets_failed").notNull().default(0),
+    draftsCreated: integer("drafts_created").notNull().default(0),
+    updatesProposed: integer("updates_proposed").notNull().default(0),
+    duplicatesFlagged: integer("duplicates_flagged").notNull().default(0),
+    staleTasksCreated: integer("stale_tasks_created").notNull().default(0),
+    errorSummary: text("error_summary"),
+    createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.blockedByRunId],
+      foreignColumns: [table.id],
+      name: "refresh_runs_blocked_by_run_id_refresh_runs_id_fk",
+    }),
+  ],
+);
+
+export const refreshLeases = pgTable("refresh_leases", {
   cityId: text("city_id")
-    .notNull()
+    .primaryKey()
     .references(() => cities.id),
-  trigger: text("trigger").notNull(),
-  status: text("status").notNull(),
-  triggeredBy: text("triggered_by").notNull(),
-  startedAt: timestamp("started_at", { mode: "string" }),
-  finishedAt: timestamp("finished_at", { mode: "string" }),
-  sourceTargetsChecked: integer("source_targets_checked").notNull().default(0),
-  sourceTargetsFailed: integer("source_targets_failed").notNull().default(0),
-  draftsCreated: integer("drafts_created").notNull().default(0),
-  updatesProposed: integer("updates_proposed").notNull().default(0),
-  duplicatesFlagged: integer("duplicates_flagged").notNull().default(0),
-  staleTasksCreated: integer("stale_tasks_created").notNull().default(0),
-  errorSummary: text("error_summary"),
-  createdAt: timestamp("created_at", { mode: "string" }).notNull(),
+  activeRunId: text("active_run_id")
+    .notNull()
+    .references(() => refreshRuns.id),
+  acquiredAt: timestamp("acquired_at", { mode: "string" }).notNull(),
 });
 
 export const refreshTargetOutcomes = pgTable(
