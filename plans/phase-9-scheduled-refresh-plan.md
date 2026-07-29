@@ -89,10 +89,10 @@ Protect the generalized refresh workflow with a database-backed Chicago lease. M
 - [x] Only one active refresh can hold the Chicago lease.
 - [x] A scheduled overlap creates a terminal skipped run linked to the active run and performs no source fetches.
 - [x] A manual overlap returns `409 Conflict` with the active run identifier and performs no source fetches.
-- [ ] Admin presents an active-run message instead of a generic refresh failure.
-- [ ] A lease older than the orphan threshold can be reconciled and reacquired safely.
-- [ ] Every acquired lease is released after successful, partial, failed, or exceptional completion.
-- [ ] Concurrency tests prove that racing refresh requests do not duplicate observations, review work, or target counters.
+- [x] Admin presents an active-run message instead of a generic refresh failure.
+- [x] A lease older than the orphan threshold can be reconciled and reacquired safely.
+- [x] Every acquired lease is released after successful, partial, failed, or exceptional completion.
+- [x] Concurrency tests prove that racing refresh requests do not duplicate observations, review work, or target counters.
 
 ---
 

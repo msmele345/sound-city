@@ -10,6 +10,7 @@ import type {
   CreateSourceEventObservationInput,
   CreateSourceOwnerInput,
   CreateSourceTargetInput,
+  RefreshLeaseRecord,
   RefreshRunLogRecord,
   RefreshRunRecord,
   RefreshTargetOutcomeRecord,
@@ -64,6 +65,7 @@ export type RefreshStore = {
   acquireRefreshLease(
     input: AcquireRefreshLeaseInput,
   ): Promise<AcquireRefreshLeaseResult>;
+  getRefreshLease(cityId: string): Promise<RefreshLeaseRecord | null>;
   releaseRefreshLease(cityId: string, runId: string): Promise<void>;
 
   // ── Refresh Target Outcomes ─────────────────────────────────

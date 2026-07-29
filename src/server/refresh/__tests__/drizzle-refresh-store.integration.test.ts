@@ -5,6 +5,11 @@ import postgres from "postgres";
 
 import * as schema from "../../db/schema";
 import { createDrizzleRefreshStore } from "../drizzle-refresh-store";
+import {
+  listRefreshRunsWithReconciliation,
+  RefreshLeaseConflictError,
+  runManualRefresh,
+} from "../engine";
 import type { RefreshStore } from "../refresh-store";
 import type { CreateReviewItemInput } from "../types";
 
@@ -144,6 +149,122 @@ describe.skipIf(!connectionString)(
       await expect(
         stores[0].listRefreshRuns("city_chicago"),
       ).resolves.toHaveLength(1);
+    });
+
+    it("reconciles an orphaned database lease before its owner starts running", async () => {
+      const acquired = await stores[0].acquireRefreshLease({
+        cityId: "city_chicago",
+        trigger: "manual",
+        triggeredBy: "admin-secret",
+        acquiredAt: "2026-07-28T10:00:00.000Z",
+      });
+      expect(acquired.acquired).toBe(true);
+      if (!acquired.acquired) {
+        throw new Error("Expected the fixture lease to be acquired");
+      }
+
+      const reconciled = await listRefreshRunsWithReconciliation(
+        stores[1],
+        "city_chicago",
+        {
+          now: new Date("2026-07-28T10:30:00.000Z"),
+          maxRunAgeMs: 60_000,
+        },
+      );
+      expect(reconciled).toEqual([
+        expect.objectContaining({
+          id: acquired.run.id,
+          status: "failed",
+          errorSummary: expect.stringMatching(/reconciled/i),
+        }),
+      ]);
+
+      const recovered = await stores[1].acquireRefreshLease({
+        cityId: "city_chicago",
+        trigger: "manual",
+        triggeredBy: "next-admin-secret",
+        acquiredAt: "2026-07-28T10:30:01.000Z",
+      });
+      expect(recovered.acquired).toBe(true);
+      if (recovered.acquired) {
+        await stores[1].releaseRefreshLease(
+          "city_chicago",
+          recovered.run.id,
+        );
+      }
+    });
+
+    it("single-flights full refreshes without duplicate durable work or counters", async () => {
+      const owner = await stores[0].createSourceOwner({
+        cityId: "city_chicago",
+        name: "Fixture Venue",
+        slug: "fixture-venue-race",
+        kind: "venue",
+        notes: "",
+      });
+      const target = await stores[0].createSourceTarget({
+        ownerId: owner.id,
+        cityId: "city_chicago",
+        url: "https://fixtures.sound-city.test/dev-static-race",
+        sourceType: "other",
+        parserStrategy: "dev-static",
+        trustLevel: "experimental",
+        enabled: true,
+        confidenceAdjustment: 0,
+        healthStatus: "healthy",
+        refreshCadence: "manual",
+        notes: "",
+      });
+
+      const attempts = await Promise.allSettled(
+        stores.map((store, index) =>
+          runManualRefresh(store, {
+            cityId: "city_chicago",
+            triggeredBy: `admin-secret-${index}`,
+            now: new Date("2026-07-28T12:00:00.000Z"),
+          }),
+        ),
+      );
+      const completed = attempts.filter(
+        (attempt) => attempt.status === "fulfilled",
+      );
+      const conflicted = attempts.filter(
+        (attempt) => attempt.status === "rejected",
+      );
+
+      expect(completed).toHaveLength(1);
+      expect(conflicted).toHaveLength(1);
+      expect(conflicted[0].reason).toBeInstanceOf(RefreshLeaseConflictError);
+
+      const items = await stores[0].listReviewItems("city_chicago");
+      expect(items).toHaveLength(4);
+      const observations = await Promise.all(
+        [
+          "fixture-new-late-shift",
+          "fixture-update-bunker-signal",
+          "fixture-dupe-afterhours-loop",
+          "fixture-stale-past-listing",
+        ].map((sourceEventKey) =>
+          stores[0].getSourceEventObservation(target.id, sourceEventKey),
+        ),
+      );
+      expect(observations.every(Boolean)).toBe(true);
+
+      await expect(
+        stores[0].listRefreshTargetOutcomes(completed[0].value.run.id),
+      ).resolves.toEqual([
+        expect.objectContaining({
+          candidateCount: 4,
+          createdCount: 4,
+          updatedCount: 0,
+          unchangedCount: 0,
+        }),
+      ]);
+      await expect(stores[0].getSourceTarget(target.id)).resolves.toMatchObject({
+        duplicateCount: 1,
+        failureCount: 0,
+        rejectionCount: 0,
+      });
     });
 
     it("serializes concurrent classification and creates one review item", async () => {

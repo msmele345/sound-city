@@ -69,6 +69,16 @@ function isoNow(date = new Date()) {
   return date.toISOString();
 }
 
+function storedTimestampMs(timestamp: string | null) {
+  if (!timestamp) {
+    return 0;
+  }
+  const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(timestamp);
+  return new Date(
+    hasTimeZone ? timestamp : `${timestamp.replace(" ", "T")}Z`,
+  ).getTime();
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Refresh failed";
 }
@@ -859,28 +869,58 @@ export async function listRefreshRunsWithReconciliation(
 ): Promise<RefreshRunRecord[]> {
   const now = options.now ?? new Date();
   const maxRunAgeMs = options.maxRunAgeMs ?? defaultMaxRunAgeMs;
-  const runs = await store.listRefreshRuns(cityId);
+  const [runs, lease] = await Promise.all([
+    store.listRefreshRuns(cityId),
+    store.getRefreshLease(cityId),
+  ]);
   const reconciled = await Promise.all(
     runs.map(async (run) => {
-      if (run.status !== "running") {
+      const ownsLease = lease?.activeRunId === run.id;
+      const isInFlight = run.status === "pending" || run.status === "running";
+      if (!isInFlight && !ownsLease) {
+        return run;
+      }
+      if (run.status === "pending" && !ownsLease) {
         return run;
       }
 
-      const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : 0;
-      const isOrphaned = !startedAt || now.getTime() - startedAt > maxRunAgeMs;
+      const activeSince = storedTimestampMs(
+        ownsLease ? lease.acquiredAt : run.startedAt,
+      );
+      const isOrphaned =
+        !activeSince || now.getTime() - activeSince > maxRunAgeMs;
       if (!isOrphaned) {
         return run;
       }
 
+      if (!isInFlight) {
+        try {
+          await log(store, run.id, {
+            level: "warning",
+            message:
+              "Orphaned refresh lease was released after terminal completion.",
+          });
+        } finally {
+          await store.releaseRefreshLease(cityId, run.id);
+        }
+        return run;
+      }
+
+      const reconciliationMessage =
+        "Refresh execution exceeded max duration and was reconciled.";
       const updated = await store.updateRefreshRun(run.id, {
         status: "failed",
         finishedAt: isoNow(now),
-        errorSummary: "Running refresh exceeded max duration and was reconciled.",
+        errorSummary: reconciliationMessage,
       });
-      await log(store, run.id, {
-        level: "error",
-        message: "Running refresh exceeded max duration and was reconciled.",
-      });
+      try {
+        await log(store, run.id, {
+          level: "error",
+          message: reconciliationMessage,
+        });
+      } finally {
+        await store.releaseRefreshLease(cityId, run.id);
+      }
       return updated;
     }),
   );

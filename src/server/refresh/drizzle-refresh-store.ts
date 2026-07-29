@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import type { RefreshStore } from "./refresh-store";
 import type {
+  RefreshLeaseRecord,
   RefreshRunLogRecord,
   RefreshRunRecord,
   RefreshTargetOutcomeRecord,
@@ -73,6 +74,12 @@ type RefreshRunRow = {
   staleTasksCreated: number;
   errorSummary: string | null;
   createdAt: string | Date;
+};
+
+type RefreshLeaseRow = {
+  cityId: string;
+  activeRunId: string;
+  acquiredAt: string | Date;
 };
 
 type RefreshRunLogRow = {
@@ -168,6 +175,7 @@ export type RefreshDbReader = {
     sourceOwners: FindManyTable<SourceOwnerRow>;
     sourceTargets: FindManyTable<SourceTargetRow>;
     refreshRuns: FindManyTable<RefreshRunRow>;
+    refreshLeases: FindManyTable<RefreshLeaseRow>;
     refreshTargetOutcomes: FindManyTable<RefreshTargetOutcomeRow>;
     refreshRunLogs: FindManyTable<RefreshRunLogRow>;
     reviewItems: FindManyTable<ReviewItemRow>;
@@ -243,6 +251,13 @@ function toSourceTarget(row: SourceTargetRow): SourceTargetRecord {
     lastFailureAt: normalizeDateOrNull(row.lastFailureAt),
     createdAt: normalizeDate(row.createdAt),
     updatedAt: normalizeDate(row.updatedAt),
+  };
+}
+
+function toRefreshLease(row: RefreshLeaseRow): RefreshLeaseRecord {
+  return {
+    ...row,
+    acquiredAt: normalizeDate(row.acquiredAt),
   };
 }
 
@@ -568,6 +583,12 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
           activeRunId: lease.activeRunId,
         };
       });
+    },
+
+    async getRefreshLease(cityId) {
+      const rows = await db.query.refreshLeases.findMany();
+      const row = rows.find((lease) => lease.cityId === cityId);
+      return row ? toRefreshLease(row) : null;
     },
 
     async releaseRefreshLease(cityId, runId) {

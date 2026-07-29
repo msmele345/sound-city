@@ -204,6 +204,12 @@ export function createSeedRefreshStore(
       }
     },
 
+    async getRefreshLease(cityId) {
+      return (
+        snapshot.refreshLeases.find((lease) => lease.cityId === cityId) ?? null
+      );
+    },
+
     async releaseRefreshLease(cityId, runId) {
       const index = snapshot.refreshLeases.findIndex(
         (lease) =>
