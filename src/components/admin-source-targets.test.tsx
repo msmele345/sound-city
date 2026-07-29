@@ -314,6 +314,53 @@ describe("AdminSourceTargets", () => {
     expect(screen.getByText(/bunker signal/i)).toBeInTheDocument();
   });
 
+  it("identifies the active run when a manual refresh overlaps", async () => {
+    const user = userEvent.setup();
+
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/admin/source-targets?city=chicago") {
+        return Promise.resolve({ ok: true, json: async () => refreshSnapshot });
+      }
+      if (
+        url === "/api/admin/refresh-runs?city=chicago" &&
+        init?.method === "POST"
+      ) {
+        return Promise.resolve({
+          ok: false,
+          status: 409,
+          json: async () => ({
+            error: "Refresh already active",
+            activeRunId: "refresh_run_city_chicago_active",
+          }),
+        });
+      }
+      if (url === "/api/admin/refresh-runs?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            runs: [],
+            outcomesByRun: {},
+            logsByRun: {},
+            reviewItems: [],
+          }),
+        });
+      }
+      return Promise.reject(new Error(`Unexpected fetch ${url}`));
+    });
+
+    render(<AdminSourceTargets allowDevParser={false} />);
+
+    await user.click(
+      await screen.findByRole("button", { name: /run refresh/i }),
+    );
+
+    expect(
+      screen.getByRole("alert", { name: /source targets status/i }),
+    ).toHaveTextContent(
+      /refresh already active.*refresh_run_city_chicago_active/i,
+    );
+  });
+
   it("summarizes partial refresh runs in source terms", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/admin/source-targets?city=chicago") {

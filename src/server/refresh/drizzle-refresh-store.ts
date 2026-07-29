@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { RefreshStore } from "./refresh-store";
 import type {
+  RefreshLeaseRecord,
   RefreshRunLogRecord,
   RefreshRunRecord,
   RefreshTargetOutcomeRecord,
@@ -62,6 +63,7 @@ type RefreshRunRow = {
   trigger: string;
   status: string;
   triggeredBy: string;
+  blockedByRunId: string | null;
   startedAt: string | Date | null;
   finishedAt: string | Date | null;
   sourceTargetsChecked: number;
@@ -72,6 +74,12 @@ type RefreshRunRow = {
   staleTasksCreated: number;
   errorSummary: string | null;
   createdAt: string | Date;
+};
+
+type RefreshLeaseRow = {
+  cityId: string;
+  activeRunId: string;
+  acquiredAt: string | Date;
 };
 
 type RefreshRunLogRow = {
@@ -167,6 +175,7 @@ export type RefreshDbReader = {
     sourceOwners: FindManyTable<SourceOwnerRow>;
     sourceTargets: FindManyTable<SourceTargetRow>;
     refreshRuns: FindManyTable<RefreshRunRow>;
+    refreshLeases: FindManyTable<RefreshLeaseRow>;
     refreshTargetOutcomes: FindManyTable<RefreshTargetOutcomeRow>;
     refreshRunLogs: FindManyTable<RefreshRunLogRow>;
     reviewItems: FindManyTable<ReviewItemRow>;
@@ -242,6 +251,13 @@ function toSourceTarget(row: SourceTargetRow): SourceTargetRecord {
     lastFailureAt: normalizeDateOrNull(row.lastFailureAt),
     createdAt: normalizeDate(row.createdAt),
     updatedAt: normalizeDate(row.updatedAt),
+  };
+}
+
+function toRefreshLease(row: RefreshLeaseRow): RefreshLeaseRecord {
+  return {
+    ...row,
+    acquiredAt: normalizeDate(row.acquiredAt),
   };
 }
 
@@ -491,6 +507,7 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         trigger: input.trigger,
         status: "pending",
         triggeredBy: input.triggeredBy,
+        blockedByRunId: null,
         startedAt: null,
         finishedAt: null,
         sourceTargetsChecked: 0,
@@ -506,6 +523,7 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         ...input,
         id,
         status: "pending",
+        blockedByRunId: null,
         startedAt: null,
         finishedAt: null,
         sourceTargetsChecked: 0,
@@ -529,6 +547,60 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
       const row = rows.find((r) => r.id === id);
       if (!row) throw new Error("Refresh run not found");
       return toRefreshRun(row);
+    },
+
+    async acquireRefreshLease(input) {
+      const writer = requireWriter(db);
+      const { acquiredAt, ...runInput } = input;
+      return writer.transaction(async (tx) => {
+        const transactionStore = createDrizzleRefreshStore(tx);
+        const run = await transactionStore.createRefreshRun(runInput);
+        const [lease] = await tx
+          .insert(schema.refreshLeases)
+          .values({
+            cityId: input.cityId,
+            activeRunId: run.id,
+            acquiredAt,
+          })
+          .onConflictDoUpdate({
+            target: schema.refreshLeases.cityId,
+            set: {
+              activeRunId: sql`${schema.refreshLeases.activeRunId}`,
+              acquiredAt: sql`${schema.refreshLeases.acquiredAt}`,
+            },
+          })
+          .returning({ activeRunId: schema.refreshLeases.activeRunId });
+
+        if (lease.activeRunId === run.id) {
+          return { acquired: true, run };
+        }
+
+        await tx
+          .delete(schema.refreshRuns)
+          .where(eq(schema.refreshRuns.id, run.id));
+        return {
+          acquired: false,
+          activeRunId: lease.activeRunId,
+        };
+      });
+    },
+
+    async getRefreshLease(cityId) {
+      const rows = await db.query.refreshLeases.findMany();
+      const row = rows.find((lease) => lease.cityId === cityId);
+      return row ? toRefreshLease(row) : null;
+    },
+
+    async releaseRefreshLease(cityId, runId) {
+      const writer = requireWriter(db);
+      await writer
+        .delete(schema.refreshLeases)
+        .where(
+          and(
+            eq(schema.refreshLeases.cityId, cityId),
+            eq(schema.refreshLeases.activeRunId, runId),
+          ),
+        );
     },
 
     // ── Refresh Target Outcomes ────────────────────────────────

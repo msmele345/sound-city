@@ -11,6 +11,7 @@ import type {
   RefreshRunRecord,
   RefreshTargetOutcomeRecord,
   ReviewItemRecord,
+  RunTrigger,
   RunStatus,
   SourceTargetRecord,
   UpdateReviewItemInput,
@@ -24,6 +25,10 @@ type RunManualRefreshInput = {
   triggeredBy: string;
   now?: Date;
   fetcher?: Fetcher;
+};
+
+type RunRefreshInput = RunManualRefreshInput & {
+  trigger: RunTrigger;
 };
 
 type RefreshRunResult = {
@@ -64,8 +69,25 @@ function isoNow(date = new Date()) {
   return date.toISOString();
 }
 
+function storedTimestampMs(timestamp: string | null) {
+  if (!timestamp) {
+    return 0;
+  }
+  const hasTimeZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(timestamp);
+  return new Date(
+    hasTimeZone ? timestamp : `${timestamp.replace(" ", "T")}Z`,
+  ).getTime();
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Refresh failed";
+}
+
+export class RefreshLeaseConflictError extends Error {
+  constructor(public readonly activeRunId: string) {
+    super(`Refresh already active: ${activeRunId}`);
+    this.name = "RefreshLeaseConflictError";
+  }
 }
 
 function unsupportedParserMessage(target: SourceTargetRecord) {
@@ -333,17 +355,62 @@ async function createStaleTasksForPastEvents(
   return items;
 }
 
-export async function runManualRefresh(
+async function runRefresh(
   store: RefreshStore,
-  input: RunManualRefreshInput,
+  input: RunRefreshInput,
   catalogStore?: CatalogReader,
 ): Promise<RefreshRunResult> {
-  const created = await store.createRefreshRun({
-    cityId: input.cityId,
-    trigger: "manual",
-    triggeredBy: input.triggeredBy,
-  });
   const startedAt = isoNow(input.now);
+  const acquisition = await store.acquireRefreshLease({
+    cityId: input.cityId,
+    trigger: input.trigger,
+    triggeredBy: input.triggeredBy,
+    acquiredAt: startedAt,
+  });
+  if (!acquisition.acquired) {
+    if (input.trigger === "manual") {
+      throw new RefreshLeaseConflictError(acquisition.activeRunId);
+    }
+
+    const created = await store.createRefreshRun({
+      cityId: input.cityId,
+      trigger: input.trigger,
+      triggeredBy: input.triggeredBy,
+    });
+    const skipped = await store.updateRefreshRun(created.id, {
+      status: "skipped",
+      blockedByRunId: acquisition.activeRunId,
+      finishedAt: startedAt,
+    });
+    await log(store, skipped.id, {
+      level: "info",
+      message: "Refresh run skipped because another run is active",
+      metadata: { activeRunId: acquisition.activeRunId },
+    });
+    return { run: skipped, reviewItems: [] };
+  }
+
+  const created = acquisition.run;
+  try {
+    return await executeRefresh(
+      store,
+      input,
+      catalogStore,
+      created,
+      startedAt,
+    );
+  } finally {
+    await store.releaseRefreshLease(input.cityId, created.id);
+  }
+}
+
+async function executeRefresh(
+  store: RefreshStore,
+  input: RunRefreshInput,
+  catalogStore: CatalogReader | undefined,
+  created: RefreshRunRecord,
+  startedAt: string,
+): Promise<RefreshRunResult> {
   let metrics = { ...emptyMetrics };
   let errorSummary: string | null = null;
   const reviewItems: ReviewItemRecord[] = [];
@@ -779,6 +846,22 @@ export async function runManualRefresh(
   return { run, reviewItems };
 }
 
+export function runManualRefresh(
+  store: RefreshStore,
+  input: RunManualRefreshInput,
+  catalogStore?: CatalogReader,
+): Promise<RefreshRunResult> {
+  return runRefresh(store, { ...input, trigger: "manual" }, catalogStore);
+}
+
+export function runScheduledRefresh(
+  store: RefreshStore,
+  input: RunManualRefreshInput,
+  catalogStore?: CatalogReader,
+): Promise<RefreshRunResult> {
+  return runRefresh(store, { ...input, trigger: "scheduled" }, catalogStore);
+}
+
 export async function listRefreshRunsWithReconciliation(
   store: RefreshStore,
   cityId: string,
@@ -786,28 +869,58 @@ export async function listRefreshRunsWithReconciliation(
 ): Promise<RefreshRunRecord[]> {
   const now = options.now ?? new Date();
   const maxRunAgeMs = options.maxRunAgeMs ?? defaultMaxRunAgeMs;
-  const runs = await store.listRefreshRuns(cityId);
+  const [runs, lease] = await Promise.all([
+    store.listRefreshRuns(cityId),
+    store.getRefreshLease(cityId),
+  ]);
   const reconciled = await Promise.all(
     runs.map(async (run) => {
-      if (run.status !== "running") {
+      const ownsLease = lease?.activeRunId === run.id;
+      const isInFlight = run.status === "pending" || run.status === "running";
+      if (!isInFlight && !ownsLease) {
+        return run;
+      }
+      if (run.status === "pending" && !ownsLease) {
         return run;
       }
 
-      const startedAt = run.startedAt ? new Date(run.startedAt).getTime() : 0;
-      const isOrphaned = !startedAt || now.getTime() - startedAt > maxRunAgeMs;
+      const activeSince = storedTimestampMs(
+        ownsLease ? lease.acquiredAt : run.startedAt,
+      );
+      const isOrphaned =
+        !activeSince || now.getTime() - activeSince > maxRunAgeMs;
       if (!isOrphaned) {
         return run;
       }
 
+      if (!isInFlight) {
+        try {
+          await log(store, run.id, {
+            level: "warning",
+            message:
+              "Orphaned refresh lease was released after terminal completion.",
+          });
+        } finally {
+          await store.releaseRefreshLease(cityId, run.id);
+        }
+        return run;
+      }
+
+      const reconciliationMessage =
+        "Refresh execution exceeded max duration and was reconciled.";
       const updated = await store.updateRefreshRun(run.id, {
         status: "failed",
         finishedAt: isoNow(now),
-        errorSummary: "Running refresh exceeded max duration and was reconciled.",
+        errorSummary: reconciliationMessage,
       });
-      await log(store, run.id, {
-        level: "error",
-        message: "Running refresh exceeded max duration and was reconciled.",
-      });
+      try {
+        await log(store, run.id, {
+          level: "error",
+          message: reconciliationMessage,
+        });
+      } finally {
+        await store.releaseRefreshLease(cityId, run.id);
+      }
       return updated;
     }),
   );

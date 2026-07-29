@@ -970,10 +970,17 @@ export function AdminSourceTargets({
         outcomes?: RefreshTargetOutcomeRecord[];
         reviewItems?: ReviewItemRecord[];
         error?: string;
+        activeRunId?: string;
       };
       if (!response.ok || !body.run) {
         if (response.status === 401) {
           setRequiresSecret(true);
+        }
+        if (response.status === 409 && body.activeRunId) {
+          throw new RefreshRequestError(
+            response.status,
+            `Refresh already active — active run ${body.activeRunId}`,
+          );
         }
         throw new RefreshRequestError(
           response.status,

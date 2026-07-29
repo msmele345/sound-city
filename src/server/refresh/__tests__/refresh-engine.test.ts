@@ -1,7 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createSeedCatalogStore } from "../../catalog/catalog-store";
-import { runManualRefresh, listRefreshRunsWithReconciliation } from "../engine";
+import {
+  listRefreshRunsWithReconciliation,
+  RefreshLeaseConflictError,
+  runManualRefresh,
+  runScheduledRefresh,
+} from "../engine";
 import { approveReviewItem, rejectReviewItem } from "../review-operations";
 import { createSeedRefreshStore } from "../store";
 import type { RefreshStore } from "../refresh-store";
@@ -22,6 +27,30 @@ async function createDevTarget(store: RefreshStore) {
     url: "https://fixtures.sound-city.test/dev-static",
     sourceType: "other",
     parserStrategy: "dev-static",
+    trustLevel: "experimental",
+    enabled: true,
+    confidenceAdjustment: 0,
+    healthStatus: "healthy",
+    refreshCadence: "manual",
+    notes: "",
+  });
+}
+
+async function createUnsupportedTarget(store: RefreshStore) {
+  const owner = await store.createSourceOwner({
+    cityId: "city_chicago",
+    name: "Unsupported Fixture",
+    slug: "unsupported-fixture",
+    kind: "venue",
+    notes: "",
+  });
+
+  return store.createSourceTarget({
+    ownerId: owner.id,
+    cityId: "city_chicago",
+    url: "https://fixtures.sound-city.test/unsupported",
+    sourceType: "artist-social",
+    parserStrategy: "artist-social",
     trustLevel: "experimental",
     enabled: true,
     confidenceAdjustment: 0,
@@ -523,14 +552,19 @@ describe("refresh engine", () => {
     });
   });
 
-  it("reconciles orphaned running runs when run history is read", async () => {
+  it("reconciles an orphaned lease and permits a new refresh", async () => {
     const store = createSeedRefreshStore();
-    const run = await store.createRefreshRun({
+    const acquired = await store.acquireRefreshLease({
       cityId: "city_chicago",
       trigger: "manual",
       triggeredBy: "admin-secret",
+      acquiredAt: "2026-06-12T10:00:00.000Z",
     });
-    await store.updateRefreshRun(run.id, {
+    expect(acquired.acquired).toBe(true);
+    if (!acquired.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+    await store.updateRefreshRun(acquired.run.id, {
       status: "running",
       startedAt: "2026-06-12T10:00:00.000Z",
     });
@@ -541,11 +575,94 @@ describe("refresh engine", () => {
     });
 
     expect(runs[0]).toMatchObject({
-      id: run.id,
+      id: acquired.run.id,
       status: "failed",
       errorSummary: expect.stringMatching(/reconciled/i),
     });
     expect(runs[0].finishedAt).toBe("2026-06-12T10:30:00.000Z");
+
+    const recovered = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: new Date("2026-06-12T10:30:01.000Z"),
+    });
+
+    expect(recovered.run).toMatchObject({
+      status: "succeeded",
+      sourceTargetsChecked: 0,
+    });
+    expect(recovered.run.id).not.toBe(acquired.run.id);
+  });
+
+  it("reconciles an orphaned lease whose owner never started running", async () => {
+    const store = createSeedRefreshStore();
+    const acquired = await store.acquireRefreshLease({
+      cityId: "city_chicago",
+      trigger: "manual",
+      triggeredBy: "admin-secret",
+      acquiredAt: "2026-06-12T10:00:00.000Z",
+    });
+    expect(acquired.acquired).toBe(true);
+    if (!acquired.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+
+    const runs = await listRefreshRunsWithReconciliation(store, "city_chicago", {
+      now: new Date("2026-06-12T10:30:00.000Z"),
+      maxRunAgeMs: 60_000,
+    });
+
+    expect(runs[0]).toMatchObject({
+      id: acquired.run.id,
+      status: "failed",
+      errorSummary: expect.stringMatching(/reconciled/i),
+    });
+
+    const recovered = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: new Date("2026-06-12T10:30:01.000Z"),
+    });
+    expect(recovered.run.status).toBe("succeeded");
+    expect(recovered.run.id).not.toBe(acquired.run.id);
+  });
+
+  it("releases an orphaned lease without overwriting its terminal run", async () => {
+    const store = createSeedRefreshStore();
+    const acquired = await store.acquireRefreshLease({
+      cityId: "city_chicago",
+      trigger: "manual",
+      triggeredBy: "admin-secret",
+      acquiredAt: "2026-06-12T10:00:00.000Z",
+    });
+    expect(acquired.acquired).toBe(true);
+    if (!acquired.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+    await store.updateRefreshRun(acquired.run.id, {
+      status: "succeeded",
+      startedAt: "2026-06-12T10:00:00.000Z",
+      finishedAt: "2026-06-12T10:00:01.000Z",
+    });
+
+    const runs = await listRefreshRunsWithReconciliation(store, "city_chicago", {
+      now: new Date("2026-06-12T10:30:00.000Z"),
+      maxRunAgeMs: 60_000,
+    });
+
+    expect(runs[0]).toMatchObject({
+      id: acquired.run.id,
+      status: "succeeded",
+      errorSummary: null,
+    });
+
+    const recovered = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      now: new Date("2026-06-12T10:30:01.000Z"),
+    });
+    expect(recovered.run.status).toBe("succeeded");
+    expect(recovered.run.id).not.toBe(acquired.run.id);
   });
 
   it("creates stale tasks for past events when a catalog store is provided", async () => {
@@ -1156,44 +1273,218 @@ describe("refresh engine", () => {
     });
   });
 
-  it("classifies concurrent first sightings atomically without duplicate review work", async () => {
+  it("records a scheduled overlap as skipped without fetching sources", async () => {
     const store = createSeedRefreshStore();
-    const { target, fetcher } = await createRssObservationFixture(store);
+    await createRssObservationFixture(store);
+    const active = await store.acquireRefreshLease({
+      cityId: "city_chicago",
+      trigger: "manual",
+      triggeredBy: "admin-secret",
+      acquiredAt: "2026-07-27T12:00:00.000Z",
+    });
+    expect(active.acquired).toBe(true);
+    if (!active.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+    const fetcher = vi.fn();
 
-    const results = await Promise.all([
+    const result = await runScheduledRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "vercel-cron",
+      now: new Date("2026-07-27T12:00:01.000Z"),
+      fetcher,
+    });
+
+    expect(result.run).toMatchObject({
+      trigger: "scheduled",
+      status: "skipped",
+      blockedByRunId: active.run.id,
+      startedAt: null,
+      finishedAt: "2026-07-27T12:00:01.000Z",
+      sourceTargetsChecked: 0,
+    });
+    expect(result.reviewItems).toEqual([]);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("rejects a manual overlap with the active run and no source fetch", async () => {
+    const store = createSeedRefreshStore();
+    await createRssObservationFixture(store);
+    const active = await store.acquireRefreshLease({
+      cityId: "city_chicago",
+      trigger: "scheduled",
+      triggeredBy: "vercel-cron",
+      acquiredAt: "2026-07-27T12:00:00.000Z",
+    });
+    expect(active.acquired).toBe(true);
+    if (!active.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+    const fetcher = vi.fn();
+
+    await expect(
+      runManualRefresh(store, {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+        now: new Date("2026-07-27T12:00:01.000Z"),
+        fetcher,
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining<Partial<RefreshLeaseConflictError>>({
+        name: "RefreshLeaseConflictError",
+        activeRunId: active.run.id,
+      }),
+    );
+    expect(fetcher).not.toHaveBeenCalled();
+    await expect(store.listRefreshRuns("city_chicago")).resolves.toEqual([
+      expect.objectContaining({ id: active.run.id }),
+    ]);
+  });
+
+  it.each([
+    {
+      terminalStatus: "succeeded",
+      arrange: async (store: RefreshStore) => {
+        await createDevTarget(store);
+      },
+    },
+    {
+      terminalStatus: "partial",
+      arrange: async (store: RefreshStore) => {
+        await createDevTarget(store);
+        await createUnsupportedTarget(store);
+      },
+    },
+    {
+      terminalStatus: "failed",
+      arrange: async (store: RefreshStore) => {
+        await createUnsupportedTarget(store);
+      },
+    },
+  ] as const)(
+    "releases the lease after $terminalStatus completion",
+    async ({ terminalStatus, arrange }) => {
+      const store = createSeedRefreshStore();
+      await arrange(store);
+
+      const result = await runManualRefresh(store, {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+      });
+      expect(result.run.status).toBe(terminalStatus);
+
+      const next = await store.acquireRefreshLease({
+        cityId: "city_chicago",
+        trigger: "manual",
+        triggeredBy: "next-admin-secret",
+        acquiredAt: "2026-07-28T12:00:00.000Z",
+      });
+      expect(next.acquired).toBe(true);
+      if (next.acquired) {
+        await store.releaseRefreshLease("city_chicago", next.run.id);
+      }
+    },
+  );
+
+  it("releases the lease when refresh execution exits exceptionally", async () => {
+    const store = createSeedRefreshStore();
+    const faultingStore: RefreshStore = {
+      ...store,
+      async updateRefreshRun(id, updates) {
+        if (updates.status === "running") {
+          throw new Error("Refresh persistence unavailable");
+        }
+        return store.updateRefreshRun(id, updates);
+      },
+    };
+
+    await expect(
+      runManualRefresh(faultingStore, {
+        cityId: "city_chicago",
+        triggeredBy: "admin-secret",
+      }),
+    ).rejects.toThrow("Refresh persistence unavailable");
+
+    const next = await store.acquireRefreshLease({
+      cityId: "city_chicago",
+      trigger: "manual",
+      triggeredBy: "next-admin-secret",
+      acquiredAt: "2026-07-28T12:00:00.000Z",
+    });
+    expect(next.acquired).toBe(true);
+    if (next.acquired) {
+      await store.releaseRefreshLease("city_chicago", next.run.id);
+    }
+  });
+
+  it("single-flights racing refreshes without duplicate observations, review work, or target counters", async () => {
+    const store = createSeedRefreshStore();
+    const target = await createDevTarget(store);
+
+    const attempts = await Promise.allSettled([
       runManualRefresh(store, {
         cityId: "city_chicago",
         triggeredBy: "admin-secret-a",
         now: new Date("2026-07-11T12:00:00.000Z"),
-        fetcher,
       }),
       runManualRefresh(store, {
         cityId: "city_chicago",
         triggeredBy: "admin-secret-b",
         now: new Date("2026-07-11T12:00:00.000Z"),
-        fetcher,
       }),
     ]);
+    const completed = attempts.filter(
+      (attempt) => attempt.status === "fulfilled",
+    );
+    const conflicted = attempts.filter(
+      (attempt) => attempt.status === "rejected",
+    );
 
-    expect(results.map(({ run }) => run.status)).toEqual([
-      "succeeded",
-      "succeeded",
-    ]);
-    expect(new Set(results.map(({ run }) => run.id)).size).toBe(2);
-    expect(
-      results.reduce(
-        (total, result) => total + result.reviewItems.length,
-        0,
-      ),
-    ).toBe(1);
+    expect(completed).toHaveLength(1);
+    expect(completed[0].value.run.status).toBe("succeeded");
+    expect(completed[0].value.reviewItems).toHaveLength(4);
+    expect(conflicted).toHaveLength(1);
+    expect(conflicted[0].reason).toEqual(
+      expect.objectContaining({
+        name: "RefreshLeaseConflictError",
+        activeRunId: completed[0].value.run.id,
+      }),
+    );
 
     const items = await store.listReviewItems("city_chicago");
-    expect(items).toHaveLength(1);
+    expect(items).toHaveLength(4);
+    const observations = await Promise.all(
+      [
+        "fixture-new-late-shift",
+        "fixture-update-bunker-signal",
+        "fixture-dupe-afterhours-loop",
+        "fixture-stale-past-listing",
+      ].map((sourceEventKey) =>
+        store.getSourceEventObservation(target.id, sourceEventKey),
+      ),
+    );
+    expect(observations).toHaveLength(4);
+    expect(observations.every(Boolean)).toBe(true);
+    expect(
+      observations.every((observation) =>
+        items.some((item) => item.id === observation?.latestReviewItemId),
+      ),
+    ).toBe(true);
+
     await expect(
-      store.getSourceEventObservation(target.id, "smartbar-event-42"),
-    ).resolves.toMatchObject({
-      latestReviewItemId: items[0].id,
-      lastSeenAt: "2026-07-11T12:00:00.000Z",
+      store.listRefreshTargetOutcomes(completed[0].value.run.id),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        candidateCount: 4,
+        createdCount: 4,
+        updatedCount: 0,
+        unchangedCount: 0,
+      }),
+    ]);
+    await expect(store.getSourceTarget(target.id)).resolves.toMatchObject({
+      duplicateCount: 1,
+      failureCount: 0,
+      rejectionCount: 0,
     });
   });
 

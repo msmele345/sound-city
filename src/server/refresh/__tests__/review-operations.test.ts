@@ -87,6 +87,7 @@ function createRefreshStoreWithTarget(): RefreshStore {
     sourceOwners: [owner],
     sourceTargets: [target],
     refreshRuns: [],
+    refreshLeases: [],
     refreshTargetOutcomes: [],
     runLogs: [],
     reviewItems: [],

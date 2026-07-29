@@ -1,0 +1,2 @@
+ALTER TABLE "refresh_runs" ADD COLUMN "blocked_by_run_id" text;--> statement-breakpoint
+ALTER TABLE "refresh_runs" ADD CONSTRAINT "refresh_runs_blocked_by_run_id_refresh_runs_id_fk" FOREIGN KEY ("blocked_by_run_id") REFERENCES "public"."refresh_runs"("id") ON DELETE no action ON UPDATE no action;
