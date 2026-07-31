@@ -1,11 +1,11 @@
 import type { CatalogReader } from "../catalog/catalog-store";
 import { parseDevStaticTarget } from "./dev-parser";
+import { externalFetcher } from "./external-fetcher";
 import { deriveSourceTargetHealth } from "./health";
 import type { RefreshStore } from "./refresh-store";
 import { parseRssEventFeedTarget } from "./rss-event-feed-parser";
 import type {
   CreateReviewItemInput,
-  FetchResult,
   Fetcher,
   ParserCandidate,
   RefreshRunRecord,
@@ -110,18 +110,6 @@ const emptyRequestTelemetry: RequestTelemetry = {
   retryCount: 0,
   finalUrl: null,
 };
-
-async function defaultFetcher(
-  url: string,
-): Promise<FetchResult> {
-  const response = await fetch(url);
-  return {
-    body: await response.text(),
-    contentType: response.headers.get("content-type") ?? "",
-    status: response.status,
-    finalUrl: response.url,
-  };
-}
 
 function terminalStatus(
   outcomes: RefreshTargetOutcomeRecord[],
@@ -452,7 +440,7 @@ async function executeRefresh(
         await store.updateSourceTarget(target.id, {
           lastFetchedAt: fetchedAt,
         });
-        const fetcher: Fetcher = input.fetcher ?? defaultFetcher;
+        const fetcher: Fetcher = input.fetcher ?? externalFetcher;
         const recordingFetcher: Fetcher = async (url) => {
           const requestStartedAt = Date.now();
           try {

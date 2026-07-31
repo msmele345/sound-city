@@ -255,21 +255,16 @@ describe("refresh engine", () => {
     expect(outcome.responseSizeBytes).toBeGreaterThan(0);
   });
 
-  it("records the final response URL after a production fetch redirect", async () => {
+  it("records the final response URL supplied by the fetch boundary", async () => {
     const store = createSeedRefreshStore();
     const { fetcher } = await createRssObservationFixture(store);
     const fetched = await fetcher();
     const finalUrl = "https://feeds.smartbarchicago.com/events.xml";
-    vi.stubGlobal("fetch", async () => ({
-      text: async () => fetched.body,
-      headers: { get: () => fetched.contentType },
-      status: fetched.status,
-      url: finalUrl,
-    }));
 
     const result = await runManualRefresh(store, {
       cityId: "city_chicago",
       triggeredBy: "admin-secret",
+      fetcher: async () => ({ ...fetched, finalUrl }),
     });
 
     const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
