@@ -82,6 +82,8 @@ export function createSeedRefreshStore(
         failureCount: 0,
         rejectionCount: 0,
         duplicateCount: 0,
+        etag: null,
+        lastModified: null,
         lastFetchedAt: null,
         lastSuccessfulRunAt: null,
         lastFailureAt: null,
@@ -96,7 +98,17 @@ export function createSeedRefreshStore(
     async updateSourceTarget(id, input) {
       const index = snapshot.sourceTargets.findIndex((t) => t.id === id);
       if (index === -1) throw new Error("Source target not found");
-      const updated = { ...snapshot.sourceTargets[index], ...input, updatedAt: now() };
+      const current = snapshot.sourceTargets[index];
+      const validators =
+        input.url !== undefined && input.url !== current.url
+          ? { etag: null, lastModified: null }
+          : {};
+      const updated = {
+        ...current,
+        ...input,
+        ...validators,
+        updatedAt: now(),
+      };
       snapshot.sourceTargets[index] = updated;
       return updated;
     },

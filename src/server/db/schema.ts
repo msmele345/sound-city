@@ -142,6 +142,8 @@ export const sourceTargets = pgTable("source_targets", {
   rejectionCount: integer("rejection_count").notNull().default(0),
   duplicateCount: integer("duplicate_count").notNull().default(0),
   refreshCadence: text("refresh_cadence").notNull().default("daily"),
+  etag: text("etag"),
+  lastModified: text("last_modified"),
   lastFetchedAt: timestamp("last_fetched_at", { mode: "string" }),
   lastSuccessfulRunAt: timestamp("last_successful_run_at", { mode: "string" }),
   lastFailureAt: timestamp("last_failure_at", { mode: "string" }),

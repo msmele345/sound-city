@@ -71,6 +71,10 @@ export async function parseVenueCalendarTarget(
 ): Promise<ParserCandidate[]> {
   const result = await fetcher(target.url);
 
+  if (result.status === 304) {
+    return [];
+  }
+
   if (result.status < 200 || result.status >= 300) {
     throw new Error(
       `Venue calendar fetch failed with status ${result.status}`,

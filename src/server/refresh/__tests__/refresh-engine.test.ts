@@ -7,9 +7,11 @@ import {
   runManualRefresh,
   runScheduledRefresh,
 } from "../engine";
+import { createExternalFetcher } from "../external-fetcher";
 import { approveReviewItem, rejectReviewItem } from "../review-operations";
 import { createSeedRefreshStore } from "../store";
 import type { RefreshStore } from "../refresh-store";
+import type { Fetcher } from "../types";
 import type { CatalogStore } from "../../catalog/catalog-store";
 
 async function createDevTarget(store: RefreshStore) {
@@ -226,14 +228,22 @@ describe("refresh engine", () => {
 
   it("records counts, timestamps, errors, and request telemetry for a successful target", async () => {
     const store = createSeedRefreshStore();
-    const { target, fetcher } = await createRssObservationFixture(store);
+    const { fetcher } = await createRssObservationFixture(store);
     const now = new Date("2026-06-20T12:00:00.000Z");
+    const fetched = await fetcher();
+    const finalUrl = "https://feeds.smartbarchicago.com/events.xml";
 
     const result = await runManualRefresh(store, {
       cityId: "city_chicago",
       triggeredBy: "admin-secret",
       now,
-      fetcher,
+      fetcher: async () => ({
+        ...fetched,
+        durationMs: 127,
+        responseSizeBytes: 2_048,
+        retryCount: 1,
+        finalUrl,
+      }),
     });
 
     const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
@@ -247,12 +257,13 @@ describe("refresh engine", () => {
       unchangedCount: 0,
       warningCount: 0,
       errorDetails: null,
+      requestDurationMs: 127,
       responseStatus: 200,
-      retryCount: 0,
-      finalUrl: target.url,
+      responseSizeBytes: 2_048,
+      retryCount: 1,
+      finalUrl,
     });
-    expect(outcome.requestDurationMs).toBeGreaterThanOrEqual(0);
-    expect(outcome.responseSizeBytes).toBeGreaterThan(0);
+    expect(outcome).not.toHaveProperty("body");
   });
 
   it("records the final response URL supplied by the fetch boundary", async () => {
@@ -318,6 +329,63 @@ describe("refresh engine", () => {
       createdCount: 0,
       updatedCount: 0,
       unchangedCount: 1,
+    });
+  });
+
+  it("uses stored validators and records a 304 response as unchanged", async () => {
+    const store = createSeedRefreshStore();
+    const { target, fetcher: fixtureFetcher } =
+      await createRssObservationFixture(store);
+    const fixture = await fixtureFetcher();
+    let attempt = 0;
+    const fetcher = vi.fn<Fetcher>(async () => {
+      attempt += 1;
+      return attempt === 1
+        ? {
+            ...fixture,
+            etag: '"smartbar-v1"',
+            lastModified: "Thu, 30 Jul 2026 23:24:44 GMT",
+          }
+        : {
+            body: "",
+            contentType: "",
+            status: 304,
+            etag: '"smartbar-v1"',
+            lastModified: "Thu, 30 Jul 2026 23:24:44 GMT",
+            responseSizeBytes: 0,
+          };
+    });
+
+    await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    const repeated = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(fetcher.mock.calls[1]?.[1]).toEqual({
+      etag: '"smartbar-v1"',
+      lastModified: "Thu, 30 Jul 2026 23:24:44 GMT",
+    });
+    expect(repeated.run.status).toBe("succeeded");
+    expect(repeated.reviewItems).toHaveLength(0);
+    const [outcome] = await store.listRefreshTargetOutcomes(repeated.run.id);
+    expect(outcome).toMatchObject({
+      status: "unchanged",
+      candidateCount: 0,
+      createdCount: 0,
+      updatedCount: 0,
+      unchangedCount: 0,
+      responseStatus: 304,
+      responseSizeBytes: 0,
+    });
+    await expect(store.getSourceTarget(target.id)).resolves.toMatchObject({
+      etag: '"smartbar-v1"',
+      lastModified: "Thu, 30 Jul 2026 23:24:44 GMT",
     });
   });
 
@@ -1118,7 +1186,7 @@ describe("refresh engine", () => {
     expect(result.reviewItems[0]).toMatchObject({
       lane: "new-event",
       sourceTargetId: target.id,
-      parserVersion: "rss-event-feed@1",
+      parserVersion: "rss-event-feed@2",
     });
     expect(result.reviewItems[0].normalizedDraft).toMatchObject({
       title: "Queen! with Derrick Carter",
@@ -1225,7 +1293,7 @@ describe("refresh engine", () => {
       evidence: {
         ...reviewItem.evidence,
         contentHashes: reviewItem.evidence.contentHashes.map((hash) =>
-          hash.replace("rss-event-feed@1", "rss-event-feed@0"),
+          hash.replace("rss-event-feed@2", "rss-event-feed@0"),
         ),
       },
       parserVersion: "rss-event-feed@0",
@@ -1248,9 +1316,9 @@ describe("refresh engine", () => {
       {
         id: reviewItem.id,
         evidence: {
-          contentHashes: [expect.stringContaining("rss-event-feed@1")],
+          contentHashes: [expect.stringContaining("rss-event-feed@2")],
         },
-        parserVersion: "rss-event-feed@1",
+        parserVersion: "rss-event-feed@2",
       },
     ]);
     expect(
@@ -1264,7 +1332,7 @@ describe("refresh engine", () => {
       lastSeenAt: upgradedAt.toISOString(),
       lastChangedAt: firstSeenAt.toISOString(),
       latestReviewItemId: reviewItem.id,
-      parserVersion: "rss-event-feed@1",
+      parserVersion: "rss-event-feed@2",
     });
   });
 
@@ -2136,5 +2204,35 @@ describe("refresh engine", () => {
 
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.failureCount).toBe(1);
+  });
+
+  it("records retry telemetry when both network attempts fail", async () => {
+    const store = createSeedRefreshStore();
+    const { target } = await createRssObservationFixture(store);
+    const fetcher = createExternalFetcher({
+      resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
+      transport: async () => {
+        throw Object.assign(new Error("socket reset"), {
+          code: "ECONNRESET",
+        });
+      },
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(result.run.status).toBe("failed");
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "failed",
+      responseStatus: null,
+      responseSizeBytes: null,
+      retryCount: 1,
+      finalUrl: target.url,
+    });
+    expect(outcome.requestDurationMs).toBeGreaterThanOrEqual(0);
   });
 });

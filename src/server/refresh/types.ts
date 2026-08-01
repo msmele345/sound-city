@@ -15,13 +15,35 @@ export type FetchResult = {
   body: string;
   contentType: string;
   status: number;
+  etag?: string;
+  lastModified?: string;
   durationMs?: number;
   responseSizeBytes?: number;
   retryCount?: number;
   finalUrl?: string;
 };
 
-export type Fetcher = (url: string) => Promise<FetchResult>;
+export type FetchValidators = {
+  etag?: string | null;
+  lastModified?: string | null;
+};
+
+export type FetchFailureTelemetry = {
+  requestDurationMs?: number | null;
+  responseStatus?: number | null;
+  responseSizeBytes?: number | null;
+  retryCount?: number;
+  finalUrl?: string | null;
+};
+
+export type FetchFailure = Error & {
+  fetchTelemetry?: FetchFailureTelemetry;
+};
+
+export type Fetcher = (
+  url: string,
+  validators?: FetchValidators,
+) => Promise<FetchResult>;
 
 export type CreateSourceOwnerInput = Omit<
   SourceOwnerRecord,
@@ -67,6 +89,8 @@ export type SourceTargetRecord = {
   rejectionCount: number;
   duplicateCount: number;
   refreshCadence: string;
+  etag: string | null;
+  lastModified: string | null;
   lastFetchedAt: string | null;
   lastSuccessfulRunAt: string | null;
   lastFailureAt: string | null;
@@ -82,6 +106,8 @@ export type CreateSourceTargetInput = Omit<
   | "failureCount"
   | "rejectionCount"
   | "duplicateCount"
+  | "etag"
+  | "lastModified"
   | "lastFetchedAt"
   | "lastSuccessfulRunAt"
   | "lastFailureAt"
@@ -101,6 +127,8 @@ export type UpdateSourceTargetInput = Partial<
     | "confidenceAdjustment"
     | "healthStatus"
     | "refreshCadence"
+    | "etag"
+    | "lastModified"
     | "notes"
     | "lastFetchedAt"
     | "lastSuccessfulRunAt"

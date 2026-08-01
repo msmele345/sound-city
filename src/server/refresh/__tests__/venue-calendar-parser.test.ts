@@ -18,6 +18,8 @@ function createTarget(overrides: Partial<SourceTargetRecord> = {}): SourceTarget
     rejectionCount: 0,
     duplicateCount: 0,
     refreshCadence: "daily",
+    etag: null,
+    lastModified: null,
     lastFetchedAt: null,
     lastSuccessfulRunAt: null,
     lastFailureAt: null,

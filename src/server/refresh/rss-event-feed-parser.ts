@@ -1,4 +1,5 @@
 import { normalizeStyleTags } from "@/lib/style-normalization";
+import { XMLParser, XMLValidator } from "fast-xml-parser";
 
 import {
   buildMatchFingerprint,
@@ -12,8 +13,14 @@ import type {
   SourceTargetRecord,
 } from "./types";
 
-const parserVersion = "rss-event-feed@1";
+const parserVersion = "rss-event-feed@2";
 const chicagoTimeZone = "America/Chicago";
+const rssXmlParser = new XMLParser({
+  ignoreAttributes: false,
+  parseTagValue: false,
+  processEntities: false,
+  trimValues: false,
+});
 
 type RssItem = {
   guid: string;
@@ -33,11 +40,15 @@ function clampConfidence(value: number): number {
 
 function decodeXmlEntities(value: string): string {
   return value
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, "\"")
-    .replace(/&#39;/g, "'")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code: string) =>
+      String.fromCodePoint(Number.parseInt(code, 16)),
+    )
     .replace(/&#(\d+);/g, (_match, code: string) =>
       String.fromCodePoint(Number(code)),
     );
@@ -51,38 +62,53 @@ function cleanText(value: string): string {
     .trim();
 }
 
-function tagValue(xml: string, tag: string): string {
-  const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const match = xml.match(
-    new RegExp(`<${escapedTag}\\b[^>]*>([\\s\\S]*?)<\\/${escapedTag}>`, "i"),
-  );
-  return match ? cleanText(match[1]) : "";
+function xmlRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
-function tagValues(xml: string, tag: string): string[] {
-  const escapedTag = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return [
-    ...xml.matchAll(
-      new RegExp(
-        `<${escapedTag}\\b[^>]*>([\\s\\S]*?)<\\/${escapedTag}>`,
-        "gi",
-      ),
-    ),
-  ]
-    .map((match) => cleanText(match[1]))
-    .filter(Boolean);
+function xmlText(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") {
+    return cleanText(String(value));
+  }
+  if (Array.isArray(value)) {
+    return cleanText(value.map(xmlText).join(" "));
+  }
+  const record = xmlRecord(value);
+  return record ? xmlText(record["#text"] ?? record["#cdata"] ?? "") : "";
 }
 
 function parseRssItems(xml: string): RssItem[] {
-  const itemMatches = xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi);
+  const validation = XMLValidator.validate(xml);
+  if (validation !== true) {
+    throw new Error(`Malformed RSS/XML document: ${validation.err.msg}`);
+  }
+  const document = xmlRecord(rssXmlParser.parse(xml));
+  const rss = xmlRecord(document?.rss);
+  const channel = xmlRecord(rss?.channel);
+  const itemNodes = Array.isArray(channel?.item)
+    ? channel.item
+    : channel?.item
+      ? [channel.item]
+      : [];
 
-  return [...itemMatches]
-    .map((match) => ({
-      guid: tagValue(match[1], "guid"),
-      title: tagValue(match[1], "title"),
-      link: tagValue(match[1], "link"),
-      description: tagValue(match[1], "description"),
-      categories: tagValues(match[1], "category"),
+  return itemNodes
+    .map(xmlRecord)
+    .filter((item): item is Record<string, unknown> => item !== null)
+    .map((item) => ({
+      guid: xmlText(item.guid),
+      title: xmlText(item.title),
+      link: xmlText(item.link),
+      description: xmlText(item.description),
+      categories: (Array.isArray(item.category)
+        ? item.category
+        : item.category
+          ? [item.category]
+          : []
+      )
+        .map(xmlText)
+        .filter(Boolean),
     }))
     .filter((item) => item.title && item.link);
 }
@@ -187,6 +213,44 @@ function extractDescriptionStart(description: string): string | null {
   return localChicagoDateToIso(year, month, day, hour, minute);
 }
 
+function splitLineup(value: string): string[] {
+  return value
+    .split(/\s*\*\s*/)
+    .map((artist) => artist.trim())
+    .filter(Boolean);
+}
+
+function extractCompactDescriptionFields(description: string, title: string) {
+  const normalized = cleanText(description);
+  const priceStart = normalized.search(/\$\d/);
+  const beforePrice =
+    priceStart >= 0 ? normalized.slice(0, priceStart) : normalized;
+  const featuringIndex = beforePrice.toLowerCase().lastIndexOf("featuring");
+  const lineup =
+    featuringIndex >= 0
+      ? splitLineup(beforePrice.slice(featuringIndex + "featuring".length))
+      : title.includes("*")
+        ? splitLineup(title)
+        : [];
+  const price = normalized.match(
+    /(\$\d[\s\S]*?)(?=\s*\/\s*(?:\d{1,2}\+|all ages)(?:\s*\/|$))/i,
+  )?.[1].trim();
+  const agePolicy = normalized.match(
+    /(?:^|\s*\/\s*)(\d{1,2}\+|all ages)(?=\s*\/|$)/i,
+  )?.[1];
+  const startsAt = extractDescriptionStart(normalized);
+
+  return {
+    startsAt,
+    ...(startsAt && /\bdoors?\s*:/i.test(normalized)
+      ? { doorsAt: startsAt }
+      : {}),
+    ...(lineup.length > 0 ? { lineup } : {}),
+    ...(price ? { price } : {}),
+    ...(agePolicy ? { agePolicy } : {}),
+  };
+}
+
 function reviewItemForItem(
   target: SourceTargetRecord,
   runId: string,
@@ -194,17 +258,22 @@ function reviewItemForItem(
   item: RssItem,
   context: ParserContext = {},
 ): ParserCandidate {
-  const startsAt = extractDescriptionStart(item.description);
+  const compactFields = extractCompactDescriptionFields(
+    item.description,
+    item.title,
+  );
+  const { startsAt, ...descriptionFields } = compactFields;
   const excerpt = cleanText(item.description);
   const venueName = context.owner?.kind === "venue" ? context.owner.name : "";
   const linkedDrafts = venueName ? [{ type: "venue", name: venueName }] : [];
-  const sourceEventKey = item.guid || canonicalizeSourceUrl(item.link);
+  const canonicalUrl = canonicalizeSourceUrl(item.link);
+  const sourceEventKey = item.guid || canonicalUrl;
 
   if (!startsAt) {
     const normalizedDraft = {
       issue: "rss-item-missing-event-date",
       title: item.title,
-      sourceUrl: item.link,
+      sourceUrl: canonicalUrl,
     };
     return {
       sourceEventKey,
@@ -229,9 +298,9 @@ function reviewItemForItem(
           "RSS item has no reliable event date in its description; pubDate was not used as startsAt.",
       },
       evidence: {
-        sourceUrls: [item.link],
+        sourceUrls: [canonicalUrl],
         excerpts: excerpt ? [excerpt] : [],
-        contentHashes: [`${item.link}:missing-date:${parserVersion}`],
+        contentHashes: [`${canonicalUrl}:missing-date:${parserVersion}`],
       },
       parserVersion,
       fetchTimestamp: fetchedAt,
@@ -242,9 +311,11 @@ function reviewItemForItem(
   const normalizedDraft = {
     title: item.title,
     startsAt,
+    ...descriptionFields,
     ...(venueName ? { venueName } : {}),
     styles: normalizeStyleTags(item.categories),
-    ticketUrl: item.link,
+    canonicalUrl,
+    ticketUrl: canonicalUrl,
   };
 
   return {
@@ -269,9 +340,9 @@ function reviewItemForItem(
     linkedDrafts,
     conflicts: null,
     evidence: {
-      sourceUrls: [item.link],
+      sourceUrls: [canonicalUrl],
       excerpts: [excerpt],
-      contentHashes: [`${item.link}:${parserVersion}`],
+      contentHashes: [`${canonicalUrl}:${parserVersion}`],
     },
     parserVersion,
     fetchTimestamp: fetchedAt,
@@ -286,6 +357,10 @@ export async function parseRssEventFeedTarget(
   context: ParserContext = {},
 ): Promise<ParserCandidate[]> {
   const result = await fetcher(target.url);
+
+  if (result.status === 304) {
+    return [];
+  }
 
   if (result.status < 200 || result.status >= 300) {
     throw new Error(`RSS event feed fetch failed with status ${result.status}`);

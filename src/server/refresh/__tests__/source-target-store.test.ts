@@ -93,6 +93,24 @@ describe("source target store", () => {
     expect(found!.url).toBe("https://smartbarchicago.com/new-calendar");
   });
 
+  it("clears conditional validators when the target URL changes", async () => {
+    const created = await store.createSourceTarget(makeTarget());
+    await store.updateSourceTarget(created.id, {
+      etag: '"old-feed"',
+      lastModified: "Thu, 30 Jul 2026 23:24:44 GMT",
+    });
+
+    const updated = await store.updateSourceTarget(created.id, {
+      url: "https://smartbarchicago.com/new-calendar",
+    });
+
+    expect(updated).toMatchObject({
+      url: "https://smartbarchicago.com/new-calendar",
+      etag: null,
+      lastModified: null,
+    });
+  });
+
   it("enables and disables a source target", async () => {
     const created = await store.createSourceTarget(makeTarget());
 

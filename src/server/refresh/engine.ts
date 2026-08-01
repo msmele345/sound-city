@@ -6,6 +6,7 @@ import type { RefreshStore } from "./refresh-store";
 import { parseRssEventFeedTarget } from "./rss-event-feed-parser";
 import type {
   CreateReviewItemInput,
+  FetchFailureTelemetry,
   Fetcher,
   ParserCandidate,
   RefreshRunRecord,
@@ -110,6 +111,16 @@ const emptyRequestTelemetry: RequestTelemetry = {
   retryCount: 0,
   finalUrl: null,
 };
+
+function fetchFailureTelemetry(error: unknown): FetchFailureTelemetry {
+  if (!error || typeof error !== "object" || !("fetchTelemetry" in error)) {
+    return {};
+  }
+  const telemetry = error.fetchTelemetry;
+  return telemetry && typeof telemetry === "object"
+    ? (telemetry as FetchFailureTelemetry)
+    : {};
+}
 
 function terminalStatus(
   outcomes: RefreshTargetOutcomeRecord[],
@@ -428,6 +439,11 @@ async function executeRefresh(
         startedAt: fetchedAt,
       });
       let requestTelemetry = { ...emptyRequestTelemetry };
+      let responseNotModified = false;
+      let responseValidators: Pick<
+        SourceTargetRecord,
+        "etag" | "lastModified"
+      > | null = null;
       let candidateCount = 0;
       let warningCount = 0;
       const targetClassificationCounts = {
@@ -441,10 +457,25 @@ async function executeRefresh(
           lastFetchedAt: fetchedAt,
         });
         const fetcher: Fetcher = input.fetcher ?? externalFetcher;
-        const recordingFetcher: Fetcher = async (url) => {
+        const recordingFetcher: Fetcher = async (url, validators) => {
           const requestStartedAt = Date.now();
           try {
-            const result = await fetcher(url);
+            const targetValidators =
+              url === target.url
+                ? {
+                    ...(target.etag ? { etag: target.etag } : {}),
+                    ...(target.lastModified
+                      ? { lastModified: target.lastModified }
+                      : {}),
+                    ...validators,
+                  }
+                : validators;
+            const result = await fetcher(
+              url,
+              targetValidators && Object.keys(targetValidators).length > 0
+                ? targetValidators
+                : undefined,
+            );
             requestTelemetry = {
               requestDurationMs:
                 result.durationMs ?? Date.now() - requestStartedAt,
@@ -455,12 +486,25 @@ async function executeRefresh(
               retryCount: result.retryCount ?? 0,
               finalUrl: result.finalUrl ?? url,
             };
+            responseNotModified = result.status === 304;
+            responseValidators = {
+              etag:
+                result.etag ??
+                (result.status === 304 ? target.etag ?? null : null),
+              lastModified:
+                result.lastModified ??
+                (result.status === 304 ? target.lastModified ?? null : null),
+            };
             return result;
           } catch (error) {
+            const failureTelemetry = fetchFailureTelemetry(error);
             requestTelemetry = {
               ...emptyRequestTelemetry,
-              requestDurationMs: Date.now() - requestStartedAt,
-              finalUrl: url,
+              ...failureTelemetry,
+              requestDurationMs:
+                failureTelemetry.requestDurationMs ??
+                Date.now() - requestStartedAt,
+              finalUrl: failureTelemetry.finalUrl ?? url,
             };
             throw error;
           }
@@ -706,7 +750,7 @@ async function executeRefresh(
           applyItemMetrics(metrics, item);
         }
 
-        if (candidateCount === 0) {
+        if (candidateCount === 0 && !responseNotModified) {
           throw new Error(
             "Source produced no reliably interpretable events",
           );
@@ -723,8 +767,9 @@ async function executeRefresh(
 
         await store.updateRefreshTargetOutcome(outcome.id, {
           status:
-            candidateCount > 0 &&
-            targetClassificationCounts.unchangedCount === candidateCount
+            responseNotModified ||
+            (candidateCount > 0 &&
+              targetClassificationCounts.unchangedCount === candidateCount)
               ? "unchanged"
               : "succeeded",
           finishedAt: isoNow(input.now),
@@ -737,6 +782,7 @@ async function executeRefresh(
         await store.updateSourceTarget(target.id, {
           healthStatus: health.status,
           lastSuccessfulRunAt: fetchedAt,
+          ...(responseValidators ?? {}),
         });
 
         await log(store, run.id, {

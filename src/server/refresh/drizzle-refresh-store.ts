@@ -48,6 +48,8 @@ type SourceTargetRow = {
   rejectionCount: number;
   duplicateCount: number;
   refreshCadence: string;
+  etag: string | null;
+  lastModified: string | null;
   lastFetchedAt: string | Date | null;
   lastSuccessfulRunAt: string | Date | null;
   lastFailureAt: string | Date | null;
@@ -417,6 +419,8 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         rejectionCount: 0,
         duplicateCount: 0,
         refreshCadence: input.refreshCadence,
+        etag: null,
+        lastModified: null,
         lastFetchedAt: null,
         lastSuccessfulRunAt: null,
         lastFailureAt: null,
@@ -431,6 +435,8 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
         failureCount: 0,
         rejectionCount: 0,
         duplicateCount: 0,
+        etag: null,
+        lastModified: null,
         lastFetchedAt: null,
         lastSuccessfulRunAt: null,
         lastFailureAt: null,
@@ -444,9 +450,16 @@ export function createDrizzleRefreshStore(db: RefreshDb): RefreshStore {
     async updateSourceTarget(id, input) {
       const writer = requireWriter(db);
       const now = new Date().toISOString();
+      const currentRows = await db.query.sourceTargets.findMany();
+      const current = currentRows.find((row) => row.id === id);
+      if (!current) throw new Error("Source target not found");
+      const validators =
+        input.url !== undefined && input.url !== current.url
+          ? { etag: null, lastModified: null }
+          : {};
       await writer
         .update(schema.sourceTargets)
-        .set({ ...input, updatedAt: now })
+        .set({ ...input, ...validators, updatedAt: now })
         .where(eq(schema.sourceTargets.id, id));
       const rows = await db.query.sourceTargets.findMany();
       const row = rows.find((r) => r.id === id);

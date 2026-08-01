@@ -2,7 +2,12 @@ import { lookup as dnsLookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
 import { BlockList, isIP, type LookupFunction } from "node:net";
 
-import type { Fetcher } from "./types";
+import type {
+  FetchFailure,
+  FetchFailureTelemetry,
+  Fetcher,
+  FetchValidators,
+} from "./types";
 
 export type ResolvedAddress = {
   address: string;
@@ -255,6 +260,7 @@ async function readBody(
 
 async function requestWithTimeout(
   url: URL,
+  validators: FetchValidators,
   resolveHostname: ResolveHostname,
   transport: ExternalFetchTransport,
 ) {
@@ -283,6 +289,12 @@ async function requestWithTimeout(
         headers: {
           accept: "*/*",
           "user-agent": soundCityUserAgent,
+          ...(validators.etag
+            ? { "if-none-match": validators.etag }
+            : {}),
+          ...(validators.lastModified
+            ? { "if-modified-since": validators.lastModified }
+            : {}),
         },
         resolvedAddresses,
         signal: controller.signal,
@@ -318,6 +330,21 @@ function header(
   )?.[1];
 }
 
+function withFailureTelemetry(
+  error: unknown,
+  telemetry: FetchFailureTelemetry,
+): FetchFailure {
+  const failure: FetchFailure =
+    error instanceof Error
+      ? error
+      : new Error("External fetch failed", { cause: error });
+  failure.fetchTelemetry = {
+    ...failure.fetchTelemetry,
+    ...telemetry,
+  };
+  return failure;
+}
+
 export function createExternalFetcher(
   dependencies: ExternalFetcherDependencies = {},
 ): Fetcher {
@@ -325,15 +352,25 @@ export function createExternalFetcher(
     dependencies.resolveHostname ?? defaultResolveHostname;
   const transport = dependencies.transport ?? nodeHttpsTransport;
 
-  const fetchOnce = async (rawUrl: string) => {
+  const fetchOnce = async (
+    rawUrl: string,
+    validators: FetchValidators,
+  ) => {
     let url = parseDestination(rawUrl);
 
     for (let redirectCount = 0; ; redirectCount += 1) {
-      const { response, body } = await requestWithTimeout(
-        url,
-        resolveHostname,
-        transport,
-      );
+      let requested;
+      try {
+        requested = await requestWithTimeout(
+          url,
+          validators,
+          resolveHostname,
+          transport,
+        );
+      } catch (error) {
+        throw withFailureTelemetry(error, { finalUrl: url.toString() });
+      }
+      const { response, body } = requested;
       const location = header(response.headers, "location");
 
       if (redirectStatuses.has(response.status) && location) {
@@ -357,6 +394,8 @@ export function createExternalFetcher(
         body: body.toString("utf8"),
         contentType: header(response.headers, "content-type") ?? "",
         status: response.status,
+        etag: header(response.headers, "etag"),
+        lastModified: header(response.headers, "last-modified"),
         responseSizeBytes: body.byteLength,
         retryCount: 0,
         finalUrl: url.toString(),
@@ -364,23 +403,33 @@ export function createExternalFetcher(
     }
   };
 
-  return async (rawUrl) => {
+  const retryOnce = async (
+    rawUrl: string,
+    validators: FetchValidators,
+  ) => {
+    try {
+      const retried = await fetchOnce(rawUrl, validators);
+      return { ...retried, retryCount: 1 };
+    } catch (retryError) {
+      throw withFailureTelemetry(retryError, { retryCount: 1 });
+    }
+  };
+
+  return async (rawUrl, validators = {}) => {
     let result;
     try {
-      result = await fetchOnce(rawUrl);
+      result = await fetchOnce(rawUrl, validators);
     } catch (error) {
       if (error instanceof ExternalFetchError && !error.retryable) {
         throw error;
       }
-      const retried = await fetchOnce(rawUrl);
-      return { ...retried, retryCount: 1 };
+      return retryOnce(rawUrl, validators);
     }
     if (
       result.status === 429 ||
       (result.status >= 500 && result.status <= 599)
     ) {
-      result = await fetchOnce(rawUrl);
-      return { ...result, retryCount: 1 };
+      return retryOnce(rawUrl, validators);
     }
     return result;
   };

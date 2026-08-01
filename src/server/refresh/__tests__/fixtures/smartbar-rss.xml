@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sanitized from the official Smartbar RSS shape observed on 2026-07-31.
+  Names and URL slug are fictional; compact field boundaries and entities are retained.
+-->
+<rss version="2.0">
+  <channel>
+    <title>smartbar</title>
+    <link>https://smartbarchicago.com</link>
+    <description>the proof is on the dancefloor :: welcome home</description>
+    <item>
+      <title>Signal Flow &#038; Friends</title>
+      <link>https://smartbarchicago.com/event/signal-flow/?utm_source=rss</link>
+      <pubDate>Wed, 29 Jul 2026 17:00:57 +0000</pubDate>
+      <description><![CDATA[Friday, September 18, 2026 Night Moves presentsSignal Flow &#038; FriendsFeaturing Artist One * Artist Two * DJ O&#8217;Three$20-$25 Adv / $25 Door / $20 Student Door (before 12am with valid ID) / 21+ / Doors: 10PM]]></description>
+    </item>
+  </channel>
+</rss>

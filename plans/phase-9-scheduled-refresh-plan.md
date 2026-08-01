@@ -109,9 +109,9 @@ Introduce one shared external fetch boundary and route Smartbar ingestion throug
 - [x] Production fetching permits public HTTPS targets and rejects embedded credentials, private addresses, loopback, link-local destinations, and HTTPS downgrade.
 - [x] Requests use a 15-second timeout, a 5 MB response limit, at most three redirects, and an identifiable Sound City user agent.
 - [x] One bounded retry is allowed for network errors, `429`, and `5xx`; other client errors are not retried.
-- [ ] Conditional ETag and Last-Modified requests are supported, and `304 Not Modified` produces a successful unchanged outcome.
-- [ ] Target outcomes record final URL, response status, duration, size, and retry count without storing full response bodies.
-- [ ] Smartbar parsing supports the certified fixture’s title, event date, doors time, lineup, price, age policy, venue, and canonical source URL when present.
+- [x] Conditional ETag and Last-Modified requests are supported, and `304 Not Modified` produces a successful unchanged outcome.
+- [x] Target outcomes record final URL, response status, duration, size, and retry count without storing full response bodies.
+- [x] Smartbar parsing supports the certified fixture’s title, event date, doors time, lineup, price, age policy, venue, and canonical source URL when present.
 - [ ] Smartbar uses its canonical item link as source identity when no feed GUID exists.
 - [ ] Entity cleanup and compact-description parsing are covered by fixture tests.
 - [ ] A live manual Smartbar run creates useful review work.

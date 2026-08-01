@@ -299,4 +299,66 @@ describe("external fetcher", () => {
     });
     expect(transport).toHaveBeenCalledTimes(2);
   });
+
+  it("reports the retry when a transient response is followed by a network error", async () => {
+    let attempt = 0;
+    const transport = vi.fn(async () => {
+      attempt += 1;
+      if (attempt === 2) {
+        throw Object.assign(new Error("socket reset"), { code: "ECONNRESET" });
+      }
+      return {
+        status: 503,
+        headers: { "content-type": "text/plain" },
+        body: responseBody("busy"),
+      };
+    });
+    const fetcher = createExternalFetcher({
+      resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
+      transport,
+    });
+
+    await expect(fetcher("https://events.example/feed.xml")).rejects.toMatchObject({
+      fetchTelemetry: {
+        retryCount: 1,
+        finalUrl: "https://events.example/feed.xml",
+      },
+    });
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+
+  it("sends stored validators and returns a not-modified response", async () => {
+    const transport = vi.fn(async () => ({
+      status: 304,
+      headers: {
+        etag: '"smartbar-v2"',
+        "last-modified": "Thu, 30 Jul 2026 23:24:44 GMT",
+      },
+      body: responseBody(""),
+    }));
+    const fetcher = createExternalFetcher({
+      resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
+      transport,
+    });
+
+    await expect(
+      fetcher("https://events.example/feed.xml", {
+        etag: '"smartbar-v1"',
+        lastModified: "Wed, 29 Jul 2026 17:00:57 GMT",
+      }),
+    ).resolves.toMatchObject({
+      body: "",
+      status: 304,
+      etag: '"smartbar-v2"',
+      lastModified: "Thu, 30 Jul 2026 23:24:44 GMT",
+    });
+    expect(transport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          "if-none-match": '"smartbar-v1"',
+          "if-modified-since": "Wed, 29 Jul 2026 17:00:57 GMT",
+        }),
+      }),
+    );
+  });
 });
