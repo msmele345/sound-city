@@ -112,8 +112,8 @@ Introduce one shared external fetch boundary and route Smartbar ingestion throug
 - [x] Conditional ETag and Last-Modified requests are supported, and `304 Not Modified` produces a successful unchanged outcome.
 - [x] Target outcomes record final URL, response status, duration, size, and retry count without storing full response bodies.
 - [x] Smartbar parsing supports the certified fixture’s title, event date, doors time, lineup, price, age policy, venue, and canonical source URL when present.
-- [ ] Smartbar uses its canonical item link as source identity when no feed GUID exists.
-- [ ] Entity cleanup and compact-description parsing are covered by fixture tests.
+- [x] Smartbar uses its canonical item link as source identity when no feed GUID exists.
+- [x] Entity cleanup and compact-description parsing are covered by fixture tests.
 - [ ] A live manual Smartbar run creates useful review work.
 - [ ] A second unchanged manual Smartbar run creates zero new review items.
 - [ ] Smartbar remains at manual cadence until its certification criteria pass.
