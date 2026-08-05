@@ -259,12 +259,12 @@ function extractLabeledDetailValue(html: string, label: string) {
 
 function extractHtmlAttribute(tag: string, attribute: string) {
   const match = tag.match(
-    new RegExp(`${attribute}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i"),
+    new RegExp(`(?:^|\\s)${attribute}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i"),
   );
   return match ? decodeXmlEntities(match[2]).trim() : undefined;
 }
 
-function radiusTicketUrl(html: string) {
+function radiusTicketUrl(html: string, detailUrl: string) {
   const ticketAnchor = (html.match(/<a\b[^>]*>/gi) ?? []).find((anchor) => {
     const title = extractHtmlAttribute(anchor, "title");
     const classes = extractHtmlAttribute(anchor, "class")?.split(/\s+/) ?? [];
@@ -273,7 +273,17 @@ function radiusTicketUrl(html: string) {
   const href = ticketAnchor
     ? extractHtmlAttribute(ticketAnchor, "href")
     : undefined;
-  return href ? canonicalizeSourceUrl(href) : undefined;
+  if (!href) return undefined;
+
+  try {
+    const url = new URL(href, detailUrl);
+    if (url.protocol !== "https:" || url.username || url.password) {
+      return undefined;
+    }
+    return canonicalizeSourceUrl(url.toString());
+  } catch {
+    return undefined;
+  }
 }
 
 function localChicagoEventTime(
@@ -307,13 +317,14 @@ function normalizeRadiusAgePolicy(value: string | undefined) {
 function extractRadiusDetailFields(
   html: string,
   eventDate: string | undefined,
+  detailUrl: string,
 ): RssItemEnrichment {
   const eventTime = extractLabeledDetailValue(html, "Time");
   const doorsTime = extractLabeledDetailValue(html, "Doors");
   const agePolicy = normalizeRadiusAgePolicy(
     extractLabeledDetailValue(html, "Ages"),
   );
-  const ticketUrl = radiusTicketUrl(html);
+  const ticketUrl = radiusTicketUrl(html, detailUrl);
   const startsAt = localChicagoEventTime(eventDate, eventTime);
   const doorsAt = localChicagoEventTime(eventDate, doorsTime);
 
@@ -529,7 +540,11 @@ export async function parseRssEventFeedTarget(
             allowedHostnames: radiusDetailHostnames,
           });
           const titleFields = extractRadiusTitleFields(target, item.title);
-          return extractRadiusDetailFields(detail.body, titleFields.eventDate);
+          return extractRadiusDetailFields(
+            detail.body,
+            titleFields.eventDate,
+            item.link,
+          );
         }),
       )
     : items.map(() => ({}));

@@ -42,4 +42,19 @@ describe("candidate identity", () => {
       }),
     ).toBe(buildMaterialContentHash(baseline));
   });
+
+  it("treats a doors-time correction as a material change", () => {
+    const baseline = {
+      title: "Warehouse Night",
+      startsAt: "2026-07-12T03:00:00.000Z",
+      doorsAt: "2026-07-12T02:00:00.000Z",
+    };
+
+    expect(
+      buildMaterialContentHash({
+        ...baseline,
+        doorsAt: "2026-07-12T01:30:00.000Z",
+      }),
+    ).not.toBe(buildMaterialContentHash(baseline));
+  });
 });

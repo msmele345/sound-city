@@ -212,8 +212,32 @@ describe("parseRssEventFeedTarget", () => {
     });
   });
 
+  it("ignores a mislabeled or non-HTTPS Radius ticket destination", async () => {
+    const target = createRadiusTarget();
+    const unsafeDetail = certifiedRadiusDetail.replace(
+      'href="https://www.axs.com/events/1000001/market-nights-tickets?skin=radius"',
+      'data-href="https://arbitrary.example/ticket" href="javascript:alert(1)"',
+    );
+    const fetcher: Fetcher = async (url) => ({
+      body: url === target.url ? certifiedRadiusRss : unsafeDetail,
+      contentType:
+        url === target.url ? "application/rss+xml" : "text/html; charset=UTF-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      target,
+      "run_radius_unsafe_ticket",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.normalizedDraft.ticketUrl).toBe(radiusDetailUrl);
+  });
+
   it("blocks a Radius detail redirect to an arbitrary public host", async () => {
     const target = createRadiusTarget();
+    let contactedArbitraryHost = false;
     const transport = vi.fn(async ({ url }: ExternalTransportRequest) => {
       if (url.toString() === target.url) {
         return {
@@ -229,6 +253,7 @@ describe("parseRssEventFeedTarget", () => {
           body: responseBody(""),
         };
       }
+      contactedArbitraryHost = true;
       return {
         status: 200,
         headers: { "content-type": "text/html" },
@@ -248,10 +273,7 @@ describe("parseRssEventFeedTarget", () => {
         fetcher,
       ),
     ).rejects.toThrow(/outside the allowed hosts/i);
-    expect(transport.mock.calls.map(([request]) => request.url.toString())).toEqual([
-      target.url,
-      radiusDetailUrl,
-    ]);
+    expect(contactedArbitraryHost).toBe(false);
   });
 
   it("parses the certified Smartbar compact description and cleans entities", async () => {
