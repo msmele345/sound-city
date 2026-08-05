@@ -178,9 +178,9 @@ Time-box discovery of a stable official Chicago ICS subscription feed that is re
 
 ### Acceptance criteria
 
-- [ ] ICS discovery is time-boxed to approximately two working days.
-- [ ] The selected feed is official, publicly fetchable, stable, Chicago-based, subscription-oriented, and relevant to Sound City discovery.
-- [ ] An irrelevant calendar or per-event ICS download is not substituted solely to satisfy protocol coverage.
+- [x] ICS discovery is time-boxed to approximately two working days.
+- [x] The selected feed is official, publicly fetchable, stable, Chicago-based, subscription-oriented, and relevant to Sound City discovery.
+- [x] An irrelevant calendar or per-event ICS download is not substituted solely to satisfy protocol coverage.
 - [ ] If no qualifying feed is found, the release gate is explicitly re-scoped with the product owner before Cron is enabled.
 - [ ] A sanitized fixture represents the selected live ICS feed.
 - [ ] The parser reliably captures UID, title, start/end time, timezone, venue, event URL, and other material fields supplied by the certified source.
@@ -192,6 +192,15 @@ Time-box discovery of a stable official Chicago ICS subscription feed that is re
 - [ ] Admin explains that daily cadence enrolls an enabled target in scheduled refresh.
 - [ ] Adding a compatible future ICS target requires configuration, fixture certification, and cadence promotion but no scheduler code change.
 - [ ] The qualifying ICS source remains a hard Phase 9 release gate.
+
+Discovery evidence (2026-08-05): Greenline's organizer-owned Luma calendar was
+selected under the August 5-6 discovery time box. Two unauthenticated fetches
+of its multi-event iCal subscription returned the same 13 UIDs and material
+event fields with `200 text/calendar`; only provider telemetry changed. The
+calendar is verified and Chicago-based, and its rave, hard-techno, hard-groove,
+juke, and hard-dance programming is relevant to Sound City. Per-event ICS
+exports, broad city calendars, and unrelated subscription calendars were
+explicitly rejected. See [the discovery record](../docs/phase-9-ics-source-discovery.md).
 
 ---
 
