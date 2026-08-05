@@ -141,18 +141,30 @@ Certify Radius as the second RSS shape. Use its RSS GUID for stable identity and
 
 ### Acceptance criteria
 
-- [ ] Radius RSS GUID is used as the stable source event key.
-- [ ] Radius event date and normalized title are extracted from the certified RSS title shape.
-- [ ] Enrichment fetches only the official Radius detail URL supplied by the RSS item.
-- [ ] Enrichment uses the shared fetch policy and cannot escape to arbitrary or unsafe hosts.
-- [ ] Labeled event time, doors time, age policy, and ticket URL are captured when available.
-- [ ] RSS and event-detail behavior are covered by separate sanitized fixtures.
-- [ ] One failed detail request is an item warning and does not hide valid sibling events.
-- [ ] An item that still lacks a reliable event time is routed to review/source-health rather than guessed.
-- [ ] The Radius target fails only when the feed itself is unusable or no item can be interpreted reliably.
-- [ ] A live manual Radius run creates useful review work.
-- [ ] A second unchanged manual Radius run creates zero new review items.
-- [ ] Radius remains at manual cadence until its certification criteria pass.
+- [x] Radius RSS GUID is used as the stable source event key.
+- [x] Radius event date and normalized title are extracted from the certified RSS title shape.
+- [x] Enrichment fetches only the official Radius detail URL supplied by the RSS item.
+- [x] Enrichment uses the shared fetch policy and cannot escape to arbitrary or unsafe hosts.
+- [x] Labeled event time, doors time, age policy, and ticket URL are captured when available.
+- [x] RSS and event-detail behavior are covered by separate sanitized fixtures.
+- [x] One failed detail request is an item warning and does not hide valid sibling events.
+- [x] An item that still lacks a reliable event time is routed to review/source-health rather than guessed.
+- [x] The Radius target fails only when the feed itself is unusable or no item can be interpreted reliably.
+- [x] A live manual Radius run creates useful review work.
+- [x] A second unchanged manual Radius run creates zero new review items.
+- [x] Radius remains at manual cadence until its certification criteria pass.
+
+Certification evidence (2026-08-05): the configured Radius target was corrected
+from the legacy HTML `/events` URL and `weekly` cadence to the official
+`https://www.radius-chicago.com/events/rss` feed at `manual` cadence. Manual run
+`refresh_run_city_chicago_7330cc86-a714-4bb0-ba9a-ea20e670c630` produced a
+successful Radius outcome with 9 reliable candidates, 9 new event review items,
+and one isolated source-health warning. The event drafts included event and
+doors times, age policies, and ticket URLs. The immediate repeat,
+`refresh_run_city_chicago_e414faf8-fbc7-415c-ae4d-e73864bb45f7`, produced an
+unchanged Radius outcome with 9 unchanged candidates and zero created or
+updated review items. The enabled Radius RSS target remained at `manual` cadence
+and its derived health returned to healthy after the two successful outcomes.
 
 ---
 
@@ -211,13 +223,37 @@ Expose the generalized refresh engine through one fail-closed Cron route and con
 
 ---
 
+## Phase 7.5: Spybar Chicago One-Day Feasibility Spike
+
+**User stories**: 34–36
+
+### What to build
+
+Spend no more than one working day determining whether SpyBar, a popular chicago nightclub, exposes a compliant, stable, server-fetchable event source that fits the parser contract. Produce a documented classification and field mapping. Stop at research: do not build a production parser or experiment with prohibited access techniques in this phase.
+
+This phase is non-blocking and may run alongside the implementation slices.
+
+### Acceptance criteria
+
+- [ ] The spike is capped at one working day.
+- [ ] Representative public Chicago event samples and candidate structured-data paths are inventoried.
+- [ ] Server-side access is tested without authentication, browser automation, session handling, CAPTCHA work, or anti-bot circumvention.
+- [ ] Available identity, title, time, venue, lineup, and canonical URL fields are mapped to the parser contract.
+- [ ] Access and stability constraints are documented.
+- [ ] The conclusion is explicitly `viable`, `experimental only`, or `manual/supporting only`.
+- [ ] Undocumented internal endpoints cannot receive a production-ready classification.
+- [ ] A viable result includes a separate production-parser estimate and proposed scope.
+- [ ] Experimental or manual-only results do not create scheduled Phase 9 work.
+
+---
+
 ## Phase 8: Resident Advisor One-Day Feasibility Spike
 
 **User stories**: 34–36
 
 ### What to build
 
-Spend no more than one working day determining whether Resident Advisor exposes a compliant, stable, server-fetchable event source that fits the parser contract. Produce a documented classification and field mapping. Stop at research: do not build a production parser or experiment with prohibited access techniques in this phase.
+Spend no more than one working day determining whether Resident Advisor, exposes a compliant, stable, server-fetchable event source that fits the parser contract. Produce a documented classification and field mapping. Stop at research: do not build a production parser or experiment with prohibited access techniques in this phase.
 
 This phase is non-blocking and may run alongside the implementation slices.
 

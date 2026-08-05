@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Radius Chicago</title>
+    <link>https://www.radius-chicago.com/</link>
+    <description></description>
+    <dc:language>en</dc:language>
+    <item>
+      <title>Market Nights 2026 on Aug 7, 2026</title>
+      <link>https://www.radius-chicago.com/events/detail/1000001</link>
+      <guid>https://www.radius-chicago.com/events/detail/1000001</guid>
+      <description><p><a href="https://www.axs.com/events/1000001/market-nights-tickets" title="Buy Tickets" target="_blank" class="tickets"><em class="icons-tickets"></em>Buy Tickets</a></p></description>
+      <dc:date>2026-05-20T14:30:00Z</dc:date>
+    </item>
+  </channel>
+</rss>

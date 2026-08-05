@@ -457,11 +457,16 @@ async function executeRefresh(
           lastFetchedAt: fetchedAt,
         });
         const fetcher: Fetcher = input.fetcher ?? externalFetcher;
-        const recordingFetcher: Fetcher = async (url, validators) => {
+        const recordingFetcher: Fetcher = async (
+          url,
+          validators,
+          destinationPolicy,
+        ) => {
+          const isPrimaryRequest = url === target.url;
           const requestStartedAt = Date.now();
           try {
             const targetValidators =
-              url === target.url
+              isPrimaryRequest
                 ? {
                     ...(target.etag ? { etag: target.etag } : {}),
                     ...(target.lastModified
@@ -475,37 +480,44 @@ async function executeRefresh(
               targetValidators && Object.keys(targetValidators).length > 0
                 ? targetValidators
                 : undefined,
+              destinationPolicy,
             );
-            requestTelemetry = {
-              requestDurationMs:
-                result.durationMs ?? Date.now() - requestStartedAt,
-              responseStatus: result.status,
-              responseSizeBytes:
-                result.responseSizeBytes ??
-                new TextEncoder().encode(result.body).byteLength,
-              retryCount: result.retryCount ?? 0,
-              finalUrl: result.finalUrl ?? url,
-            };
-            responseNotModified = result.status === 304;
-            responseValidators = {
-              etag:
-                result.etag ??
-                (result.status === 304 ? target.etag ?? null : null),
-              lastModified:
-                result.lastModified ??
-                (result.status === 304 ? target.lastModified ?? null : null),
-            };
+            if (isPrimaryRequest) {
+              requestTelemetry = {
+                requestDurationMs:
+                  result.durationMs ?? Date.now() - requestStartedAt,
+                responseStatus: result.status,
+                responseSizeBytes:
+                  result.responseSizeBytes ??
+                  new TextEncoder().encode(result.body).byteLength,
+                retryCount: result.retryCount ?? 0,
+                finalUrl: result.finalUrl ?? url,
+              };
+              responseNotModified = result.status === 304;
+              responseValidators = {
+                etag:
+                  result.etag ??
+                  (result.status === 304 ? target.etag ?? null : null),
+                lastModified:
+                  result.lastModified ??
+                  (result.status === 304
+                    ? target.lastModified ?? null
+                    : null),
+              };
+            }
             return result;
           } catch (error) {
-            const failureTelemetry = fetchFailureTelemetry(error);
-            requestTelemetry = {
-              ...emptyRequestTelemetry,
-              ...failureTelemetry,
-              requestDurationMs:
-                failureTelemetry.requestDurationMs ??
-                Date.now() - requestStartedAt,
-              finalUrl: failureTelemetry.finalUrl ?? url,
-            };
+            if (isPrimaryRequest) {
+              const failureTelemetry = fetchFailureTelemetry(error);
+              requestTelemetry = {
+                ...emptyRequestTelemetry,
+                ...failureTelemetry,
+                requestDurationMs:
+                  failureTelemetry.requestDurationMs ??
+                  Date.now() - requestStartedAt,
+                finalUrl: failureTelemetry.finalUrl ?? url,
+              };
+            }
             throw error;
           }
         };

@@ -13,8 +13,12 @@ import type {
   SourceTargetRecord,
 } from "./types";
 
-const parserVersion = "rss-event-feed@2";
+const parserVersion = "rss-event-feed@5";
 const chicagoTimeZone = "America/Chicago";
+const radiusDetailHostnames = [
+  "radius-chicago.com",
+  "www.radius-chicago.com",
+] as const;
 const rssXmlParser = new XMLParser({
   ignoreAttributes: false,
   parseTagValue: false,
@@ -32,6 +36,18 @@ type RssItem = {
 
 type ParserContext = {
   owner?: SourceOwnerRecord | null;
+};
+
+type RssItemEnrichment = {
+  startsAt?: string;
+  doorsAt?: string;
+  agePolicy?: string;
+  ticketUrl?: string;
+};
+
+type RssItemEnrichmentResult = {
+  enrichment: RssItemEnrichment;
+  warningMessage?: string;
 };
 
 function clampConfidence(value: number): number {
@@ -169,6 +185,7 @@ function localChicagoDateToIso(
 }
 
 function monthNumber(monthName: string): number | null {
+  const normalizedMonth = monthName.toLowerCase();
   const month = [
     "january",
     "february",
@@ -182,13 +199,150 @@ function monthNumber(monthName: string): number | null {
     "october",
     "november",
     "december",
-  ].indexOf(monthName.toLowerCase());
+  ].findIndex(
+    (candidate) =>
+      candidate === normalizedMonth ||
+      candidate.slice(0, 3) === normalizedMonth.slice(0, 3),
+  );
   return month >= 0 ? month + 1 : null;
+}
+
+function isRadiusTarget(target: SourceTargetRecord): boolean {
+  try {
+    return new URL(target.url).hostname.replace(/^www\./i, "").toLowerCase() ===
+      "radius-chicago.com";
+  } catch {
+    return false;
+  }
+}
+
+function extractRadiusTitleFields(
+  target: SourceTargetRecord,
+  title: string,
+): { title: string; eventDate?: string } {
+  if (!isRadiusTarget(target)) return { title };
+
+  const match = title.match(
+    /^(.*?)\s+on\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2}),\s+(\d{4})$/i,
+  );
+  if (!match) return { title };
+
+  const month = monthNumber(match[2]);
+  if (!month) return { title };
+
+  const day = Number(match[3]);
+  const year = Number(match[4]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return { title };
+  }
+
+  return {
+    title: match[1].trim(),
+    eventDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  };
 }
 
 function hourFromMeridiem(hour: number, meridiem: string): number {
   const normalized = hour % 12;
   return meridiem.toLowerCase() === "pm" ? normalized + 12 : normalized;
+}
+
+function extractLabeledDetailValue(html: string, label: string) {
+  const match = html.match(
+    new RegExp(
+      `<label\\b[^>]*>\\s*${label}\\s*</label>\\s*<span\\b[^>]*>([\\s\\S]*?)</span>`,
+      "i",
+    ),
+  );
+  return match ? cleanText(match[1]) : undefined;
+}
+
+function extractHtmlAttribute(tag: string, attribute: string) {
+  const match = tag.match(
+    new RegExp(`(?:^|\\s)${attribute}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i"),
+  );
+  return match ? decodeXmlEntities(match[2]).trim() : undefined;
+}
+
+function radiusTicketUrl(html: string, detailUrl: string) {
+  const ticketAnchor = (html.match(/<a\b[^>]*>/gi) ?? []).find((anchor) => {
+    const title = extractHtmlAttribute(anchor, "title");
+    const classes = extractHtmlAttribute(anchor, "class")?.split(/\s+/) ?? [];
+    return title?.toLowerCase() === "buy tickets" && classes.includes("tickets");
+  });
+  const href = ticketAnchor
+    ? extractHtmlAttribute(ticketAnchor, "href")
+    : undefined;
+  if (!href) return undefined;
+
+  try {
+    const url = new URL(href, detailUrl);
+    if (url.protocol !== "https:" || url.username || url.password) {
+      return undefined;
+    }
+    return canonicalizeSourceUrl(url.toString());
+  } catch {
+    return undefined;
+  }
+}
+
+function localChicagoEventTime(
+  eventDate: string | undefined,
+  value: string | undefined,
+) {
+  if (!eventDate || !value) return undefined;
+  const dateMatch = eventDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = value.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (!dateMatch || !timeMatch) return undefined;
+
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2] ?? 0);
+  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return undefined;
+
+  return localChicagoDateToIso(
+    Number(dateMatch[1]),
+    Number(dateMatch[2]),
+    Number(dateMatch[3]),
+    hourFromMeridiem(hour, timeMatch[3]),
+    minute,
+  );
+}
+
+function normalizeRadiusAgePolicy(value: string | undefined) {
+  if (!value) return undefined;
+  const minimumAge = value.match(/^(\d{1,2})\s*(?:&|and)\s*over$/i)?.[1];
+  return minimumAge ? `${minimumAge}+` : value;
+}
+
+function extractRadiusDetailFields(
+  html: string,
+  eventDate: string | undefined,
+  detailUrl: string,
+): RssItemEnrichment {
+  const eventTime = extractLabeledDetailValue(html, "Time");
+  const doorsTime = extractLabeledDetailValue(html, "Doors");
+  const agePolicy = normalizeRadiusAgePolicy(
+    extractLabeledDetailValue(html, "Ages"),
+  );
+  const ticketUrl = radiusTicketUrl(html, detailUrl);
+  const startsAt = localChicagoEventTime(eventDate, eventTime);
+  const doorsAt = localChicagoEventTime(eventDate, doorsTime);
+
+  return {
+    ...(startsAt ? { startsAt } : {}),
+    ...(doorsAt ? { doorsAt } : {}),
+    ...(agePolicy ? { agePolicy } : {}),
+    ...(ticketUrl ? { ticketUrl } : {}),
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Radius detail request failed";
 }
 
 function extractDescriptionStart(description: string): string | null {
@@ -257,12 +411,20 @@ function reviewItemForItem(
   fetchedAt: string,
   item: RssItem,
   context: ParserContext = {},
+  enrichment: RssItemEnrichment = {},
 ): ParserCandidate {
+  const titleFields = extractRadiusTitleFields(target, item.title);
   const compactFields = extractCompactDescriptionFields(
     item.description,
-    item.title,
+    titleFields.title,
   );
-  const { startsAt, ...descriptionFields } = compactFields;
+  const { startsAt: descriptionStartsAt, ...descriptionFields } = compactFields;
+  const {
+    startsAt: enrichedStartsAt,
+    ticketUrl: enrichedTicketUrl,
+    ...enrichedFields
+  } = enrichment;
+  const startsAt = enrichedStartsAt ?? descriptionStartsAt;
   const excerpt = cleanText(item.description);
   const venueName = context.owner?.kind === "venue" ? context.owner.name : "";
   const linkedDrafts = venueName ? [{ type: "venue", name: venueName }] : [];
@@ -271,8 +433,10 @@ function reviewItemForItem(
 
   if (!startsAt) {
     const normalizedDraft = {
-      issue: "rss-item-missing-event-date",
-      title: item.title,
+      issue: titleFields.eventDate
+        ? "rss-item-missing-event-time"
+        : "rss-item-missing-event-date",
+      ...titleFields,
       sourceUrl: canonicalUrl,
     };
     return {
@@ -285,7 +449,9 @@ function reviewItemForItem(
       priority: 40,
       confidence: 20,
       confidenceReasons: [
-        "RSS item did not include a reliable event date in the description",
+        titleFields.eventDate
+          ? "RSS item did not include a reliable event time"
+          : "RSS item did not include a reliable event date in the description",
       ],
       targetEntityType: "source-target",
       targetEntityId: target.id,
@@ -295,7 +461,9 @@ function reviewItemForItem(
       linkedDrafts: [],
       conflicts: {
         reason:
-          "RSS item has no reliable event date in its description; pubDate was not used as startsAt.",
+          titleFields.eventDate
+            ? "RSS item has an event date but no reliable event time; no startsAt was guessed."
+            : "RSS item has no reliable event date in its description; pubDate was not used as startsAt.",
       },
       evidence: {
         sourceUrls: [canonicalUrl],
@@ -309,13 +477,14 @@ function reviewItemForItem(
 
   const confidence = clampConfidence(68 + target.confidenceAdjustment);
   const normalizedDraft = {
-    title: item.title,
+    ...titleFields,
     startsAt,
     ...descriptionFields,
+    ...enrichedFields,
     ...(venueName ? { venueName } : {}),
     styles: normalizeStyleTags(item.categories),
     canonicalUrl,
-    ticketUrl: canonicalUrl,
+    ticketUrl: enrichedTicketUrl ?? canonicalUrl,
   };
 
   return {
@@ -349,6 +518,50 @@ function reviewItemForItem(
   };
 }
 
+function radiusDetailWarningCandidate(
+  target: SourceTargetRecord,
+  runId: string,
+  fetchedAt: string,
+  item: RssItem,
+  message: string,
+): ParserCandidate {
+  const titleFields = extractRadiusTitleFields(target, item.title);
+  const canonicalUrl = canonicalizeSourceUrl(item.link);
+  const sourceEventKey = item.guid || canonicalUrl;
+  const normalizedDraft = {
+    issue: "radius-detail-fetch-failed",
+    ...titleFields,
+    sourceUrl: canonicalUrl,
+    message,
+  };
+
+  return {
+    sourceEventKey: `${sourceEventKey}:detail-warning`,
+    materialContentHash: buildMaterialContentHash(normalizedDraft),
+    cityId: target.cityId,
+    runId,
+    sourceTargetId: target.id,
+    lane: "source-health",
+    priority: 40,
+    confidence: 20,
+    confidenceReasons: ["Radius detail page could not be fetched"],
+    targetEntityType: "source-target",
+    targetEntityId: target.id,
+    matchFingerprint: `source-health:${target.id}:${sourceEventKey}:detail-warning`,
+    normalizedDraft,
+    fieldDiffs: null,
+    linkedDrafts: [],
+    conflicts: { reason: message },
+    evidence: {
+      sourceUrls: [canonicalUrl],
+      excerpts: [`${titleFields.title}: ${message}`],
+      contentHashes: [`${canonicalUrl}:detail-warning:${parserVersion}`],
+    },
+    parserVersion,
+    fetchTimestamp: fetchedAt,
+  };
+}
+
 export async function parseRssEventFeedTarget(
   target: SourceTargetRecord,
   runId: string,
@@ -375,7 +588,54 @@ export async function parseRssEventFeedTarget(
     throw new Error("RSS event feed source does not contain RSS/XML event items.");
   }
 
-  return items.map((item) =>
-    reviewItemForItem(target, runId, fetchedAt, item, context),
-  );
+  const enrichmentResults: RssItemEnrichmentResult[] = isRadiusTarget(target)
+    ? await Promise.all(
+        items.map(async (item) => {
+          try {
+            const detail = await fetcher(item.link, undefined, {
+              allowedHostnames: radiusDetailHostnames,
+            });
+            if (detail.status < 200 || detail.status >= 300) {
+              throw new Error(
+                `Radius detail fetch failed with status ${detail.status}`,
+              );
+            }
+            const titleFields = extractRadiusTitleFields(target, item.title);
+            return {
+              enrichment: extractRadiusDetailFields(
+                detail.body,
+                titleFields.eventDate,
+                item.link,
+              ),
+            };
+          } catch (error) {
+            return { enrichment: {}, warningMessage: errorMessage(error) };
+          }
+        }),
+      )
+    : items.map(() => ({ enrichment: {} }));
+
+  return items.flatMap((item, index) => {
+    const enrichmentResult = enrichmentResults[index];
+    const candidate = reviewItemForItem(
+      target,
+      runId,
+      fetchedAt,
+      item,
+      context,
+      enrichmentResult.enrichment,
+    );
+    if (!enrichmentResult.warningMessage) return [candidate];
+
+    const warning = radiusDetailWarningCandidate(
+      target,
+      runId,
+      fetchedAt,
+      item,
+      enrichmentResult.warningMessage,
+    );
+    return candidate.lane === "source-health"
+      ? [warning]
+      : [candidate, warning];
+  });
 }

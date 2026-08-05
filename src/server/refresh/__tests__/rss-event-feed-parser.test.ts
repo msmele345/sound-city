@@ -1,9 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
+import {
+  createExternalFetcher,
+  type ExternalTransportRequest,
+} from "../external-fetcher";
 import { parseRssEventFeedTarget } from "../rss-event-feed-parser";
 import type { Fetcher, SourceOwnerRecord, SourceTargetRecord } from "../types";
+
+async function* responseBody(body: string) {
+  yield Buffer.from(body);
+}
 
 function createTarget(
   overrides: Partial<SourceTargetRecord> = {},
@@ -55,10 +63,36 @@ const smartbarRss = `<?xml version="1.0" encoding="UTF-8"?>
   </channel>
 </rss>`;
 
+const radiusDetailUrl =
+  "https://www.radius-chicago.com/events/detail/1000001";
+const radiusGuid = radiusDetailUrl;
+
+function createRadiusTarget(): SourceTargetRecord {
+  return createTarget({
+    id: "target_radius_rss",
+    ownerId: "owner_radius",
+    url: "https://www.radius-chicago.com/events/rss",
+  });
+}
+
 const certifiedSmartbarRss = readFileSync(
   resolve(
     process.cwd(),
     "src/server/refresh/__tests__/fixtures/smartbar-rss.xml",
+  ),
+  "utf8",
+);
+const certifiedRadiusRss = readFileSync(
+  resolve(
+    process.cwd(),
+    "src/server/refresh/__tests__/fixtures/radius-rss.xml",
+  ),
+  "utf8",
+);
+const certifiedRadiusDetail = readFileSync(
+  resolve(
+    process.cwd(),
+    "src/server/refresh/__tests__/fixtures/radius-event-detail.html",
   ),
   "utf8",
 );
@@ -80,6 +114,305 @@ function createOwner(
 }
 
 describe("parseRssEventFeedTarget", () => {
+  it("uses the Radius RSS guid as the stable source event key", async () => {
+    const fetcher: Fetcher = async () => ({
+      body: certifiedRadiusRss,
+      contentType: "application/rss+xml",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      createRadiusTarget(),
+      "run_radius_identity",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.sourceEventKey).toBe(radiusGuid);
+  });
+
+  it("normalizes the Radius RSS title and extracts its event date without inventing a time", async () => {
+    const fetcher: Fetcher = async () => ({
+      body: certifiedRadiusRss,
+      contentType: "application/rss+xml",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      createRadiusTarget(),
+      "run_radius_title",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.normalizedDraft).toMatchObject({
+      title: "Market Nights 2026",
+      eventDate: "2026-08-07",
+    });
+    expect(candidate.normalizedDraft).not.toHaveProperty("startsAt");
+  });
+
+  it("enriches a Radius item only from the detail URL supplied by its RSS entry", async () => {
+    const target = createRadiusTarget();
+    const fetcher = vi.fn<Fetcher>(async (url) => {
+      if (url === target.url) {
+        return {
+          body: certifiedRadiusRss,
+          contentType: "application/rss+xml",
+          status: 200,
+        };
+      }
+      if (url === radiusDetailUrl) {
+        return {
+          body: certifiedRadiusDetail,
+          contentType: "text/html",
+          status: 200,
+        };
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await parseRssEventFeedTarget(
+      target,
+      "run_radius_detail",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      target.url,
+      radiusDetailUrl,
+    ]);
+  });
+
+  it("captures labeled Radius event time, doors, age policy, and ticket URL from the detail fixture", async () => {
+    const target = createRadiusTarget();
+    const fetcher: Fetcher = async (url) => ({
+      body: url === target.url ? certifiedRadiusRss : certifiedRadiusDetail,
+      contentType:
+        url === target.url ? "application/rss+xml" : "text/html; charset=UTF-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      target,
+      "run_radius_labeled_fields",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.normalizedDraft).toMatchObject({
+      title: "Market Nights 2026",
+      eventDate: "2026-08-07",
+      startsAt: "2026-08-08T02:30:00.000Z",
+      doorsAt: "2026-08-08T01:00:00.000Z",
+      agePolicy: "21+",
+      ticketUrl:
+        "https://www.axs.com/events/1000001/market-nights-tickets?skin=radius",
+    });
+  });
+
+  it("turns a failed Radius detail request into an item warning without hiding valid sibling events", async () => {
+    const target = createRadiusTarget();
+    const failedDetailUrl =
+      "https://www.radius-chicago.com/events/detail/1000002";
+    const rssWithSibling = certifiedRadiusRss.replace(
+      "  </channel>",
+      `    <item>
+      <title>After Hours on Aug 8, 2026</title>
+      <link>${failedDetailUrl}</link>
+      <guid>radius-event-1000002</guid>
+      <description><![CDATA[Official Radius event listing.]]></description>
+    </item>
+  </channel>`,
+    );
+    const fetcher: Fetcher = async (url) => {
+      if (url === target.url) {
+        return {
+          body: rssWithSibling,
+          contentType: "application/rss+xml",
+          status: 200,
+        };
+      }
+      if (url === radiusDetailUrl) {
+        return {
+          body: certifiedRadiusDetail,
+          contentType: "text/html; charset=UTF-8",
+          status: 200,
+        };
+      }
+      throw new Error("Radius detail request timed out");
+    };
+
+    const candidates = await parseRssEventFeedTarget(
+      target,
+      "run_radius_detail_warning",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          lane: "new-event",
+          normalizedDraft: expect.objectContaining({
+            title: "Market Nights 2026",
+          }),
+        }),
+        expect.objectContaining({
+          lane: "source-health",
+          normalizedDraft: expect.objectContaining({
+            issue: "radius-detail-fetch-failed",
+            title: "After Hours",
+            eventDate: "2026-08-08",
+            sourceUrl: failedDetailUrl,
+          }),
+          conflicts: {
+            reason: "Radius detail request timed out",
+          },
+        }),
+      ]),
+    );
+  });
+
+  it("routes a Radius item with no reliable detail time to source health without guessing startsAt", async () => {
+    const target = createRadiusTarget();
+    const detailWithoutEventTime = certifiedRadiusDetail.replace(
+      "<span>9:30 PM</span>",
+      "<span>To be announced</span>",
+    );
+    const fetcher: Fetcher = async (url) => ({
+      body: url === target.url ? certifiedRadiusRss : detailWithoutEventTime,
+      contentType:
+        url === target.url ? "application/rss+xml" : "text/html; charset=UTF-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      target,
+      "run_radius_missing_time",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate).toMatchObject({
+      lane: "source-health",
+      confidenceReasons: [
+        "RSS item did not include a reliable event time",
+      ],
+      normalizedDraft: {
+        issue: "rss-item-missing-event-time",
+        title: "Market Nights 2026",
+        eventDate: "2026-08-07",
+        sourceUrl: radiusDetailUrl,
+      },
+      conflicts: {
+        reason:
+          "RSS item has an event date but no reliable event time; no startsAt was guessed.",
+      },
+    });
+    expect(candidate.normalizedDraft).not.toHaveProperty("startsAt");
+  });
+
+  it("uses the exact Radius ticket href instead of a similarly named attribute", async () => {
+    const target = createRadiusTarget();
+    const ticketUrl = "https://tickets.example.com/events/1000001";
+    const detailWithDecoyAttribute = certifiedRadiusDetail.replace(
+      'href="https://www.axs.com/events/1000001/market-nights-tickets?skin=radius"',
+      `data-href="https://arbitrary.example/ticket" href="${ticketUrl}"`,
+    );
+    const fetcher: Fetcher = async (url) => ({
+      body: url === target.url ? certifiedRadiusRss : detailWithDecoyAttribute,
+      contentType:
+        url === target.url ? "application/rss+xml" : "text/html; charset=UTF-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      target,
+      "run_radius_unsafe_ticket",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.normalizedDraft.ticketUrl).toBe(ticketUrl);
+  });
+
+  it("ignores a non-HTTPS Radius ticket destination", async () => {
+    const target = createRadiusTarget();
+    const unsafeDetail = certifiedRadiusDetail.replace(
+      'href="https://www.axs.com/events/1000001/market-nights-tickets?skin=radius"',
+      'href="javascript:alert(1)"',
+    );
+    const fetcher: Fetcher = async (url) => ({
+      body: url === target.url ? certifiedRadiusRss : unsafeDetail,
+      contentType:
+        url === target.url ? "application/rss+xml" : "text/html; charset=UTF-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      target,
+      "run_radius_unsafe_ticket",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.normalizedDraft.ticketUrl).toBe(radiusDetailUrl);
+  });
+
+  it("blocks a Radius detail redirect to an arbitrary public host", async () => {
+    const target = createRadiusTarget();
+    let contactedArbitraryHost = false;
+    const transport = vi.fn(async ({ url }: ExternalTransportRequest) => {
+      if (url.toString() === target.url) {
+        return {
+          status: 200,
+          headers: { "content-type": "application/rss+xml" },
+          body: responseBody(certifiedRadiusRss),
+        };
+      }
+      if (url.toString() === radiusDetailUrl) {
+        return {
+          status: 302,
+          headers: { location: "https://arbitrary.example/events/1000001" },
+          body: responseBody(""),
+        };
+      }
+      contactedArbitraryHost = true;
+      return {
+        status: 200,
+        headers: { "content-type": "text/html" },
+        body: responseBody("<main>unexpected escaped detail page</main>"),
+      };
+    });
+    const fetcher = createExternalFetcher({
+      resolveHostname: async () => [{ address: "93.184.216.34", family: 4 }],
+      transport,
+    });
+
+    const [warning] = await parseRssEventFeedTarget(
+      target,
+      "run_radius_host_policy",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(warning).toMatchObject({
+      lane: "source-health",
+      normalizedDraft: {
+        issue: "radius-detail-fetch-failed",
+        title: "Market Nights 2026",
+        eventDate: "2026-08-07",
+        sourceUrl: radiusDetailUrl,
+      },
+      conflicts: {
+        reason: expect.stringMatching(/outside the allowed hosts/i),
+      },
+    });
+    expect(contactedArbitraryHost).toBe(false);
+  });
+
   it("parses the certified Smartbar compact description and cleans entities", async () => {
     const fetcher: Fetcher = async () => ({
       body: certifiedSmartbarRss,
@@ -228,7 +561,7 @@ describe("parseRssEventFeedTarget", () => {
       lane: "new-event",
       targetEntityType: "event",
       targetEntityId: null,
-      parserVersion: "rss-event-feed@2",
+      parserVersion: "rss-event-feed@5",
       fetchTimestamp: "2026-06-17T20:00:00.000Z",
     });
     expect(items[0].confidence).toBeLessThan(82);
@@ -249,7 +582,7 @@ describe("parseRssEventFeedTarget", () => {
         "Sunday, June 28, 2026 Doors: 10:00 PM 21+ / Smartbar / $20 advance",
       ],
       contentHashes: [
-        "https://smartbarchicago.com/event/queen-derrick-carter/:rss-event-feed@2",
+        "https://smartbarchicago.com/event/queen-derrick-carter/:rss-event-feed@5",
       ],
     });
     expect(items[0].matchFingerprint).toBe(
@@ -354,7 +687,7 @@ describe("parseRssEventFeedTarget", () => {
       confidence: 20,
       targetEntityType: "source-target",
       targetEntityId: "target_smartbar_rss",
-      parserVersion: "rss-event-feed@2",
+      parserVersion: "rss-event-feed@5",
     });
     expect(items[0].normalizedDraft).toMatchObject({
       issue: "rss-item-missing-event-date",

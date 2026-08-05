@@ -42,4 +42,5 @@ describe("candidate identity", () => {
       }),
     ).toBe(buildMaterialContentHash(baseline));
   });
+
 });
