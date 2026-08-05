@@ -1186,7 +1186,7 @@ describe("refresh engine", () => {
     expect(result.reviewItems[0]).toMatchObject({
       lane: "new-event",
       sourceTargetId: target.id,
-      parserVersion: "rss-event-feed@3",
+      parserVersion: "rss-event-feed@4",
     });
     expect(result.reviewItems[0].normalizedDraft).toMatchObject({
       title: "Queen! with Derrick Carter",
@@ -1293,7 +1293,7 @@ describe("refresh engine", () => {
       evidence: {
         ...reviewItem.evidence,
         contentHashes: reviewItem.evidence.contentHashes.map((hash) =>
-          hash.replace("rss-event-feed@3", "rss-event-feed@0"),
+          hash.replace("rss-event-feed@4", "rss-event-feed@0"),
         ),
       },
       parserVersion: "rss-event-feed@0",
@@ -1316,9 +1316,9 @@ describe("refresh engine", () => {
       {
         id: reviewItem.id,
         evidence: {
-          contentHashes: [expect.stringContaining("rss-event-feed@3")],
+          contentHashes: [expect.stringContaining("rss-event-feed@4")],
         },
-        parserVersion: "rss-event-feed@3",
+        parserVersion: "rss-event-feed@4",
       },
     ]);
     expect(
@@ -1332,7 +1332,7 @@ describe("refresh engine", () => {
       lastSeenAt: upgradedAt.toISOString(),
       lastChangedAt: firstSeenAt.toISOString(),
       latestReviewItemId: reviewItem.id,
-      parserVersion: "rss-event-feed@3",
+      parserVersion: "rss-event-feed@4",
     });
   });
 

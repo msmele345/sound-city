@@ -144,9 +144,9 @@ Certify Radius as the second RSS shape. Use its RSS GUID for stable identity and
 - [x] Radius RSS GUID is used as the stable source event key.
 - [x] Radius event date and normalized title are extracted from the certified RSS title shape.
 - [x] Enrichment fetches only the official Radius detail URL supplied by the RSS item.
-- [ ] Enrichment uses the shared fetch policy and cannot escape to arbitrary or unsafe hosts.
-- [ ] Labeled event time, doors time, age policy, and ticket URL are captured when available.
-- [ ] RSS and event-detail behavior are covered by separate sanitized fixtures.
+- [x] Enrichment uses the shared fetch policy and cannot escape to arbitrary or unsafe hosts.
+- [x] Labeled event time, doors time, age policy, and ticket URL are captured when available.
+- [x] RSS and event-detail behavior are covered by separate sanitized fixtures.
 - [ ] One failed detail request is an item warning and does not hide valid sibling events.
 - [ ] An item that still lacks a reliable event time is routed to review/source-health rather than guessed.
 - [ ] The Radius target fails only when the feed itself is unusable or no item can be interpreted reliably.

@@ -457,7 +457,11 @@ async function executeRefresh(
           lastFetchedAt: fetchedAt,
         });
         const fetcher: Fetcher = input.fetcher ?? externalFetcher;
-        const recordingFetcher: Fetcher = async (url, validators) => {
+        const recordingFetcher: Fetcher = async (
+          url,
+          validators,
+          destinationPolicy,
+        ) => {
           const requestStartedAt = Date.now();
           try {
             const targetValidators =
@@ -475,6 +479,7 @@ async function executeRefresh(
               targetValidators && Object.keys(targetValidators).length > 0
                 ? targetValidators
                 : undefined,
+              destinationPolicy,
             );
             requestTelemetry = {
               requestDurationMs:

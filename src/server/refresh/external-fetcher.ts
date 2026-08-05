@@ -3,6 +3,7 @@ import { request as httpsRequest } from "node:https";
 import { BlockList, isIP, type LookupFunction } from "node:net";
 
 import type {
+  FetchDestinationPolicy,
   FetchFailure,
   FetchFailureTelemetry,
   Fetcher,
@@ -156,7 +157,10 @@ async function resolvePublicAddresses(
   return addresses;
 }
 
-function parseDestination(rawUrl: string) {
+function parseDestination(
+  rawUrl: string,
+  destinationPolicy: FetchDestinationPolicy,
+) {
   let url: URL;
   try {
     url = new URL(rawUrl);
@@ -169,6 +173,14 @@ function parseDestination(rawUrl: string) {
   }
   if (url.username || url.password) {
     unsafeDestination("embedded credentials are not permitted");
+  }
+  if (
+    destinationPolicy.allowedHostnames &&
+    !destinationPolicy.allowedHostnames.some(
+      (hostname) => hostname.toLowerCase() === url.hostname.toLowerCase(),
+    )
+  ) {
+    unsafeDestination(`${url.hostname} is outside the allowed hosts`);
   }
   return url;
 }
@@ -355,8 +367,9 @@ export function createExternalFetcher(
   const fetchOnce = async (
     rawUrl: string,
     validators: FetchValidators,
+    destinationPolicy: FetchDestinationPolicy,
   ) => {
-    let url = parseDestination(rawUrl);
+    let url = parseDestination(rawUrl, destinationPolicy);
 
     for (let redirectCount = 0; ; redirectCount += 1) {
       let requested;
@@ -386,7 +399,7 @@ export function createExternalFetcher(
         } catch {
           unsafeDestination("invalid redirect URL");
         }
-        url = parseDestination(redirectUrl.toString());
+        url = parseDestination(redirectUrl.toString(), destinationPolicy);
         continue;
       }
 
@@ -406,30 +419,31 @@ export function createExternalFetcher(
   const retryOnce = async (
     rawUrl: string,
     validators: FetchValidators,
+    destinationPolicy: FetchDestinationPolicy,
   ) => {
     try {
-      const retried = await fetchOnce(rawUrl, validators);
+      const retried = await fetchOnce(rawUrl, validators, destinationPolicy);
       return { ...retried, retryCount: 1 };
     } catch (retryError) {
       throw withFailureTelemetry(retryError, { retryCount: 1 });
     }
   };
 
-  return async (rawUrl, validators = {}) => {
+  return async (rawUrl, validators = {}, destinationPolicy = {}) => {
     let result;
     try {
-      result = await fetchOnce(rawUrl, validators);
+      result = await fetchOnce(rawUrl, validators, destinationPolicy);
     } catch (error) {
       if (error instanceof ExternalFetchError && !error.retryable) {
         throw error;
       }
-      return retryOnce(rawUrl, validators);
+      return retryOnce(rawUrl, validators, destinationPolicy);
     }
     if (
       result.status === 429 ||
       (result.status >= 500 && result.status <= 599)
     ) {
-      return retryOnce(rawUrl, validators);
+      return retryOnce(rawUrl, validators, destinationPolicy);
     }
     return result;
   };

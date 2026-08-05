@@ -13,8 +13,12 @@ import type {
   SourceTargetRecord,
 } from "./types";
 
-const parserVersion = "rss-event-feed@3";
+const parserVersion = "rss-event-feed@4";
 const chicagoTimeZone = "America/Chicago";
+const radiusDetailHostnames = [
+  "radius-chicago.com",
+  "www.radius-chicago.com",
+] as const;
 const rssXmlParser = new XMLParser({
   ignoreAttributes: false,
   parseTagValue: false,
@@ -32,6 +36,13 @@ type RssItem = {
 
 type ParserContext = {
   owner?: SourceOwnerRecord | null;
+};
+
+type RssItemEnrichment = {
+  startsAt?: string;
+  doorsAt?: string;
+  agePolicy?: string;
+  ticketUrl?: string;
 };
 
 function clampConfidence(value: number): number {
@@ -236,6 +247,84 @@ function hourFromMeridiem(hour: number, meridiem: string): number {
   return meridiem.toLowerCase() === "pm" ? normalized + 12 : normalized;
 }
 
+function extractLabeledDetailValue(html: string, label: string) {
+  const match = html.match(
+    new RegExp(
+      `<label\\b[^>]*>\\s*${label}\\s*</label>\\s*<span\\b[^>]*>([\\s\\S]*?)</span>`,
+      "i",
+    ),
+  );
+  return match ? cleanText(match[1]) : undefined;
+}
+
+function extractHtmlAttribute(tag: string, attribute: string) {
+  const match = tag.match(
+    new RegExp(`${attribute}\\s*=\\s*(["'])([\\s\\S]*?)\\1`, "i"),
+  );
+  return match ? decodeXmlEntities(match[2]).trim() : undefined;
+}
+
+function radiusTicketUrl(html: string) {
+  const ticketAnchor = (html.match(/<a\b[^>]*>/gi) ?? []).find((anchor) => {
+    const title = extractHtmlAttribute(anchor, "title");
+    const classes = extractHtmlAttribute(anchor, "class")?.split(/\s+/) ?? [];
+    return title?.toLowerCase() === "buy tickets" && classes.includes("tickets");
+  });
+  const href = ticketAnchor
+    ? extractHtmlAttribute(ticketAnchor, "href")
+    : undefined;
+  return href ? canonicalizeSourceUrl(href) : undefined;
+}
+
+function localChicagoEventTime(
+  eventDate: string | undefined,
+  value: string | undefined,
+) {
+  if (!eventDate || !value) return undefined;
+  const dateMatch = eventDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const timeMatch = value.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
+  if (!dateMatch || !timeMatch) return undefined;
+
+  const hour = Number(timeMatch[1]);
+  const minute = Number(timeMatch[2] ?? 0);
+  if (hour < 1 || hour > 12 || minute < 0 || minute > 59) return undefined;
+
+  return localChicagoDateToIso(
+    Number(dateMatch[1]),
+    Number(dateMatch[2]),
+    Number(dateMatch[3]),
+    hourFromMeridiem(hour, timeMatch[3]),
+    minute,
+  );
+}
+
+function normalizeRadiusAgePolicy(value: string | undefined) {
+  if (!value) return undefined;
+  const minimumAge = value.match(/^(\d{1,2})\s*(?:&|and)\s*over$/i)?.[1];
+  return minimumAge ? `${minimumAge}+` : value;
+}
+
+function extractRadiusDetailFields(
+  html: string,
+  eventDate: string | undefined,
+): RssItemEnrichment {
+  const eventTime = extractLabeledDetailValue(html, "Time");
+  const doorsTime = extractLabeledDetailValue(html, "Doors");
+  const agePolicy = normalizeRadiusAgePolicy(
+    extractLabeledDetailValue(html, "Ages"),
+  );
+  const ticketUrl = radiusTicketUrl(html);
+  const startsAt = localChicagoEventTime(eventDate, eventTime);
+  const doorsAt = localChicagoEventTime(eventDate, doorsTime);
+
+  return {
+    ...(startsAt ? { startsAt } : {}),
+    ...(doorsAt ? { doorsAt } : {}),
+    ...(agePolicy ? { agePolicy } : {}),
+    ...(ticketUrl ? { ticketUrl } : {}),
+  };
+}
+
 function extractDescriptionStart(description: string): string | null {
   const normalized = cleanText(description);
   const dateMatch = normalized.match(
@@ -302,13 +391,20 @@ function reviewItemForItem(
   fetchedAt: string,
   item: RssItem,
   context: ParserContext = {},
+  enrichment: RssItemEnrichment = {},
 ): ParserCandidate {
   const titleFields = extractRadiusTitleFields(target, item.title);
   const compactFields = extractCompactDescriptionFields(
     item.description,
     titleFields.title,
   );
-  const { startsAt, ...descriptionFields } = compactFields;
+  const { startsAt: descriptionStartsAt, ...descriptionFields } = compactFields;
+  const {
+    startsAt: enrichedStartsAt,
+    ticketUrl: enrichedTicketUrl,
+    ...enrichedFields
+  } = enrichment;
+  const startsAt = enrichedStartsAt ?? descriptionStartsAt;
   const excerpt = cleanText(item.description);
   const venueName = context.owner?.kind === "venue" ? context.owner.name : "";
   const linkedDrafts = venueName ? [{ type: "venue", name: venueName }] : [];
@@ -362,10 +458,11 @@ function reviewItemForItem(
     ...titleFields,
     startsAt,
     ...descriptionFields,
+    ...enrichedFields,
     ...(venueName ? { venueName } : {}),
     styles: normalizeStyleTags(item.categories),
     canonicalUrl,
-    ticketUrl: canonicalUrl,
+    ticketUrl: enrichedTicketUrl ?? canonicalUrl,
   };
 
   return {
@@ -425,11 +522,26 @@ export async function parseRssEventFeedTarget(
     throw new Error("RSS event feed source does not contain RSS/XML event items.");
   }
 
-  if (isRadiusTarget(target)) {
-    await Promise.all(items.map((item) => fetcher(item.link)));
-  }
+  const enrichments = isRadiusTarget(target)
+    ? await Promise.all(
+        items.map(async (item) => {
+          const detail = await fetcher(item.link, undefined, {
+            allowedHostnames: radiusDetailHostnames,
+          });
+          const titleFields = extractRadiusTitleFields(target, item.title);
+          return extractRadiusDetailFields(detail.body, titleFields.eventDate);
+        }),
+      )
+    : items.map(() => ({}));
 
-  return items.map((item) =>
-    reviewItemForItem(target, runId, fetchedAt, item, context),
+  return items.map((item, index) =>
+    reviewItemForItem(
+      target,
+      runId,
+      fetchedAt,
+      item,
+      context,
+      enrichments[index],
+    ),
   );
 }

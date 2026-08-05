@@ -28,6 +28,10 @@ export type FetchValidators = {
   lastModified?: string | null;
 };
 
+export type FetchDestinationPolicy = {
+  allowedHostnames?: readonly string[];
+};
+
 export type FetchFailureTelemetry = {
   requestDurationMs?: number | null;
   responseStatus?: number | null;
@@ -43,6 +47,7 @@ export type FetchFailure = Error & {
 export type Fetcher = (
   url: string,
   validators?: FetchValidators,
+  destinationPolicy?: FetchDestinationPolicy,
 ) => Promise<FetchResult>;
 
 export type CreateSourceOwnerInput = Omit<
