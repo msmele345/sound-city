@@ -13,7 +13,7 @@ import type {
   SourceTargetRecord,
 } from "./types";
 
-const parserVersion = "rss-event-feed@2";
+const parserVersion = "rss-event-feed@3";
 const chicagoTimeZone = "America/Chicago";
 const rssXmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -169,6 +169,7 @@ function localChicagoDateToIso(
 }
 
 function monthNumber(monthName: string): number | null {
+  const normalizedMonth = monthName.toLowerCase();
   const month = [
     "january",
     "february",
@@ -182,8 +183,52 @@ function monthNumber(monthName: string): number | null {
     "october",
     "november",
     "december",
-  ].indexOf(monthName.toLowerCase());
+  ].findIndex(
+    (candidate) =>
+      candidate === normalizedMonth ||
+      candidate.slice(0, 3) === normalizedMonth.slice(0, 3),
+  );
   return month >= 0 ? month + 1 : null;
+}
+
+function isRadiusTarget(target: SourceTargetRecord): boolean {
+  try {
+    return new URL(target.url).hostname.replace(/^www\./i, "").toLowerCase() ===
+      "radius-chicago.com";
+  } catch {
+    return false;
+  }
+}
+
+function extractRadiusTitleFields(
+  target: SourceTargetRecord,
+  title: string,
+): { title: string; eventDate?: string } {
+  if (!isRadiusTarget(target)) return { title };
+
+  const match = title.match(
+    /^(.*?)\s+on\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2}),\s+(\d{4})$/i,
+  );
+  if (!match) return { title };
+
+  const month = monthNumber(match[2]);
+  if (!month) return { title };
+
+  const day = Number(match[3]);
+  const year = Number(match[4]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return { title };
+  }
+
+  return {
+    title: match[1].trim(),
+    eventDate: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  };
 }
 
 function hourFromMeridiem(hour: number, meridiem: string): number {
@@ -258,9 +303,10 @@ function reviewItemForItem(
   item: RssItem,
   context: ParserContext = {},
 ): ParserCandidate {
+  const titleFields = extractRadiusTitleFields(target, item.title);
   const compactFields = extractCompactDescriptionFields(
     item.description,
-    item.title,
+    titleFields.title,
   );
   const { startsAt, ...descriptionFields } = compactFields;
   const excerpt = cleanText(item.description);
@@ -271,8 +317,10 @@ function reviewItemForItem(
 
   if (!startsAt) {
     const normalizedDraft = {
-      issue: "rss-item-missing-event-date",
-      title: item.title,
+      issue: titleFields.eventDate
+        ? "rss-item-missing-event-time"
+        : "rss-item-missing-event-date",
+      ...titleFields,
       sourceUrl: canonicalUrl,
     };
     return {
@@ -295,7 +343,9 @@ function reviewItemForItem(
       linkedDrafts: [],
       conflicts: {
         reason:
-          "RSS item has no reliable event date in its description; pubDate was not used as startsAt.",
+          titleFields.eventDate
+            ? "RSS item has an event date but no reliable event time; no startsAt was guessed."
+            : "RSS item has no reliable event date in its description; pubDate was not used as startsAt.",
       },
       evidence: {
         sourceUrls: [canonicalUrl],
@@ -309,7 +359,7 @@ function reviewItemForItem(
 
   const confidence = clampConfidence(68 + target.confidenceAdjustment);
   const normalizedDraft = {
-    title: item.title,
+    ...titleFields,
     startsAt,
     ...descriptionFields,
     ...(venueName ? { venueName } : {}),
@@ -373,6 +423,10 @@ export async function parseRssEventFeedTarget(
   const items = parseRssItems(result.body);
   if (items.length === 0) {
     throw new Error("RSS event feed source does not contain RSS/XML event items.");
+  }
+
+  if (isRadiusTarget(target)) {
+    await Promise.all(items.map((item) => fetcher(item.link)));
   }
 
   return items.map((item) =>

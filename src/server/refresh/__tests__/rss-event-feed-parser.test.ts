@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -55,6 +55,32 @@ const smartbarRss = `<?xml version="1.0" encoding="UTF-8"?>
   </channel>
 </rss>`;
 
+const radiusDetailUrl =
+  "https://www.radius-chicago.com/events/detail/1099683";
+const radiusGuid = "radius-event-1099683";
+const radiusRss = `<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Radius Chicago</title>
+    <item>
+      <title>MEAT XXL Market Days 2026 on Aug 7, 2026</title>
+      <link>${radiusDetailUrl}</link>
+      <guid>${radiusGuid}</guid>
+      <description><![CDATA[
+        <p><a href="https://tickets.example.test/ignored">Buy Tickets</a></p>
+      ]]></description>
+    </item>
+  </channel>
+</rss>`;
+
+function createRadiusTarget(): SourceTargetRecord {
+  return createTarget({
+    id: "target_radius_rss",
+    ownerId: "owner_radius",
+    url: "https://www.radius-chicago.com/events/rss",
+  });
+}
+
 const certifiedSmartbarRss = readFileSync(
   resolve(
     process.cwd(),
@@ -80,6 +106,77 @@ function createOwner(
 }
 
 describe("parseRssEventFeedTarget", () => {
+  it("uses the Radius RSS guid as the stable source event key", async () => {
+    const fetcher: Fetcher = async () => ({
+      body: radiusRss,
+      contentType: "application/rss+xml",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      createRadiusTarget(),
+      "run_radius_identity",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.sourceEventKey).toBe(radiusGuid);
+  });
+
+  it("normalizes the Radius RSS title and extracts its event date without inventing a time", async () => {
+    const fetcher: Fetcher = async () => ({
+      body: radiusRss,
+      contentType: "application/rss+xml",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      createRadiusTarget(),
+      "run_radius_title",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate.normalizedDraft).toMatchObject({
+      title: "MEAT XXL Market Days 2026",
+      eventDate: "2026-08-07",
+    });
+    expect(candidate.normalizedDraft).not.toHaveProperty("startsAt");
+  });
+
+  it("enriches a Radius item only from the detail URL supplied by its RSS entry", async () => {
+    const target = createRadiusTarget();
+    const fetcher = vi.fn<Fetcher>(async (url) => {
+      if (url === target.url) {
+        return {
+          body: radiusRss,
+          contentType: "application/rss+xml",
+          status: 200,
+        };
+      }
+      if (url === radiusDetailUrl) {
+        return {
+          body: `<main><a href="https://tickets.example.test/ignored">Tickets</a></main>`,
+          contentType: "text/html",
+          status: 200,
+        };
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    await parseRssEventFeedTarget(
+      target,
+      "run_radius_detail",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      target.url,
+      radiusDetailUrl,
+    ]);
+  });
+
   it("parses the certified Smartbar compact description and cleans entities", async () => {
     const fetcher: Fetcher = async () => ({
       body: certifiedSmartbarRss,
@@ -228,7 +325,7 @@ describe("parseRssEventFeedTarget", () => {
       lane: "new-event",
       targetEntityType: "event",
       targetEntityId: null,
-      parserVersion: "rss-event-feed@2",
+      parserVersion: "rss-event-feed@3",
       fetchTimestamp: "2026-06-17T20:00:00.000Z",
     });
     expect(items[0].confidence).toBeLessThan(82);
@@ -249,7 +346,7 @@ describe("parseRssEventFeedTarget", () => {
         "Sunday, June 28, 2026 Doors: 10:00 PM 21+ / Smartbar / $20 advance",
       ],
       contentHashes: [
-        "https://smartbarchicago.com/event/queen-derrick-carter/:rss-event-feed@2",
+        "https://smartbarchicago.com/event/queen-derrick-carter/:rss-event-feed@3",
       ],
     });
     expect(items[0].matchFingerprint).toBe(
@@ -354,7 +451,7 @@ describe("parseRssEventFeedTarget", () => {
       confidence: 20,
       targetEntityType: "source-target",
       targetEntityId: "target_smartbar_rss",
-      parserVersion: "rss-event-feed@2",
+      parserVersion: "rss-event-feed@3",
     });
     expect(items[0].normalizedDraft).toMatchObject({
       issue: "rss-item-missing-event-date",
