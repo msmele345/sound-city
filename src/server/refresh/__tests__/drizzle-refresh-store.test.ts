@@ -139,6 +139,8 @@ describe("drizzle refresh store", () => {
 
       expect(created.url).toBe("https://smartbarchicago.com/calendar");
       expect(created.parserStrategy).toBe("venue-calendar");
+      expect(created.etag).toBeNull();
+      expect(created.lastModified).toBeNull();
     });
   });
 

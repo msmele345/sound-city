@@ -18,6 +18,8 @@ const target: SourceTargetRecord = {
   rejectionCount: 0,
   duplicateCount: 0,
   refreshCadence: "manual",
+  etag: null,
+  lastModified: null,
   lastFetchedAt: null,
   lastSuccessfulRunAt: null,
   lastFailureAt: null,

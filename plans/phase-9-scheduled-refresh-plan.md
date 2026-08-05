@@ -106,17 +106,28 @@ Introduce one shared external fetch boundary and route Smartbar ingestion throug
 
 ### Acceptance criteria
 
-- [ ] Production fetching permits public HTTPS targets and rejects embedded credentials, private addresses, loopback, link-local destinations, and HTTPS downgrade.
-- [ ] Requests use a 15-second timeout, a 5 MB response limit, at most three redirects, and an identifiable Sound City user agent.
-- [ ] One bounded retry is allowed for network errors, `429`, and `5xx`; other client errors are not retried.
-- [ ] Conditional ETag and Last-Modified requests are supported, and `304 Not Modified` produces a successful unchanged outcome.
-- [ ] Target outcomes record final URL, response status, duration, size, and retry count without storing full response bodies.
-- [ ] Smartbar parsing supports the certified fixture’s title, event date, doors time, lineup, price, age policy, venue, and canonical source URL when present.
-- [ ] Smartbar uses its canonical item link as source identity when no feed GUID exists.
-- [ ] Entity cleanup and compact-description parsing are covered by fixture tests.
-- [ ] A live manual Smartbar run creates useful review work.
-- [ ] A second unchanged manual Smartbar run creates zero new review items.
-- [ ] Smartbar remains at manual cadence until its certification criteria pass.
+- [x] Production fetching permits public HTTPS targets and rejects embedded credentials, private addresses, loopback, link-local destinations, and HTTPS downgrade.
+- [x] Requests use a 15-second timeout, a 5 MB response limit, at most three redirects, and an identifiable Sound City user agent.
+- [x] One bounded retry is allowed for network errors, `429`, and `5xx`; other client errors are not retried.
+- [x] Conditional ETag and Last-Modified requests are supported, and `304 Not Modified` produces a successful unchanged outcome.
+- [x] Target outcomes record final URL, response status, duration, size, and retry count without storing full response bodies.
+- [x] Smartbar parsing supports the certified fixture’s title, event date, doors time, lineup, price, age policy, venue, and canonical source URL when present.
+- [x] Smartbar uses its canonical item link as source identity when no feed GUID exists.
+- [x] Entity cleanup and compact-description parsing are covered by fixture tests.
+- [x] A live manual Smartbar run creates useful review work.
+- [x] A second unchanged manual Smartbar run creates zero new review items.
+- [x] Smartbar remains at manual cadence until its certification criteria pass.
+
+Certification evidence (2026-08-04): manual run
+`refresh_run_city_chicago_7c146f5d-a269-4565-b8a8-2911deb79dc9` produced a
+successful Smartbar outcome with 15 candidates and 15 new event review items.
+The immediate repeat,
+`refresh_run_city_chicago_291a032c-21e0-42fc-834f-28b558244a2a`, produced an
+unchanged Smartbar outcome with 15 unchanged candidates and zero created or
+updated review items. The enabled Smartbar RSS target remained at `manual`
+cadence throughout certification. Both city-wide runs were partial because the
+separately configured Radius target did not serve structured RSS/XML; the
+Smartbar target outcomes themselves satisfied these source-specific criteria.
 
 ---
 

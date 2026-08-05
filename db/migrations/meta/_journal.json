@@ -50,6 +50,13 @@
       "when": 1785184782938,
       "tag": "0006_phase9_refresh_overlap_link",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785541976180,
+      "tag": "0007_phase9_fetch_validators",
+      "breakpoints": true
     }
   ]
 }

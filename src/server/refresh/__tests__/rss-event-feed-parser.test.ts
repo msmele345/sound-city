@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { parseRssEventFeedTarget } from "../rss-event-feed-parser";
 import type { Fetcher, SourceOwnerRecord, SourceTargetRecord } from "../types";
@@ -21,6 +23,8 @@ function createTarget(
     rejectionCount: 0,
     duplicateCount: 0,
     refreshCadence: "daily",
+    etag: null,
+    lastModified: null,
     lastFetchedAt: null,
     lastSuccessfulRunAt: null,
     lastFailureAt: null,
@@ -51,6 +55,14 @@ const smartbarRss = `<?xml version="1.0" encoding="UTF-8"?>
   </channel>
 </rss>`;
 
+const certifiedSmartbarRss = readFileSync(
+  resolve(
+    process.cwd(),
+    "src/server/refresh/__tests__/fixtures/smartbar-rss.xml",
+  ),
+  "utf8",
+);
+
 function createOwner(
   overrides: Partial<SourceOwnerRecord> = {},
 ): SourceOwnerRecord {
@@ -68,6 +80,131 @@ function createOwner(
 }
 
 describe("parseRssEventFeedTarget", () => {
+  it("parses the certified Smartbar compact description and cleans entities", async () => {
+    const fetcher: Fetcher = async () => ({
+      body: certifiedSmartbarRss,
+      contentType: "text/xml; charset=UTF-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      createTarget(),
+      "run_certification",
+      "2026-07-31T13:32:13.000Z",
+      fetcher,
+      { owner: createOwner() },
+    );
+
+    expect(candidate.sourceEventKey).toBe(
+      "https://smartbarchicago.com/event/signal-flow/",
+    );
+    expect(candidate.normalizedDraft).toEqual({
+      title: "Signal Flow & Friends",
+      startsAt: "2026-09-19T03:00:00.000Z",
+      doorsAt: "2026-09-19T03:00:00.000Z",
+      venueName: "Smartbar",
+      lineup: ["Artist One", "Artist Two", "DJ O’Three"],
+      price:
+        "$20-$25 Adv / $25 Door / $20 Student Door (before 12am with valid ID)",
+      agePolicy: "21+",
+      styles: [],
+      canonicalUrl: "https://smartbarchicago.com/event/signal-flow/",
+      ticketUrl: "https://smartbarchicago.com/event/signal-flow/",
+    });
+    expect(candidate.evidence.sourceUrls).toEqual([
+      "https://smartbarchicago.com/event/signal-flow/",
+    ]);
+    expect(candidate.evidence.excerpts[0]).toContain("Signal Flow & Friends");
+    expect(candidate.evidence.excerpts[0]).toContain("DJ O’Three");
+  });
+
+  it("treats tag-shaped text inside legal CDATA as description content", async () => {
+    const fetcher: Fetcher = async () => ({
+      body: certifiedSmartbarRss.replace(
+        "Night Moves presents",
+        "Night Moves </item> presents",
+      ),
+      contentType: "text/xml; charset=UTF-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      createTarget(),
+      "run_cdata",
+      "2026-07-31T13:32:13.000Z",
+      fetcher,
+      { owner: createOwner() },
+    );
+
+    expect(candidate).toMatchObject({
+      lane: "new-event",
+      normalizedDraft: {
+        title: "Signal Flow & Friends",
+        startsAt: "2026-09-19T03:00:00.000Z",
+      },
+    });
+    expect(candidate.evidence.excerpts[0]).toContain("Night Moves presents");
+  });
+
+  it("rejects a malformed RSS document instead of parsing a partial tree", async () => {
+    const fetcher: Fetcher = async () => ({
+      body: certifiedSmartbarRss.replace("  </channel>\n</rss>\n", ""),
+      contentType: "text/xml; charset=UTF-8",
+      status: 200,
+    });
+
+    await expect(
+      parseRssEventFeedTarget(
+        createTarget(),
+        "run_malformed_document",
+        "2026-07-31T13:32:13.000Z",
+        fetcher,
+        { owner: createOwner() },
+      ),
+    ).rejects.toThrow(/malformed rss\/xml document/i);
+  });
+
+  it("retains a certified event when a sibling item is incomplete", async () => {
+    const malformedSibling = `
+    <item>
+      <title>Recently announced Smartbar night</title>
+      <link>https://smartbarchicago.com/event/recently-announced/</link>
+      <description>Lineup and ticket details coming soon.</description>
+    </item>`;
+    const fetcher: Fetcher = async () => ({
+      body: certifiedSmartbarRss.replace(
+        "  </channel>",
+        `${malformedSibling}\n  </channel>`,
+      ),
+      contentType: "text/xml; charset=UTF-8",
+      status: 200,
+    });
+
+    const candidates = await parseRssEventFeedTarget(
+      createTarget(),
+      "run_malformed_sibling",
+      "2026-07-31T13:32:13.000Z",
+      fetcher,
+      { owner: createOwner() },
+    );
+
+    expect(candidates).toEqual([
+      expect.objectContaining({
+        lane: "new-event",
+        normalizedDraft: expect.objectContaining({
+          title: "Signal Flow & Friends",
+        }),
+      }),
+      expect.objectContaining({
+        lane: "source-health",
+        normalizedDraft: expect.objectContaining({
+          issue: "rss-item-missing-event-date",
+          title: "Recently announced Smartbar night",
+        }),
+      }),
+    ]);
+  });
+
   it("creates low-confidence review items from Smartbar-shaped RSS items", async () => {
     const target = createTarget();
     const fetcher: Fetcher = async () => ({
@@ -91,7 +228,7 @@ describe("parseRssEventFeedTarget", () => {
       lane: "new-event",
       targetEntityType: "event",
       targetEntityId: null,
-      parserVersion: "rss-event-feed@1",
+      parserVersion: "rss-event-feed@2",
       fetchTimestamp: "2026-06-17T20:00:00.000Z",
     });
     expect(items[0].confidence).toBeLessThan(82);
@@ -112,7 +249,7 @@ describe("parseRssEventFeedTarget", () => {
         "Sunday, June 28, 2026 Doors: 10:00 PM 21+ / Smartbar / $20 advance",
       ],
       contentHashes: [
-        "https://smartbarchicago.com/event/queen-derrick-carter/:rss-event-feed@1",
+        "https://smartbarchicago.com/event/queen-derrick-carter/:rss-event-feed@2",
       ],
     });
     expect(items[0].matchFingerprint).toBe(
@@ -217,7 +354,7 @@ describe("parseRssEventFeedTarget", () => {
       confidence: 20,
       targetEntityType: "source-target",
       targetEntityId: "target_smartbar_rss",
-      parserVersion: "rss-event-feed@1",
+      parserVersion: "rss-event-feed@2",
     });
     expect(items[0].normalizedDraft).toMatchObject({
       issue: "rss-item-missing-event-date",
