@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 const materialFields = [
   "title",
   "startsAt",
-  "doorsAt",
   "endsAt",
   "venueName",
   "artists",
