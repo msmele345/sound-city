@@ -212,6 +212,108 @@ describe("parseRssEventFeedTarget", () => {
     });
   });
 
+  it("turns a failed Radius detail request into an item warning without hiding valid sibling events", async () => {
+    const target = createRadiusTarget();
+    const failedDetailUrl =
+      "https://www.radius-chicago.com/events/detail/1000002";
+    const rssWithSibling = certifiedRadiusRss.replace(
+      "  </channel>",
+      `    <item>
+      <title>After Hours on Aug 8, 2026</title>
+      <link>${failedDetailUrl}</link>
+      <guid>radius-event-1000002</guid>
+      <description><![CDATA[Official Radius event listing.]]></description>
+    </item>
+  </channel>`,
+    );
+    const fetcher: Fetcher = async (url) => {
+      if (url === target.url) {
+        return {
+          body: rssWithSibling,
+          contentType: "application/rss+xml",
+          status: 200,
+        };
+      }
+      if (url === radiusDetailUrl) {
+        return {
+          body: certifiedRadiusDetail,
+          contentType: "text/html; charset=UTF-8",
+          status: 200,
+        };
+      }
+      throw new Error("Radius detail request timed out");
+    };
+
+    const candidates = await parseRssEventFeedTarget(
+      target,
+      "run_radius_detail_warning",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          lane: "new-event",
+          normalizedDraft: expect.objectContaining({
+            title: "Market Nights 2026",
+          }),
+        }),
+        expect.objectContaining({
+          lane: "source-health",
+          normalizedDraft: expect.objectContaining({
+            issue: "radius-detail-fetch-failed",
+            title: "After Hours",
+            eventDate: "2026-08-08",
+            sourceUrl: failedDetailUrl,
+          }),
+          conflicts: {
+            reason: "Radius detail request timed out",
+          },
+        }),
+      ]),
+    );
+  });
+
+  it("routes a Radius item with no reliable detail time to source health without guessing startsAt", async () => {
+    const target = createRadiusTarget();
+    const detailWithoutEventTime = certifiedRadiusDetail.replace(
+      "<span>9:30 PM</span>",
+      "<span>To be announced</span>",
+    );
+    const fetcher: Fetcher = async (url) => ({
+      body: url === target.url ? certifiedRadiusRss : detailWithoutEventTime,
+      contentType:
+        url === target.url ? "application/rss+xml" : "text/html; charset=UTF-8",
+      status: 200,
+    });
+
+    const [candidate] = await parseRssEventFeedTarget(
+      target,
+      "run_radius_missing_time",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(candidate).toMatchObject({
+      lane: "source-health",
+      confidenceReasons: [
+        "RSS item did not include a reliable event time",
+      ],
+      normalizedDraft: {
+        issue: "rss-item-missing-event-time",
+        title: "Market Nights 2026",
+        eventDate: "2026-08-07",
+        sourceUrl: radiusDetailUrl,
+      },
+      conflicts: {
+        reason:
+          "RSS item has an event date but no reliable event time; no startsAt was guessed.",
+      },
+    });
+    expect(candidate.normalizedDraft).not.toHaveProperty("startsAt");
+  });
+
   it("uses the exact Radius ticket href instead of a similarly named attribute", async () => {
     const target = createRadiusTarget();
     const ticketUrl = "https://tickets.example.com/events/1000001";
@@ -289,14 +391,25 @@ describe("parseRssEventFeedTarget", () => {
       transport,
     });
 
-    await expect(
-      parseRssEventFeedTarget(
-        target,
-        "run_radius_host_policy",
-        "2026-08-04T12:00:00.000Z",
-        fetcher,
-      ),
-    ).rejects.toThrow(/outside the allowed hosts/i);
+    const [warning] = await parseRssEventFeedTarget(
+      target,
+      "run_radius_host_policy",
+      "2026-08-04T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(warning).toMatchObject({
+      lane: "source-health",
+      normalizedDraft: {
+        issue: "radius-detail-fetch-failed",
+        title: "Market Nights 2026",
+        eventDate: "2026-08-07",
+        sourceUrl: radiusDetailUrl,
+      },
+      conflicts: {
+        reason: expect.stringMatching(/outside the allowed hosts/i),
+      },
+    });
     expect(contactedArbitraryHost).toBe(false);
   });
 
@@ -448,7 +561,7 @@ describe("parseRssEventFeedTarget", () => {
       lane: "new-event",
       targetEntityType: "event",
       targetEntityId: null,
-      parserVersion: "rss-event-feed@4",
+      parserVersion: "rss-event-feed@5",
       fetchTimestamp: "2026-06-17T20:00:00.000Z",
     });
     expect(items[0].confidence).toBeLessThan(82);
@@ -469,7 +582,7 @@ describe("parseRssEventFeedTarget", () => {
         "Sunday, June 28, 2026 Doors: 10:00 PM 21+ / Smartbar / $20 advance",
       ],
       contentHashes: [
-        "https://smartbarchicago.com/event/queen-derrick-carter/:rss-event-feed@4",
+        "https://smartbarchicago.com/event/queen-derrick-carter/:rss-event-feed@5",
       ],
     });
     expect(items[0].matchFingerprint).toBe(
@@ -574,7 +687,7 @@ describe("parseRssEventFeedTarget", () => {
       confidence: 20,
       targetEntityType: "source-target",
       targetEntityId: "target_smartbar_rss",
-      parserVersion: "rss-event-feed@4",
+      parserVersion: "rss-event-feed@5",
     });
     expect(items[0].normalizedDraft).toMatchObject({
       issue: "rss-item-missing-event-date",

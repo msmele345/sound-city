@@ -147,9 +147,9 @@ Certify Radius as the second RSS shape. Use its RSS GUID for stable identity and
 - [x] Enrichment uses the shared fetch policy and cannot escape to arbitrary or unsafe hosts.
 - [x] Labeled event time, doors time, age policy, and ticket URL are captured when available.
 - [x] RSS and event-detail behavior are covered by separate sanitized fixtures.
-- [ ] One failed detail request is an item warning and does not hide valid sibling events.
-- [ ] An item that still lacks a reliable event time is routed to review/source-health rather than guessed.
-- [ ] The Radius target fails only when the feed itself is unusable or no item can be interpreted reliably.
+- [x] One failed detail request is an item warning and does not hide valid sibling events.
+- [x] An item that still lacks a reliable event time is routed to review/source-health rather than guessed.
+- [x] The Radius target fails only when the feed itself is unusable or no item can be interpreted reliably.
 - [ ] A live manual Radius run creates useful review work.
 - [ ] A second unchanged manual Radius run creates zero new review items.
 - [ ] Radius remains at manual cadence until its certification criteria pass.

@@ -111,6 +111,30 @@ async function createRssObservationFixture(store: RefreshStore) {
   };
 }
 
+async function createRadiusRefreshTarget(store: RefreshStore, slug: string) {
+  const owner = await store.createSourceOwner({
+    cityId: "city_chicago",
+    name: "Radius Chicago",
+    slug,
+    kind: "venue",
+    notes: "",
+  });
+
+  return store.createSourceTarget({
+    ownerId: owner.id,
+    cityId: "city_chicago",
+    url: "https://www.radius-chicago.com/events/rss",
+    sourceType: "official-venue-calendar",
+    parserStrategy: "rss-event-feed",
+    trustLevel: "primary",
+    enabled: true,
+    confidenceAdjustment: 0,
+    healthStatus: "healthy",
+    refreshCadence: "manual",
+    notes: "",
+  });
+}
+
 function createCatalogWithPastEvent(
   startsAt = "2026-05-30T03:00:00.000Z",
 ): CatalogStore {
@@ -1186,7 +1210,7 @@ describe("refresh engine", () => {
     expect(result.reviewItems[0]).toMatchObject({
       lane: "new-event",
       sourceTargetId: target.id,
-      parserVersion: "rss-event-feed@4",
+      parserVersion: "rss-event-feed@5",
     });
     expect(result.reviewItems[0].normalizedDraft).toMatchObject({
       title: "Queen! with Derrick Carter",
@@ -1201,6 +1225,190 @@ describe("refresh engine", () => {
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.lastSuccessfulRunAt).not.toBeNull();
     expect(updated!.failureCount).toBe(0);
+  });
+
+  it("succeeds a Radius target when a detail warning has a reliably interpreted sibling", async () => {
+    const store = createSeedRefreshStore();
+    const target = await createRadiusRefreshTarget(
+      store,
+      "radius-chicago-warning-sibling",
+    );
+    const feedUrl = target.url;
+    const validDetailUrl =
+      "https://www.radius-chicago.com/events/detail/1000001";
+    const failedDetailUrl =
+      "https://www.radius-chicago.com/events/detail/1000002";
+    const rssBody = `<?xml version="1.0"?><rss><channel>
+      <item>
+        <title>Market Nights on Aug 7, 2026</title>
+        <link>${validDetailUrl}</link>
+        <guid>radius-event-1000001</guid>
+        <description>Official Radius event listing.</description>
+      </item>
+      <item>
+        <title>After Hours on Aug 8, 2026</title>
+        <link>${failedDetailUrl}</link>
+        <guid>radius-event-1000002</guid>
+        <description>Official Radius event listing.</description>
+      </item>
+    </channel></rss>`;
+    const fetcher: Fetcher = async (url) => {
+      if (url === feedUrl) {
+        return {
+          body: rssBody,
+          contentType: "application/rss+xml",
+          status: 200,
+        };
+      }
+      if (url === validDetailUrl) {
+        return {
+          body: "<label>Time</label><span>9:30 PM</span>",
+          contentType: "text/html",
+          status: 200,
+        };
+      }
+      throw new Error("Radius detail request timed out");
+    };
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(result.run).toMatchObject({
+      status: "succeeded",
+      sourceTargetsChecked: 1,
+      sourceTargetsFailed: 0,
+      draftsCreated: 1,
+    });
+    expect(result.reviewItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          lane: "new-event",
+          normalizedDraft: expect.objectContaining({ title: "Market Nights" }),
+        }),
+        expect.objectContaining({
+          sourceTargetId: target.id,
+          lane: "source-health",
+          normalizedDraft: expect.objectContaining({
+            issue: "radius-detail-fetch-failed",
+            title: "After Hours",
+          }),
+        }),
+      ]),
+    );
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      sourceTargetId: target.id,
+      status: "succeeded",
+      candidateCount: 1,
+      createdCount: 1,
+      warningCount: 1,
+      errorDetails: null,
+    });
+  });
+
+  it("fails a Radius target when no feed item has a reliable event time", async () => {
+    const store = createSeedRefreshStore();
+    const target = await createRadiusRefreshTarget(
+      store,
+      "radius-chicago-no-event-time",
+    );
+    const feedUrl = target.url;
+    const detailUrl = "https://www.radius-chicago.com/events/detail/1000001";
+    const fetcher: Fetcher = async (url) => ({
+      body:
+        url === feedUrl
+          ? `<?xml version="1.0"?><rss><channel><item>
+              <title>Market Nights on Aug 7, 2026</title>
+              <link>${detailUrl}</link>
+              <guid>radius-event-1000001</guid>
+              <description>Official Radius event listing.</description>
+            </item></channel></rss>`
+          : "<label>Time</label><span>To be announced</span>",
+      contentType: url === feedUrl ? "application/rss+xml" : "text/html",
+      status: 200,
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(result.run).toMatchObject({
+      status: "failed",
+      sourceTargetsChecked: 1,
+      sourceTargetsFailed: 1,
+      draftsCreated: 0,
+    });
+    expect(result.reviewItems).toEqual([
+      expect.objectContaining({
+        sourceTargetId: target.id,
+        lane: "source-health",
+        normalizedDraft: expect.objectContaining({
+          issue: "rss-item-missing-event-time",
+          title: "Market Nights",
+        }),
+      }),
+    ]);
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      sourceTargetId: target.id,
+      status: "failed",
+      candidateCount: 0,
+      createdCount: 0,
+      warningCount: 1,
+      errorDetails: {
+        message: expect.stringMatching(/no reliably interpretable events/i),
+      },
+    });
+  });
+
+  it("does not treat a Radius detail 304 as an unchanged feed when no event is reliable", async () => {
+    const store = createSeedRefreshStore();
+    const target = await createRadiusRefreshTarget(
+      store,
+      "radius-chicago-detail-not-modified",
+    );
+    const detailUrl = "https://www.radius-chicago.com/events/detail/1000001";
+    const fetcher: Fetcher = async (url) => ({
+      body:
+        url === target.url
+          ? `<?xml version="1.0"?><rss><channel><item>
+              <title>Market Nights on Aug 7, 2026</title>
+              <link>${detailUrl}</link>
+              <guid>radius-event-1000001</guid>
+              <description>Official Radius event listing.</description>
+            </item></channel></rss>`
+          : "",
+      contentType: url === target.url ? "application/rss+xml" : "text/html",
+      status: url === target.url ? 200 : 304,
+    });
+
+    const result = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(result.run).toMatchObject({
+      status: "failed",
+      sourceTargetsFailed: 1,
+    });
+    const [outcome] = await store.listRefreshTargetOutcomes(result.run.id);
+    expect(outcome).toMatchObject({
+      status: "failed",
+      candidateCount: 0,
+      warningCount: 1,
+      responseStatus: 200,
+      finalUrl: target.url,
+      errorDetails: {
+        message: expect.stringMatching(/no reliably interpretable events/i),
+      },
+    });
   });
 
   it("creates and links a source observation when an event is first seen", async () => {
@@ -1293,7 +1501,7 @@ describe("refresh engine", () => {
       evidence: {
         ...reviewItem.evidence,
         contentHashes: reviewItem.evidence.contentHashes.map((hash) =>
-          hash.replace("rss-event-feed@4", "rss-event-feed@0"),
+          hash.replace("rss-event-feed@5", "rss-event-feed@0"),
         ),
       },
       parserVersion: "rss-event-feed@0",
@@ -1316,9 +1524,9 @@ describe("refresh engine", () => {
       {
         id: reviewItem.id,
         evidence: {
-          contentHashes: [expect.stringContaining("rss-event-feed@4")],
+          contentHashes: [expect.stringContaining("rss-event-feed@5")],
         },
-        parserVersion: "rss-event-feed@4",
+        parserVersion: "rss-event-feed@5",
       },
     ]);
     expect(
@@ -1332,7 +1540,7 @@ describe("refresh engine", () => {
       lastSeenAt: upgradedAt.toISOString(),
       lastChangedAt: firstSeenAt.toISOString(),
       latestReviewItemId: reviewItem.id,
-      parserVersion: "rss-event-feed@4",
+      parserVersion: "rss-event-feed@5",
     });
   });
 

@@ -13,7 +13,7 @@ import type {
   SourceTargetRecord,
 } from "./types";
 
-const parserVersion = "rss-event-feed@4";
+const parserVersion = "rss-event-feed@5";
 const chicagoTimeZone = "America/Chicago";
 const radiusDetailHostnames = [
   "radius-chicago.com",
@@ -43,6 +43,11 @@ type RssItemEnrichment = {
   doorsAt?: string;
   agePolicy?: string;
   ticketUrl?: string;
+};
+
+type RssItemEnrichmentResult = {
+  enrichment: RssItemEnrichment;
+  warningMessage?: string;
 };
 
 function clampConfidence(value: number): number {
@@ -336,6 +341,10 @@ function extractRadiusDetailFields(
   };
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Radius detail request failed";
+}
+
 function extractDescriptionStart(description: string): string | null {
   const normalized = cleanText(description);
   const dateMatch = normalized.match(
@@ -440,7 +449,9 @@ function reviewItemForItem(
       priority: 40,
       confidence: 20,
       confidenceReasons: [
-        "RSS item did not include a reliable event date in the description",
+        titleFields.eventDate
+          ? "RSS item did not include a reliable event time"
+          : "RSS item did not include a reliable event date in the description",
       ],
       targetEntityType: "source-target",
       targetEntityId: target.id,
@@ -507,6 +518,50 @@ function reviewItemForItem(
   };
 }
 
+function radiusDetailWarningCandidate(
+  target: SourceTargetRecord,
+  runId: string,
+  fetchedAt: string,
+  item: RssItem,
+  message: string,
+): ParserCandidate {
+  const titleFields = extractRadiusTitleFields(target, item.title);
+  const canonicalUrl = canonicalizeSourceUrl(item.link);
+  const sourceEventKey = item.guid || canonicalUrl;
+  const normalizedDraft = {
+    issue: "radius-detail-fetch-failed",
+    ...titleFields,
+    sourceUrl: canonicalUrl,
+    message,
+  };
+
+  return {
+    sourceEventKey: `${sourceEventKey}:detail-warning`,
+    materialContentHash: buildMaterialContentHash(normalizedDraft),
+    cityId: target.cityId,
+    runId,
+    sourceTargetId: target.id,
+    lane: "source-health",
+    priority: 40,
+    confidence: 20,
+    confidenceReasons: ["Radius detail page could not be fetched"],
+    targetEntityType: "source-target",
+    targetEntityId: target.id,
+    matchFingerprint: `source-health:${target.id}:${sourceEventKey}:detail-warning`,
+    normalizedDraft,
+    fieldDiffs: null,
+    linkedDrafts: [],
+    conflicts: { reason: message },
+    evidence: {
+      sourceUrls: [canonicalUrl],
+      excerpts: [`${titleFields.title}: ${message}`],
+      contentHashes: [`${canonicalUrl}:detail-warning:${parserVersion}`],
+    },
+    parserVersion,
+    fetchTimestamp: fetchedAt,
+  };
+}
+
 export async function parseRssEventFeedTarget(
   target: SourceTargetRecord,
   runId: string,
@@ -533,30 +588,54 @@ export async function parseRssEventFeedTarget(
     throw new Error("RSS event feed source does not contain RSS/XML event items.");
   }
 
-  const enrichments = isRadiusTarget(target)
+  const enrichmentResults: RssItemEnrichmentResult[] = isRadiusTarget(target)
     ? await Promise.all(
         items.map(async (item) => {
-          const detail = await fetcher(item.link, undefined, {
-            allowedHostnames: radiusDetailHostnames,
-          });
-          const titleFields = extractRadiusTitleFields(target, item.title);
-          return extractRadiusDetailFields(
-            detail.body,
-            titleFields.eventDate,
-            item.link,
-          );
+          try {
+            const detail = await fetcher(item.link, undefined, {
+              allowedHostnames: radiusDetailHostnames,
+            });
+            if (detail.status < 200 || detail.status >= 300) {
+              throw new Error(
+                `Radius detail fetch failed with status ${detail.status}`,
+              );
+            }
+            const titleFields = extractRadiusTitleFields(target, item.title);
+            return {
+              enrichment: extractRadiusDetailFields(
+                detail.body,
+                titleFields.eventDate,
+                item.link,
+              ),
+            };
+          } catch (error) {
+            return { enrichment: {}, warningMessage: errorMessage(error) };
+          }
         }),
       )
-    : items.map(() => ({}));
+    : items.map(() => ({ enrichment: {} }));
 
-  return items.map((item, index) =>
-    reviewItemForItem(
+  return items.flatMap((item, index) => {
+    const enrichmentResult = enrichmentResults[index];
+    const candidate = reviewItemForItem(
       target,
       runId,
       fetchedAt,
       item,
       context,
-      enrichments[index],
-    ),
-  );
+      enrichmentResult.enrichment,
+    );
+    if (!enrichmentResult.warningMessage) return [candidate];
+
+    const warning = radiusDetailWarningCandidate(
+      target,
+      runId,
+      fetchedAt,
+      item,
+      enrichmentResult.warningMessage,
+    );
+    return candidate.lane === "source-health"
+      ? [warning]
+      : [candidate, warning];
+  });
 }
