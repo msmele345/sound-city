@@ -150,9 +150,21 @@ Certify Radius as the second RSS shape. Use its RSS GUID for stable identity and
 - [x] One failed detail request is an item warning and does not hide valid sibling events.
 - [x] An item that still lacks a reliable event time is routed to review/source-health rather than guessed.
 - [x] The Radius target fails only when the feed itself is unusable or no item can be interpreted reliably.
-- [ ] A live manual Radius run creates useful review work.
-- [ ] A second unchanged manual Radius run creates zero new review items.
-- [ ] Radius remains at manual cadence until its certification criteria pass.
+- [x] A live manual Radius run creates useful review work.
+- [x] A second unchanged manual Radius run creates zero new review items.
+- [x] Radius remains at manual cadence until its certification criteria pass.
+
+Certification evidence (2026-08-05): the configured Radius target was corrected
+from the legacy HTML `/events` URL and `weekly` cadence to the official
+`https://www.radius-chicago.com/events/rss` feed at `manual` cadence. Manual run
+`refresh_run_city_chicago_7330cc86-a714-4bb0-ba9a-ea20e670c630` produced a
+successful Radius outcome with 9 reliable candidates, 9 new event review items,
+and one isolated source-health warning. The event drafts included event and
+doors times, age policies, and ticket URLs. The immediate repeat,
+`refresh_run_city_chicago_e414faf8-fbc7-415c-ae4d-e73864bb45f7`, produced an
+unchanged Radius outcome with 9 unchanged candidates and zero created or
+updated review items. The enabled Radius RSS target remained at `manual` cadence
+and its derived health returned to healthy after the two successful outcomes.
 
 ---
 
