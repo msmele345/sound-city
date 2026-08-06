@@ -10,8 +10,9 @@ Select Greenline's organizer-owned Luma calendar as the Phase 9 ICS source:
 - Parser strategy for later enrollment: `venue-calendar`
 - Initial cadence for later enrollment: `manual`
 
-This decision covers Phase 6 AC1-AC3 only. Fixture capture, parser changes,
-source-target enrollment, and live manual certification remain AC5 and later.
+This decision originally covered Phase 6 AC1-AC3. The AC4 release-gate
+decision and the AC5-AC6 fixture/parser evidence are recorded below. Source-
+target enrollment and live manual certification remain later criteria.
 
 ## Time box
 
@@ -23,6 +24,29 @@ source-target enrollment, and live manual certification remain AC5 and later.
   certification, do not substitute an irrelevant or single-event feed. Resume
   the remaining discovery window, then use AC4's product-owner re-scope gate if
   no replacement qualifies.
+
+## AC4 release-gate status
+
+The selected Greenline feed qualifies, so the AC4 re-scope path was not
+invoked. If the feed stops qualifying and no replacement is found, the Phase 9
+release gate must be explicitly re-scoped with the product owner in this record
+and the plan before Cron is enabled. This implementation does not enable Cron
+or waive the qualifying-ICS requirement.
+
+## AC5-AC6 fixture and parser status
+
+The sanitized capture is
+`src/server/refresh/__tests__/fixtures/greenline-luma.ics`. It retains all 13
+VEVENT identities and material event fields from the public subscription while
+omitting provider-generated `DTSTAMP`, `SEQUENCE`, organizer, status, and GEO
+telemetry plus private access instructions. The parser fixture tests cover the
+13-event result, zero warnings, UID, title, UTC start/end values, Chicago
+locations, and canonical Luma event URLs.
+
+Greenline places its canonical event URL in the description's first HTTP(S)
+link rather than an ICS `URL` property. `parseIcsDocument` now uses that link as
+the event URL only when an explicit `URL` property is absent; existing
+explicit-URL feeds retain their behavior.
 
 ## Qualification evidence
 

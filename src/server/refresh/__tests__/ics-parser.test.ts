@@ -1,7 +1,48 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
-import { parseIcs } from "../ics-parser";
+import { parseIcs, parseIcsDocument } from "../ics-parser";
+
+const certifiedGreenlineIcs = readFileSync(
+  resolve(
+    process.cwd(),
+    "src/server/refresh/__tests__/fixtures/greenline-luma.ics",
+  ),
+  "utf8",
+);
 
 describe("parseIcs", () => {
+  it("parses the sanitized Greenline Luma subscription fixture", () => {
+    const result = parseIcsDocument(certifiedGreenlineIcs);
+
+    expect(result.warnings).toEqual([]);
+    expect(result.events).toHaveLength(13);
+    expect(result.events[0]).toMatchObject({
+      uid: "evt-R4jlVGB5Ii1x5tZ@events.lu.ma",
+      summary: "greenline ep8",
+      dtStart: "2025-06-06T04:45:00.000Z",
+      dtEnd: "2025-06-06T10:00:00.000Z",
+      location: "3201 S State St, Chicago, IL 60616, USA",
+      url: "https://luma.com/b5cpkvd7",
+    });
+    expect(result.events.map((event) => event.url)).toEqual([
+      "https://luma.com/b5cpkvd7",
+      "https://luma.com/3ydv0is1",
+      "https://luma.com/lak4s7ux",
+      "https://luma.com/ysx4nuz2",
+      "https://luma.com/7w0xk1s2",
+      "https://luma.com/qgcb154h",
+      "https://luma.com/uyzlea3v",
+      "https://luma.com/ke01u2ox",
+      "https://luma.com/d9t5fi64",
+      "https://luma.com/agofeco8",
+      "https://luma.com/40nulu2n",
+      "https://luma.com/dn42ztgl",
+      "https://luma.com/6ljwnq0g",
+    ]);
+  });
+
   it("parses a basic ICS feed with multiple VEVENT blocks", () => {
     const ics = [
       "BEGIN:VCALENDAR",

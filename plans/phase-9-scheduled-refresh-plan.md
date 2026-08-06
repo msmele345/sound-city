@@ -181,9 +181,9 @@ Time-box discovery of a stable official Chicago ICS subscription feed that is re
 - [x] ICS discovery is time-boxed to approximately two working days.
 - [x] The selected feed is official, publicly fetchable, stable, Chicago-based, subscription-oriented, and relevant to Sound City discovery.
 - [x] An irrelevant calendar or per-event ICS download is not substituted solely to satisfy protocol coverage.
-- [ ] If no qualifying feed is found, the release gate is explicitly re-scoped with the product owner before Cron is enabled.
-- [ ] A sanitized fixture represents the selected live ICS feed.
-- [ ] The parser reliably captures UID, title, start/end time, timezone, venue, event URL, and other material fields supplied by the certified source.
+- [x] If no qualifying feed is found, the release gate is explicitly re-scoped with the product owner before Cron is enabled.
+- [x] A sanitized fixture represents the selected live ICS feed.
+- [x] The parser reliably captures UID, title, start/end time, timezone, venue, event URL, and other material fields supplied by the certified source.
 - [ ] Invalid individual events are isolated without hiding valid siblings.
 - [ ] A live manual ICS run creates useful review work.
 - [ ] A second unchanged manual ICS run creates zero new review items.
