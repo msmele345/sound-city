@@ -232,7 +232,7 @@ Expose the generalized refresh engine through one fail-closed Cron route and con
 
 ---
 
-## Phase 7.5: Spybar Chicago One-Day Feasibility Spike
+## Phase 7.5: Spybar Chicago Quick Feasibility Spike
 
 **User stories**: 34–36
 
