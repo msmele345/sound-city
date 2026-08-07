@@ -214,9 +214,9 @@ Expose the generalized refresh engine through one fail-closed Cron route and con
 
 ### Acceptance criteria
 
-- [ ] The Cron route accepts only an exact `Authorization: Bearer ${CRON_SECRET}` credential.
-- [ ] Missing Cron configuration fails closed and performs no work.
-- [ ] Invalid or missing credentials return unauthorized and perform no work.
+- [x] The Cron route accepts only an exact `Authorization: Bearer ${CRON_SECRET}` credential.
+- [x] Missing Cron configuration fails closed and performs no work.
+- [x] Invalid or missing credentials return unauthorized and perform no work.
 - [ ] Admin credentials are not accepted by the Cron route.
 - [ ] Request parameters cannot select targets or override cadence.
 - [ ] Only enabled daily targets are selected; enabled manual targets remain excluded.
