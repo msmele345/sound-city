@@ -1,6 +1,17 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { describe, expect, it } from "vitest";
 import { parseVenueCalendarTarget } from "../venue-calendar-parser";
 import type { Fetcher, SourceTargetRecord } from "../types";
+
+const certifiedGreenlineIcs = readFileSync(
+  resolve(
+    process.cwd(),
+    "src/server/refresh/__tests__/fixtures/greenline-luma.ics",
+  ),
+  "utf8",
+);
 
 function createTarget(overrides: Partial<SourceTargetRecord> = {}): SourceTargetRecord {
   return {
@@ -48,6 +59,39 @@ const sampleIcs = [
 ].join("\r\n");
 
 describe("parseVenueCalendarTarget", () => {
+  it("maps Greenline's description URLs into event review candidates", async () => {
+    const target = createTarget({
+      url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-WBFN4Ar4zrbkCZM",
+    });
+    const fetcher: Fetcher = async () => ({
+      body: certifiedGreenlineIcs,
+      contentType: "text/calendar; charset=utf-8",
+      status: 200,
+    });
+
+    const items = await parseVenueCalendarTarget(
+      target,
+      "run_greenline",
+      "2026-08-06T12:00:00.000Z",
+      fetcher,
+    );
+
+    expect(items).toHaveLength(13);
+    expect(items.every((item) => item.lane === "new-event")).toBe(true);
+    expect(items[0]).toMatchObject({
+      sourceEventKey: "evt-R4jlVGB5Ii1x5tZ@events.lu.ma",
+      normalizedDraft: {
+        title: "greenline ep8",
+        venueName: "3201 S State St, Chicago, IL 60616, USA",
+        startsAt: "2025-06-06T04:45:00.000Z",
+        ticketUrl: "https://luma.com/b5cpkvd7",
+      },
+      evidence: {
+        sourceUrls: ["https://luma.com/b5cpkvd7"],
+      },
+    });
+  });
+
   it("creates review items from an ICS feed", async () => {
     const target = createTarget();
     const fetcher: Fetcher = async () => ({

@@ -57,6 +57,13 @@ function unescapeIcsText(value: string): string {
     .replace(/\\\\/g, "\\");
 }
 
+function extractUrlFromDescription(description: string | null): string | null {
+  if (!description) return null;
+
+  const match = description.match(/https?:\/\/[^\s<>"']+/i);
+  return match?.[0].replace(/[),.;!?]+$/, "") ?? null;
+}
+
 type IcsDateParams = {
   tzid?: string;
 };
@@ -285,6 +292,12 @@ function parseVEventBlock(
   }
 
   const dtEnd = properties.get("DTEND");
+  const description = properties.get("DESCRIPTION")?.value
+    ? unescapeIcsText(properties.get("DESCRIPTION")!.value.trim())
+    : null;
+  const explicitUrl = properties.get("URL")?.value
+    ? unescapeIcsText(properties.get("URL")!.value.trim())
+    : null;
 
   return {
     uid,
@@ -302,9 +315,7 @@ function parseVEventBlock(
     location: properties.get("LOCATION")?.value
       ? unescapeIcsText(properties.get("LOCATION")!.value.trim())
       : null,
-    description: properties.get("DESCRIPTION")?.value
-      ? unescapeIcsText(properties.get("DESCRIPTION")!.value.trim())
-      : null,
+    description,
     categories: properties.get("CATEGORIES")?.value
       ? properties
           .get("CATEGORIES")!
@@ -312,7 +323,7 @@ function parseVEventBlock(
           .map((category) => unescapeIcsText(category.trim()))
           .filter(Boolean)
       : [],
-    url: properties.get("URL")?.value ? properties.get("URL")!.value.trim() : null,
+    url: explicitUrl ?? extractUrlFromDescription(description),
   };
 }
 
