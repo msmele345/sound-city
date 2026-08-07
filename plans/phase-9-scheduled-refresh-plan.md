@@ -184,7 +184,7 @@ Time-box discovery of a stable official Chicago ICS subscription feed that is re
 - [x] If no qualifying feed is found, the release gate is explicitly re-scoped with the product owner before Cron is enabled.
 - [x] A sanitized fixture represents the selected live ICS feed.
 - [x] The parser reliably captures UID, title, start/end time, timezone, venue, event URL, and other material fields supplied by the certified source.
-- [ ] Invalid individual events are isolated without hiding valid siblings.
+- [x] Invalid individual events are isolated without hiding valid siblings.
 - [ ] A live manual ICS run creates useful review work.
 - [ ] A second unchanged manual ICS run creates zero new review items.
 - [ ] Source-target cadence accepts only `manual` or `daily` in Phase 9.

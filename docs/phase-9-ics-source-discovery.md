@@ -48,6 +48,25 @@ link rather than an ICS `URL` property. `parseIcsDocument` now uses that link as
 the event URL only when an explicit `URL` property is absent; existing
 explicit-URL feeds retain their behavior.
 
+## AC7 invalid-event isolation
+
+The refresh-engine regression test exercises a mixed ICS document with two
+malformed `VEVENT`s and one valid sibling. The valid event creates a
+`new-event` review item while each malformed sibling is retained as a stable
+`source-health` warning; repeating a semantically identical reformatted feed
+does not create duplicate warning or event review items.
+
+## AC8-AC9 live-certification status (2026-08-07)
+
+The public Greenline subscription re-fetch returned `200 text/calendar`, but
+its newest published event starts on June 20, 2026. Because that date is past,
+the feed currently has no upcoming materially useful event and cannot satisfy
+AC8's useful-review-work gate. No production source target or manual refresh
+was created from this historical inventory, so AC8 and AC9 remain open. When
+Greenline publishes a useful future event, enroll the target at `manual`, run
+the two durable Admin manual refreshes, and record the first-run review work
+and unchanged-repeat evidence here.
+
 ## Qualification evidence
 
 | Gate | Evidence |
