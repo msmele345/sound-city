@@ -46,9 +46,25 @@ export async function GET(request: NextRequest) {
     },
     getCatalogStore(),
   );
+  const { run } = result;
 
   return NextResponse.json(
-    { run: result.run },
+    {
+      runId: run.id,
+      status: run.status,
+      trigger: run.trigger,
+      triggeredBy: run.triggeredBy,
+      blockedByRunId: run.blockedByRunId,
+      summary: {
+        sourceTargetsChecked: run.sourceTargetsChecked,
+        sourceTargetsFailed: run.sourceTargetsFailed,
+        draftsCreated: run.draftsCreated,
+        updatesProposed: run.updatesProposed,
+        duplicatesFlagged: run.duplicatesFlagged,
+        staleTasksCreated: run.staleTasksCreated,
+        errorSummary: run.errorSummary,
+      },
+    },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

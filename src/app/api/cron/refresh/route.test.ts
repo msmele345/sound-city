@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 
+import { GET as GETRefreshRuns } from "@/app/api/admin/refresh-runs/route";
 import { getRefreshStore } from "@/server/refresh/refresh-store";
 
 import { GET } from "./route";
@@ -13,6 +14,24 @@ function requestAt(
   init?: ConstructorParameters<typeof NextRequest>[1],
 ) {
   return new NextRequest(new URL(path, "http://localhost:3000"), init);
+}
+
+const emptyRunSummary = {
+  sourceTargetsChecked: 0,
+  sourceTargetsFailed: 0,
+  draftsCreated: 0,
+  updatesProposed: 0,
+  duplicatesFlagged: 0,
+  staleTasksCreated: 0,
+  errorSummary: null,
+};
+
+async function persistedRunFor(runId: string) {
+  const response = await GETRefreshRuns(
+    requestAt("/api/admin/refresh-runs?city=chicago"),
+  );
+  const body = await response.json();
+  return body.runs.find((run: { id: string }) => run.id === runId);
 }
 
 describe("Cron refresh route", () => {
@@ -86,6 +105,78 @@ describe("Cron refresh route", () => {
       expect(
         (await store.listRefreshRuns("city_chicago")).map((run) => run.id),
       ).toEqual(afterAccepted.map((run) => run.id));
+    }
+  });
+
+  it("waits for and returns a durable terminal scheduled run summary", async () => {
+    process.env.CRON_SECRET = "cron-route-test-secret";
+
+    const response = await GET(
+      requestFor({
+        headers: { authorization: "Bearer cron-route-test-secret" },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      runId: expect.stringMatching(/^refresh_run_/),
+      status: "succeeded",
+      trigger: "scheduled",
+      triggeredBy: "vercel-cron",
+      blockedByRunId: null,
+      summary: emptyRunSummary,
+    });
+    await expect(persistedRunFor(body.runId)).resolves.toMatchObject({
+      id: body.runId,
+      status: "succeeded",
+      trigger: "scheduled",
+      triggeredBy: "vercel-cron",
+      finishedAt: expect.any(String),
+    });
+  });
+
+  it("returns success for a durably recorded skipped scheduled run", async () => {
+    process.env.CRON_SECRET = "cron-route-test-secret";
+    const store = getRefreshStore();
+    const active = await store.acquireRefreshLease({
+      cityId: "city_chicago",
+      trigger: "manual",
+      triggeredBy: "admin-secret",
+      acquiredAt: new Date().toISOString(),
+    });
+    expect(active.acquired).toBe(true);
+    if (!active.acquired) {
+      throw new Error("Expected the fixture lease to be acquired");
+    }
+
+    try {
+      const response = await GET(
+        requestFor({
+          headers: { authorization: "Bearer cron-route-test-secret" },
+        }),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toEqual({
+        runId: expect.stringMatching(/^refresh_run_/),
+        status: "skipped",
+        trigger: "scheduled",
+        triggeredBy: "vercel-cron",
+        blockedByRunId: active.run.id,
+        summary: emptyRunSummary,
+      });
+      await expect(persistedRunFor(body.runId)).resolves.toMatchObject({
+        id: body.runId,
+        status: "skipped",
+        trigger: "scheduled",
+        triggeredBy: "vercel-cron",
+        blockedByRunId: active.run.id,
+        finishedAt: expect.any(String),
+      });
+    } finally {
+      await store.releaseRefreshLease("city_chicago", active.run.id);
     }
   });
 
