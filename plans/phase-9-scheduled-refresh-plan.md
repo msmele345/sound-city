@@ -226,9 +226,9 @@ Expose the generalized refresh engine through one fail-closed Cron route and con
 - [x] Partial and failed runs return a server error so platform observability records degradation.
 - [x] A target failure does not discard candidates or observations produced by successful targets.
 - [x] The existing past-event stale-task stage runs and remains review-only.
-- [ ] The Vercel schedule invokes the route once daily in UTC on production deployments only.
-- [ ] Route integration tests cover authorization, target eligibility, terminal responses, and overlap behavior.
-- [ ] No queue or background workflow infrastructure is introduced.
+- [x] The Vercel schedule invokes the route once daily in UTC on production deployments only.
+- [x] Route integration tests cover authorization, target eligibility, terminal responses, and overlap behavior.
+- [x] No queue or background workflow infrastructure is introduced.
 
 ---
 

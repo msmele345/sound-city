@@ -1,4 +1,10 @@
 {
   "framework": "nextjs",
-  "buildCommand": "NODE_ENV=test npm test && npm run lint && npm run build && npm run typecheck"
+  "buildCommand": "NODE_ENV=test npm test && npm run lint && npm run build && npm run typecheck",
+  "crons": [
+    {
+      "path": "/api/cron/refresh",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
