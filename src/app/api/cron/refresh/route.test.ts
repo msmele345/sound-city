@@ -1,6 +1,14 @@
 import { NextRequest } from "next/server";
 
+import { POST as POSTAdminCatalog } from "@/app/api/admin/catalog/route";
 import { GET as GETRefreshRuns } from "@/app/api/admin/refresh-runs/route";
+import { GET as GETReviewItems } from "@/app/api/admin/review-items/route";
+import {
+  GET as GETSourceTargets,
+  PATCH as PATCHSourceTarget,
+  POST as POSTSourceTarget,
+} from "@/app/api/admin/source-targets/route";
+import { GET as GETCatalogEvents } from "@/app/api/catalog/events/route";
 import { getRefreshStore } from "@/server/refresh/refresh-store";
 
 import { GET } from "./route";
@@ -27,11 +35,104 @@ const emptyRunSummary = {
 };
 
 async function persistedRunFor(runId: string) {
+  const body = await refreshHistory();
+  return body.runs.find((run: { id: string }) => run.id === runId);
+}
+
+async function refreshHistory() {
   const response = await GETRefreshRuns(
     requestAt("/api/admin/refresh-runs?city=chicago"),
   );
-  const body = await response.json();
-  return body.runs.find((run: { id: string }) => run.id === runId);
+  return response.json();
+}
+
+async function updateSourceTarget(
+  id: string,
+  input: Record<string, unknown>,
+) {
+  const response = await PATCHSourceTarget(
+    requestAt("/api/admin/source-targets", {
+      method: "PATCH",
+      body: JSON.stringify({ entity: "sourceTarget", id, input }),
+    }),
+  );
+  if (!response.ok) {
+    throw new Error(`Source target update failed with ${response.status}`);
+  }
+  return (await response.json()).target;
+}
+
+async function suspendEnabledDailyTargets() {
+  const response = await GETSourceTargets(
+    requestAt("/api/admin/source-targets?city=chicago"),
+  );
+  const targets = ((await response.json()).targets as Array<{
+    id: string;
+    enabled: boolean;
+    refreshCadence: string;
+  }>).filter(
+    (target) => target.enabled && target.refreshCadence === "daily",
+  );
+  await Promise.all(
+    targets.map((target) => updateSourceTarget(target.id, { enabled: false })),
+  );
+
+  return () =>
+    Promise.all(
+      targets.map((target) => updateSourceTarget(target.id, { enabled: true })),
+    );
+}
+
+async function createDailyTarget(
+  input: { name: string; parserStrategy: "dev-static" | "artist-social" },
+) {
+  const suffix = crypto.randomUUID();
+  const ownerResponse = await POSTSourceTarget(
+    requestAt("/api/admin/source-targets", {
+      method: "POST",
+      body: JSON.stringify({
+        entity: "sourceOwner",
+        input: {
+          cityId: "city_chicago",
+          name: input.name,
+          slug: `cron-${input.parserStrategy}-${suffix}`,
+          kind: "venue",
+          notes: "",
+        },
+      }),
+    }),
+  );
+  if (!ownerResponse.ok) {
+    throw new Error(`Source owner creation failed with ${ownerResponse.status}`);
+  }
+  const { owner } = await ownerResponse.json();
+
+  const targetResponse = await POSTSourceTarget(
+    requestAt("/api/admin/source-targets", {
+      method: "POST",
+      body: JSON.stringify({
+        entity: "sourceTarget",
+        input: {
+          ownerId: owner.id,
+          cityId: "city_chicago",
+          url: `https://fixtures.sound-city.test/${input.parserStrategy}/${suffix}`,
+          sourceType:
+            input.parserStrategy === "dev-static" ? "other" : "artist-social",
+          parserStrategy: input.parserStrategy,
+          trustLevel: "experimental",
+          enabled: true,
+          confidenceAdjustment: 0,
+          healthStatus: "healthy",
+          refreshCadence: "daily",
+          notes: "",
+        },
+      }),
+    }),
+  );
+  if (!targetResponse.ok) {
+    throw new Error(`Source target creation failed with ${targetResponse.status}`);
+  }
+  return (await targetResponse.json()).target;
 }
 
 describe("Cron refresh route", () => {
@@ -178,6 +279,224 @@ describe("Cron refresh route", () => {
     } finally {
       await store.releaseRefreshLease("city_chicago", active.run.id);
     }
+  });
+
+  it("returns a server error for a partial run without discarding successful target work", async () => {
+    process.env.CRON_SECRET = "cron-route-test-secret";
+    const restoreExistingTargets = await suspendEnabledDailyTargets();
+    const successfulTarget = await createDailyTarget({
+      name: "Successful scheduled fixture",
+      parserStrategy: "dev-static",
+    });
+    const failedTarget = await createDailyTarget({
+      name: "Failed scheduled fixture",
+      parserStrategy: "artist-social",
+    });
+
+    try {
+      const response = await GET(
+        requestFor({
+          headers: { authorization: "Bearer cron-route-test-secret" },
+        }),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body).toMatchObject({
+        runId: expect.stringMatching(/^refresh_run_/),
+        status: "partial",
+        trigger: "scheduled",
+        triggeredBy: "vercel-cron",
+        summary: {
+          sourceTargetsChecked: 2,
+          sourceTargetsFailed: 1,
+          draftsCreated: 1,
+          updatesProposed: 1,
+          duplicatesFlagged: 1,
+          staleTasksCreated: expect.any(Number),
+          errorSummary: expect.stringMatching(/no parser is available/i),
+        },
+      });
+
+      const history = await refreshHistory();
+      expect(history.outcomesByRun[body.runId]).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            sourceTargetId: successfulTarget.id,
+            status: "succeeded",
+            candidateCount: 4,
+            createdCount: 4,
+          }),
+          expect.objectContaining({
+            sourceTargetId: failedTarget.id,
+            status: "failed",
+          }),
+        ]),
+      );
+      expect(
+        history.reviewItems.filter(
+          (item: { runId: string; sourceTargetId: string | null }) =>
+            item.runId === body.runId &&
+            item.sourceTargetId === successfulTarget.id,
+        ),
+      ).toHaveLength(4);
+
+      await updateSourceTarget(failedTarget.id, { enabled: false });
+      const repeatedResponse = await GET(
+        requestFor({
+          headers: { authorization: "Bearer cron-route-test-secret" },
+        }),
+      );
+      const repeatedBody = await repeatedResponse.json();
+      expect(repeatedResponse.status).toBe(200);
+      expect(repeatedBody).toMatchObject({ status: "succeeded" });
+
+      const repeatedHistory = await refreshHistory();
+      expect(repeatedHistory.outcomesByRun[repeatedBody.runId]).toEqual([
+        expect.objectContaining({
+          sourceTargetId: successfulTarget.id,
+          status: "unchanged",
+          candidateCount: 4,
+          unchangedCount: 4,
+          createdCount: 0,
+        }),
+      ]);
+    } finally {
+      await Promise.all([
+        updateSourceTarget(successfulTarget.id, { enabled: false }),
+        updateSourceTarget(failedTarget.id, { enabled: false }),
+      ]);
+      await restoreExistingTargets();
+    }
+  });
+
+  it("returns a server error for a durably recorded failed run", async () => {
+    process.env.CRON_SECRET = "cron-route-test-secret";
+    const restoreExistingTargets = await suspendEnabledDailyTargets();
+    const failedTarget = await createDailyTarget({
+      name: "All-failed scheduled fixture",
+      parserStrategy: "artist-social",
+    });
+
+    try {
+      const response = await GET(
+        requestFor({
+          headers: { authorization: "Bearer cron-route-test-secret" },
+        }),
+      );
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body).toMatchObject({
+        runId: expect.stringMatching(/^refresh_run_/),
+        status: "failed",
+        trigger: "scheduled",
+        triggeredBy: "vercel-cron",
+        summary: {
+          sourceTargetsChecked: 1,
+          sourceTargetsFailed: 1,
+          errorSummary: expect.stringMatching(/no parser is available/i),
+        },
+      });
+
+      const history = await refreshHistory();
+      expect(
+        history.runs.find((run: { id: string }) => run.id === body.runId),
+      ).toMatchObject({
+        id: body.runId,
+        status: "failed",
+        finishedAt: expect.any(String),
+      });
+      expect(history.outcomesByRun[body.runId]).toEqual([
+        expect.objectContaining({
+          sourceTargetId: failedTarget.id,
+          status: "failed",
+        }),
+      ]);
+    } finally {
+      await updateSourceTarget(failedTarget.id, { enabled: false });
+      await restoreExistingTargets();
+    }
+  });
+
+  it("runs the review-only stale-task stage during scheduled refresh", async () => {
+    process.env.CRON_SECRET = "cron-route-test-secret";
+    const suffix = crypto.randomUUID();
+    const createdResponse = await POSTAdminCatalog(
+      requestAt("/api/admin/catalog", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          entity: "event",
+          input: {
+            citySlug: "chicago",
+            title: "Scheduled stale-task fixture",
+            slug: `scheduled-stale-task-${suffix}`,
+            startsAt: "2020-01-01T06:00:00.000Z",
+            venueSlug: "smartbar",
+            artistSlugs: [],
+            styles: ["techno"],
+            source: {
+              title: "Scheduled stale-task fixture source",
+              url: `https://fixtures.sound-city.test/stale/${suffix}`,
+              lastVerifiedAt: "2026-08-08",
+            },
+          },
+        }),
+      }),
+    );
+    expect(createdResponse.status).toBe(201);
+    const { event } = await createdResponse.json();
+
+    const beforeResponse = await GETCatalogEvents(
+      requestAt("/api/catalog/events?city=chicago"),
+    );
+    const before = (await beforeResponse.json()).events.find(
+      (candidate: { id: string }) => candidate.id === event.id,
+    );
+    expect(before).toEqual(event);
+
+    const response = await GET(
+      requestFor({
+        headers: { authorization: "Bearer cron-route-test-secret" },
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      status: "succeeded",
+      trigger: "scheduled",
+      summary: { staleTasksCreated: expect.any(Number) },
+    });
+    expect(body.summary.staleTasksCreated).toBeGreaterThan(0);
+
+    const reviewResponse = await GETReviewItems(
+      requestAt("/api/admin/review-items?city=chicago&lane=stale-task"),
+    );
+    const reviewItems = (await reviewResponse.json()).items;
+    expect(reviewItems).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          runId: body.runId,
+          lane: "stale-task",
+          status: "pending",
+          sourceTargetId: null,
+          targetEntityId: event.id,
+          normalizedDraft: expect.objectContaining({
+            action: "review-past-event",
+          }),
+        }),
+      ]),
+    );
+
+    const afterResponse = await GETCatalogEvents(
+      requestAt("/api/catalog/events?city=chicago"),
+    );
+    const after = (await afterResponse.json()).events.find(
+      (candidate: { id: string }) => candidate.id === event.id,
+    );
+    expect(after).toEqual(before);
   });
 
   it("rejects admin credentials and fails closed when credential domains overlap", async () => {

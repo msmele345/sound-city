@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
     getCatalogStore(),
   );
   const { run } = result;
+  const responseStatus =
+    run.status === "partial" || run.status === "failed" ? 500 : 200;
 
   return NextResponse.json(
     {
@@ -65,6 +67,9 @@ export async function GET(request: NextRequest) {
         errorSummary: run.errorSummary,
       },
     },
-    { headers: { "Cache-Control": "no-store" } },
+    {
+      status: responseStatus,
+      headers: { "Cache-Control": "no-store" },
+    },
   );
 }
