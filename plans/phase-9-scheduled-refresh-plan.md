@@ -214,21 +214,21 @@ Expose the generalized refresh engine through one fail-closed Cron route and con
 
 ### Acceptance criteria
 
-- [ ] The Cron route accepts only an exact `Authorization: Bearer ${CRON_SECRET}` credential.
-- [ ] Missing Cron configuration fails closed and performs no work.
-- [ ] Invalid or missing credentials return unauthorized and perform no work.
-- [ ] Admin credentials are not accepted by the Cron route.
-- [ ] Request parameters cannot select targets or override cadence.
-- [ ] Only enabled daily targets are selected; enabled manual targets remain excluded.
-- [ ] The scheduled trigger and actor are recorded distinctly from manual refresh.
-- [ ] Scheduled execution waits for a terminal run result and returns its durable identifier and summary.
-- [ ] Succeeded and skipped runs return a successful response.
-- [ ] Partial and failed runs return a server error so platform observability records degradation.
-- [ ] A target failure does not discard candidates or observations produced by successful targets.
-- [ ] The existing past-event stale-task stage runs and remains review-only.
-- [ ] The Vercel schedule invokes the route once daily in UTC on production deployments only.
-- [ ] Route integration tests cover authorization, target eligibility, terminal responses, and overlap behavior.
-- [ ] No queue or background workflow infrastructure is introduced.
+- [x] The Cron route accepts only an exact `Authorization: Bearer ${CRON_SECRET}` credential.
+- [x] Missing Cron configuration fails closed and performs no work.
+- [x] Invalid or missing credentials return unauthorized and perform no work.
+- [x] Admin credentials are not accepted by the Cron route.
+- [x] Request parameters cannot select targets or override cadence.
+- [x] Only enabled daily targets are selected; enabled manual targets remain excluded.
+- [x] The scheduled trigger and actor are recorded distinctly from manual refresh.
+- [x] Scheduled execution waits for a terminal run result and returns its durable identifier and summary.
+- [x] Succeeded and skipped runs return a successful response.
+- [x] Partial and failed runs return a server error so platform observability records degradation.
+- [x] A target failure does not discard candidates or observations produced by successful targets.
+- [x] The existing past-event stale-task stage runs and remains review-only.
+- [x] The Vercel schedule invokes the route once daily in UTC on production deployments only.
+- [x] Route integration tests cover authorization, target eligibility, terminal responses, and overlap behavior.
+- [x] No queue or background workflow infrastructure is introduced.
 
 ---
 

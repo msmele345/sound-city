@@ -28,8 +28,11 @@ type RunManualRefreshInput = {
   fetcher?: Fetcher;
 };
 
+type TargetSelectionPolicy = (target: SourceTargetRecord) => boolean;
+
 type RunRefreshInput = RunManualRefreshInput & {
   trigger: RunTrigger;
+  targetSelection: TargetSelectionPolicy;
 };
 
 type RefreshRunResult = {
@@ -65,6 +68,11 @@ const emptyMetrics: Metrics = {
   duplicatesFlagged: 0,
   staleTasksCreated: 0,
 };
+
+const allEnabledTargets: TargetSelectionPolicy = () => true;
+
+const enabledDailyTargets: TargetSelectionPolicy = (target) =>
+  target.refreshCadence === "daily";
 
 function isoNow(date = new Date()) {
   return date.toISOString();
@@ -426,7 +434,7 @@ async function executeRefresh(
 
   try {
     const targets = (await store.listSourceTargets(input.cityId)).filter(
-      (target) => target.enabled,
+      (target) => target.enabled && input.targetSelection(target),
     );
 
     for (const target of targets) {
@@ -840,7 +848,7 @@ async function executeRefresh(
     if (targets.length === 0) {
       await log(store, run.id, {
         level: "warning",
-        message: "No enabled source targets found",
+        message: "No eligible source targets found",
       });
     }
 
@@ -897,7 +905,11 @@ export function runManualRefresh(
   input: RunManualRefreshInput,
   catalogStore?: CatalogReader,
 ): Promise<RefreshRunResult> {
-  return runRefresh(store, { ...input, trigger: "manual" }, catalogStore);
+  return runRefresh(
+    store,
+    { ...input, trigger: "manual", targetSelection: allEnabledTargets },
+    catalogStore,
+  );
 }
 
 export function runScheduledRefresh(
@@ -905,7 +917,11 @@ export function runScheduledRefresh(
   input: RunManualRefreshInput,
   catalogStore?: CatalogReader,
 ): Promise<RefreshRunResult> {
-  return runRefresh(store, { ...input, trigger: "scheduled" }, catalogStore);
+  return runRefresh(
+    store,
+    { ...input, trigger: "scheduled", targetSelection: enabledDailyTargets },
+    catalogStore,
+  );
 }
 
 export async function listRefreshRunsWithReconciliation(

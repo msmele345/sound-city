@@ -1544,6 +1544,71 @@ describe("refresh engine", () => {
     });
   });
 
+  it("limits scheduled refresh to enabled daily targets", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Scheduled target fixture",
+      slug: "scheduled-target-fixture",
+      kind: "venue",
+      notes: "",
+    });
+    const createTarget = (input: {
+      url: string;
+      enabled: boolean;
+      refreshCadence: string;
+    }) =>
+      store.createSourceTarget({
+        ownerId: owner.id,
+        cityId: "city_chicago",
+        url: input.url,
+        sourceType: "other",
+        parserStrategy: "dev-static",
+        trustLevel: "experimental",
+        enabled: input.enabled,
+        confidenceAdjustment: 0,
+        healthStatus: "healthy",
+        refreshCadence: input.refreshCadence,
+        notes: "",
+      });
+    const dailyTarget = await createTarget({
+      url: "https://fixtures.sound-city.test/daily",
+      enabled: true,
+      refreshCadence: "daily",
+    });
+    const manualTarget = await createTarget({
+      url: "https://fixtures.sound-city.test/manual",
+      enabled: true,
+      refreshCadence: "manual",
+    });
+    const disabledDailyTarget = await createTarget({
+      url: "https://fixtures.sound-city.test/disabled-daily",
+      enabled: false,
+      refreshCadence: "daily",
+    });
+
+    const result = await runScheduledRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "vercel-cron",
+    });
+
+    expect(result.run).toMatchObject({
+      trigger: "scheduled",
+      status: "succeeded",
+      sourceTargetsChecked: 1,
+      sourceTargetsFailed: 0,
+    });
+    expect(await store.listRefreshTargetOutcomes(result.run.id)).toEqual([
+      expect.objectContaining({ sourceTargetId: dailyTarget.id }),
+    ]);
+    expect(await store.getSourceTarget(manualTarget.id)).toMatchObject({
+      lastFetchedAt: null,
+    });
+    expect(await store.getSourceTarget(disabledDailyTarget.id)).toMatchObject({
+      lastFetchedAt: null,
+    });
+  });
+
   it("records a scheduled overlap as skipped without fetching sources", async () => {
     const store = createSeedRefreshStore();
     await createRssObservationFixture(store);
