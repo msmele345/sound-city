@@ -139,11 +139,13 @@ describe("Cron refresh route", () => {
   const originalCronSecret = process.env.CRON_SECRET;
   const originalAdminSecret = process.env.ADMIN_SECRET;
   const originalDatabaseUrl = process.env.DATABASE_URL;
+  const originalVercelEnv = process.env.VERCEL_ENV;
 
   beforeEach(() => {
     delete process.env.CRON_SECRET;
     delete process.env.ADMIN_SECRET;
     delete process.env.DATABASE_URL;
+    delete process.env.VERCEL_ENV;
   });
 
   afterEach(() => {
@@ -163,6 +165,12 @@ describe("Cron refresh route", () => {
       delete process.env.DATABASE_URL;
     } else {
       process.env.DATABASE_URL = originalDatabaseUrl;
+    }
+
+    if (originalVercelEnv === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = originalVercelEnv;
     }
   });
 
