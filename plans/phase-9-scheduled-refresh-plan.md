@@ -244,15 +244,15 @@ This phase is non-blocking and may run alongside the implementation slices.
 
 ### Acceptance criteria
 
-- [ ] The spike is capped at one working day.
-- [ ] Representative public Chicago event samples and candidate structured-data paths are inventoried.
-- [ ] Server-side access is tested without authentication, browser automation, session handling, CAPTCHA work, or anti-bot circumvention.
-- [ ] Available identity, title, time, venue, lineup, and canonical URL fields are mapped to the parser contract.
-- [ ] Access and stability constraints are documented.
-- [ ] The conclusion is explicitly `viable`, `experimental only`, or `manual/supporting only`.
-- [ ] Undocumented internal endpoints cannot receive a production-ready classification.
-- [ ] A viable result includes a separate production-parser estimate and proposed scope.
-- [ ] Experimental or manual-only results do not create scheduled Phase 9 work.
+- [X] The spike is capped at one working day.
+- [X] Representative public Chicago event samples and candidate structured-data paths are inventoried.
+- [x] Server-side access is tested without authentication, browser automation, session handling, CAPTCHA work, or anti-bot circumvention.
+- [x] Available identity, title, time, venue, lineup, and canonical URL fields are mapped to the parser contract.
+- [x] Access and stability constraints are documented.
+- [x] The conclusion is explicitly `viable`, `experimental only`, or `manual/supporting only`.
+- [x] Undocumented internal endpoints cannot receive a production-ready classification.
+- [x] A viable result includes a separate production-parser estimate and proposed scope.
+- [x] Experimental or manual-only results do not create scheduled Phase 9 work.
 
 ---
 
