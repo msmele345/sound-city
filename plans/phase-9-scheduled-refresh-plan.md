@@ -20,7 +20,7 @@
 - **Parser boundary**: Parser support is fixture-certified against named sources. Malformed items are isolated where the document remains usable. Broader format compatibility is added only when a certified source requires it.
 - **Source health**: Operational health is derived from recent outcomes with deterministic thresholds and recovery hysteresis. It never disables a target or changes trust/confidence automatically.
 - **Stale detection**: Scheduled runs retain the existing review-only past-event stale-task stage.
-- **RA boundary**: Resident Advisor receives a one-working-day feasibility spike. Browser automation, authentication, CAPTCHA handling, session workarounds, and anti-bot circumvention remain prohibited.
+- **RA boundary**: Resident Advisor receives an approximately 30-minute feasibility spike. Browser automation, authentication, CAPTCHA handling, session workarounds, and anti-bot circumvention remain prohibited.
 - **Testing strategy**: Use red-green-refactor. Refresh-engine integration is the primary seam, supported by parser fixtures, persistence constraints, route behavior, Admin rendering, and manual source certification.
 
 ---
@@ -256,27 +256,36 @@ This phase is non-blocking and may run alongside the implementation slices.
 
 ---
 
-## Phase 8: Resident Advisor One-Day Feasibility Spike
+## Phase 8: Resident Advisor 30-Minute Feasibility Spike
 
 **User stories**: 34–36
 
 ### What to build
 
-Spend no more than one working day determining whether Resident Advisor, exposes a compliant, stable, server-fetchable event source that fits the parser contract. Produce a documented classification and field mapping. Stop at research: do not build a production parser or experiment with prohibited access techniques in this phase.
+Spend approximately 30 minutes determining whether Resident Advisor exposes a compliant, stable, server-fetchable event source that fits the parser contract. Produce a documented classification and field mapping. Stop at research: do not build a production parser or experiment with prohibited access techniques in this phase.
 
 This phase is non-blocking and may run alongside the implementation slices.
 
 ### Acceptance criteria
 
-- [ ] The spike is capped at one working day.
-- [ ] Representative public Chicago event samples and candidate structured-data paths are inventoried.
-- [ ] Server-side access is tested without authentication, browser automation, session handling, CAPTCHA work, or anti-bot circumvention.
-- [ ] Available identity, title, time, venue, lineup, and canonical URL fields are mapped to the parser contract.
-- [ ] Access and stability constraints are documented.
-- [ ] The conclusion is explicitly `viable`, `experimental only`, or `manual/supporting only`.
-- [ ] Undocumented internal endpoints cannot receive a production-ready classification.
-- [ ] A viable result includes a separate production-parser estimate and proposed scope.
-- [ ] Experimental or manual-only results do not create scheduled Phase 9 work.
+- [x] The spike is capped at approximately 30 minutes.
+- [x] Representative public Chicago event samples and candidate structured-data paths are inventoried.
+- [x] Server-side access is tested without authentication, browser automation, session handling, CAPTCHA work, or anti-bot circumvention.
+- [x] Available identity, title, time, venue, lineup, and canonical URL fields are mapped to the parser contract.
+- [x] Access and stability constraints are documented.
+- [x] The conclusion is explicitly `viable`, `experimental only`, or `manual/supporting only`.
+- [x] Undocumented internal endpoints cannot receive a production-ready classification.
+- [x] A viable result includes a separate production-parser estimate and proposed scope.
+- [x] Experimental or manual-only results do not create scheduled Phase 9 work.
+
+Spike evidence (2026-08-11): the product-owner-shortened 30-minute
+investigation classified Resident Advisor as `manual/supporting only`. Public
+event pages expose useful fields to people and standard search engines, but
+unauthenticated server requests received only a DataDome/Cloudflare JavaScript
+challenge, and RA's current terms prohibit the automated access needed by a
+scheduled parser. No undocumented endpoint, parser, fixture, estimate, or
+scheduled Phase 9 work was created. See [the feasibility
+report](../docs/phase-9-resident-advisor-feasibility-spike.md).
 
 ---
 
