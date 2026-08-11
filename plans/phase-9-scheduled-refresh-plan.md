@@ -299,7 +299,7 @@ Certify the complete production path incrementally. Keep every target manually r
 
 ### Acceptance criteria
 
-- [ ] Smartbar, Radius, and the selected relevant ICS target each pass automated fixture and engine integration tests.
+- [x] Smartbar, Radius, and the selected relevant ICS target each pass automated fixture and engine integration tests.
 - [ ] Each target completes two consecutive manual runs, with the unchanged second run creating zero new review items.
 - [ ] Only one source is promoted to daily cadence at a time.
 - [ ] Each promoted source completes two acceptable scheduled runs before the next source is promoted.
@@ -311,3 +311,21 @@ Certify the complete production path incrementally. Keep every target manually r
 - [ ] Repository tests, lint, type checking, and production build pass before deployment.
 - [ ] Production configuration includes the Cron secret and the daily schedule.
 - [ ] Phase 9 completion is recorded only after the staged rollout gates pass.
+
+AC1 evidence (2026-08-11): the focused automated certification command
+`npm test -- src/server/refresh/__tests__/rss-event-feed-parser.test.ts
+src/server/refresh/__tests__/ics-parser.test.ts
+src/server/refresh/__tests__/refresh-engine.test.ts` passed all 80 tests across
+the three files. The certified Smartbar and Radius RSS/detail fixtures cover
+their source-specific parser contracts; the certified Greenline Luma fixture
+covers the selected ICS contract and passes through `runManualRefresh`; and the
+refresh-engine tests exercise all three matrix sources, repeat suppression, and
+invalid-sibling isolation.
+
+AC2-AC3 status (2026-08-11): a fresh public fetch of the selected Greenline
+subscription still ended on June 20, 2026, so it had no upcoming inventory and
+remained ineligible for production enrollment under Phase 6's useful-review-
+work gate. The configured local Admin credential was also rejected by the
+production API, while Vercel correctly kept the current Sensitive credential
+non-readable. No production target was created, no manual run was triggered,
+and no cadence was changed; AC2 and AC3 therefore remain open.

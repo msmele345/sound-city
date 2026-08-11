@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createSeedCatalogStore } from "../../catalog/catalog-store";
@@ -13,6 +16,14 @@ import { createSeedRefreshStore } from "../store";
 import type { RefreshStore } from "../refresh-store";
 import type { Fetcher } from "../types";
 import type { CatalogStore } from "../../catalog/catalog-store";
+
+const certifiedGreenlineIcs = readFileSync(
+  resolve(
+    process.cwd(),
+    "src/server/refresh/__tests__/fixtures/greenline-luma.ics",
+  ),
+  "utf8",
+);
 
 async function createDevTarget(store: RefreshStore) {
   const owner = await store.createSourceOwner({
@@ -960,6 +971,80 @@ describe("refresh engine", () => {
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.lastSuccessfulRunAt).not.toBeNull();
     expect(updated!.failureCount).toBe(0);
+  });
+
+  it("runs the certified Greenline fixture through the engine and suppresses an unchanged repeat", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "Greenline",
+      slug: "greenline",
+      kind: "promoter",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-WBFN4Ar4zrbkCZM",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "manual",
+      notes: "",
+    });
+    const fetcher: Fetcher = async () => ({
+      body: certifiedGreenlineIcs,
+      contentType: "text/calendar",
+      status: 200,
+    });
+
+    const first = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(first.run).toMatchObject({
+      status: "succeeded",
+      sourceTargetsChecked: 1,
+      sourceTargetsFailed: 0,
+      draftsCreated: 13,
+    });
+    expect(first.reviewItems).toHaveLength(13);
+    expect(first.reviewItems[0]).toMatchObject({
+      lane: "new-event",
+      sourceTargetId: target.id,
+      parserVersion: "venue-calendar@1",
+      normalizedDraft: expect.objectContaining({
+        title: "greenline ep8",
+        venueName: "3201 S State St, Chicago, IL 60616, USA",
+      }),
+    });
+
+    const second = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    const [secondOutcome] = await store.listRefreshTargetOutcomes(second.run.id);
+
+    expect(second.run).toMatchObject({
+      status: "succeeded",
+      draftsCreated: 0,
+      updatesProposed: 0,
+    });
+    expect(second.reviewItems).toEqual([]);
+    expect(secondOutcome).toMatchObject({
+      sourceTargetId: target.id,
+      status: "unchanged",
+      candidateCount: 13,
+      createdCount: 0,
+      updatedCount: 0,
+      unchangedCount: 13,
+    });
   });
 
   it("retains valid ICS events and persists malformed sibling warnings once", async () => {
