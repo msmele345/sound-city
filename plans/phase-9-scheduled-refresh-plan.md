@@ -193,14 +193,17 @@ Time-box discovery of a stable official Chicago ICS subscription feed that is re
 - [ ] Adding a compatible future ICS target requires configuration, fixture certification, and cadence promotion but no scheduler code change.
 - [ ] The qualifying ICS source remains a hard Phase 9 release gate.
 
-Discovery evidence (2026-08-05): Greenline's organizer-owned Luma calendar was
-selected under the August 5-6 discovery time box. Two unauthenticated fetches
-of its multi-event iCal subscription returned the same 13 UIDs and material
-event fields with `200 text/calendar`; only provider telemetry changed. The
-calendar is verified and Chicago-based, and its rave, hard-techno, hard-groove,
-juke, and hard-dance programming is relevant to Sound City. Per-event ICS
-exports, broad city calendars, and unrelated subscription calendars were
-explicitly rejected. See [the discovery record](../docs/phase-9-ics-source-discovery.md).
+Discovery evidence (updated 2026-08-12): the product owner approved replacing
+Greenline after its live feed remained historical. The Vinyl Collectiv's
+organizer-owned Luma subscription was selected from the resumed search. Two
+unauthenticated fetches returned the same 16 UIDs and material event fields
+with `200 text/calendar`; only provider telemetry changed. The Chicago feed has
+an upcoming August 13 DJ/open-decks event and a history that includes Chicago
+house and electronic-music programming. Its broader-than-house scope remains a
+first-run review gate. Per-event exports, broad city calendars, and unrelated
+subscription calendars remain excluded. See [the discovery
+record](../docs/phase-9-ics-source-discovery.md) and [replacement
+report](../docs/phase-9-ics-source-replacement.md).
 
 ---
 
@@ -312,20 +315,21 @@ Certify the complete production path incrementally. Keep every target manually r
 - [ ] Production configuration includes the Cron secret and the daily schedule.
 - [ ] Phase 9 completion is recorded only after the staged rollout gates pass.
 
-AC1 evidence (2026-08-11): the focused automated certification command
+AC1 evidence (updated 2026-08-12): the focused automated certification command
 `npm test -- src/server/refresh/__tests__/rss-event-feed-parser.test.ts
 src/server/refresh/__tests__/ics-parser.test.ts
-src/server/refresh/__tests__/refresh-engine.test.ts` passed all 80 tests across
-the three files. The certified Smartbar and Radius RSS/detail fixtures cover
-their source-specific parser contracts; the certified Greenline Luma fixture
-covers the selected ICS contract and passes through `runManualRefresh`; and the
-refresh-engine tests exercise all three matrix sources, repeat suppression, and
-invalid-sibling isolation.
+src/server/refresh/__tests__/venue-calendar-parser.test.ts
+src/server/refresh/__tests__/refresh-engine.test.ts` passed all 92 tests across
+the four files. The certified Smartbar and Radius RSS/detail fixtures cover
+their source-specific parser contracts; the replacement Vinyl Collectiv Luma fixture
+covers the selected ICS parser and adapter contracts and passes twice through
+`runManualRefresh`; and the refresh-engine tests exercise all three matrix
+sources, repeat suppression, and invalid-sibling isolation.
 
-AC2-AC3 status (2026-08-11): a fresh public fetch of the selected Greenline
-subscription still ended on June 20, 2026, so it had no upcoming inventory and
-remained ineligible for production enrollment under Phase 6's useful-review-
-work gate. The configured local Admin credential was also rejected by the
-production API, while Vercel correctly kept the current Sensitive credential
+AC2-AC3 status (updated 2026-08-12): The Vinyl Collectiv replacement has 16
+events and one upcoming Chicago item on August 13, so the stale-inventory
+blocker is resolved. The configured local Admin credential is still rejected by
+the production API with `401`, while Vercel keeps the current Sensitive value
 non-readable. No production target was created, no manual run was triggered,
-and no cadence was changed; AC2 and AC3 therefore remain open.
+and no cadence was changed; AC2 and AC3 therefore remain open pending valid
+Admin access.

@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 import { parseVenueCalendarTarget } from "../venue-calendar-parser";
 import type { Fetcher, SourceTargetRecord } from "../types";
 
-const certifiedGreenlineIcs = readFileSync(
+const certifiedVinylCollectivIcs = readFileSync(
   resolve(
     process.cwd(),
-    "src/server/refresh/__tests__/fixtures/greenline-luma.ics",
+    "src/server/refresh/__tests__/fixtures/vinyl-collectiv-luma.ics",
   ),
   "utf8",
 );
@@ -59,35 +59,36 @@ const sampleIcs = [
 ].join("\r\n");
 
 describe("parseVenueCalendarTarget", () => {
-  it("maps Greenline's description URLs into event review candidates", async () => {
+  it("maps The Vinyl Collectiv's description URLs into event review candidates", async () => {
     const target = createTarget({
-      url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-WBFN4Ar4zrbkCZM",
+      url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-h8F4UvqlCzCPatc",
     });
     const fetcher: Fetcher = async () => ({
-      body: certifiedGreenlineIcs,
+      body: certifiedVinylCollectivIcs,
       contentType: "text/calendar; charset=utf-8",
       status: 200,
     });
 
     const items = await parseVenueCalendarTarget(
       target,
-      "run_greenline",
-      "2026-08-06T12:00:00.000Z",
+      "run_vinyl_collectiv",
+      "2026-08-12T12:00:00.000Z",
       fetcher,
     );
 
-    expect(items).toHaveLength(13);
+    expect(items).toHaveLength(16);
     expect(items.every((item) => item.lane === "new-event")).toBe(true);
-    expect(items[0]).toMatchObject({
-      sourceEventKey: "evt-R4jlVGB5Ii1x5tZ@events.lu.ma",
+    expect(items.at(-1)).toMatchObject({
+      sourceEventKey: "evt-M2v4qf6qcktf7tJ@events.lu.ma",
       normalizedDraft: {
-        title: "greenline ep8",
-        venueName: "3201 S State St, Chicago, IL 60616, USA",
-        startsAt: "2025-06-06T04:45:00.000Z",
-        ticketUrl: "https://luma.com/b5cpkvd7",
+        title:
+          "Bring a Record, Catch a Vibe: One-Year Anniversary Edition @ Marc Nolan",
+        venueName: "Marc Nolan, 171 N Sangamon St, Chicago, IL 60607, USA",
+        startsAt: "2026-08-14T00:00:00.000Z",
+        ticketUrl: "https://luma.com/jn6gvemj",
       },
       evidence: {
-        sourceUrls: ["https://luma.com/b5cpkvd7"],
+        sourceUrls: ["https://luma.com/jn6gvemj"],
       },
     });
   });

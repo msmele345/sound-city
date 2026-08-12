@@ -17,10 +17,10 @@ import type { RefreshStore } from "../refresh-store";
 import type { Fetcher } from "../types";
 import type { CatalogStore } from "../../catalog/catalog-store";
 
-const certifiedGreenlineIcs = readFileSync(
+const certifiedVinylCollectivIcs = readFileSync(
   resolve(
     process.cwd(),
-    "src/server/refresh/__tests__/fixtures/greenline-luma.ics",
+    "src/server/refresh/__tests__/fixtures/vinyl-collectiv-luma.ics",
   ),
   "utf8",
 );
@@ -973,19 +973,19 @@ describe("refresh engine", () => {
     expect(updated!.failureCount).toBe(0);
   });
 
-  it("runs the certified Greenline fixture through the engine and suppresses an unchanged repeat", async () => {
+  it("runs the certified Vinyl Collectiv fixture through the engine and suppresses an unchanged repeat", async () => {
     const store = createSeedRefreshStore();
     const owner = await store.createSourceOwner({
       cityId: "city_chicago",
-      name: "Greenline",
-      slug: "greenline",
+      name: "The Vinyl Collectiv",
+      slug: "the-vinyl-collectiv",
       kind: "promoter",
       notes: "",
     });
     const target = await store.createSourceTarget({
       ownerId: owner.id,
       cityId: "city_chicago",
-      url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-WBFN4Ar4zrbkCZM",
+      url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-h8F4UvqlCzCPatc",
       sourceType: "official-venue-calendar",
       parserStrategy: "venue-calendar",
       trustLevel: "primary",
@@ -996,7 +996,7 @@ describe("refresh engine", () => {
       notes: "",
     });
     const fetcher: Fetcher = async () => ({
-      body: certifiedGreenlineIcs,
+      body: certifiedVinylCollectivIcs,
       contentType: "text/calendar",
       status: 200,
     });
@@ -1011,16 +1011,17 @@ describe("refresh engine", () => {
       status: "succeeded",
       sourceTargetsChecked: 1,
       sourceTargetsFailed: 0,
-      draftsCreated: 13,
+      draftsCreated: 16,
     });
-    expect(first.reviewItems).toHaveLength(13);
-    expect(first.reviewItems[0]).toMatchObject({
+    expect(first.reviewItems).toHaveLength(16);
+    expect(first.reviewItems.at(-1)).toMatchObject({
       lane: "new-event",
       sourceTargetId: target.id,
       parserVersion: "venue-calendar@1",
       normalizedDraft: expect.objectContaining({
-        title: "greenline ep8",
-        venueName: "3201 S State St, Chicago, IL 60616, USA",
+        title:
+          "Bring a Record, Catch a Vibe: One-Year Anniversary Edition @ Marc Nolan",
+        venueName: "Marc Nolan, 171 N Sangamon St, Chicago, IL 60607, USA",
       }),
     });
 
@@ -1040,10 +1041,10 @@ describe("refresh engine", () => {
     expect(secondOutcome).toMatchObject({
       sourceTargetId: target.id,
       status: "unchanged",
-      candidateCount: 13,
+      candidateCount: 16,
       createdCount: 0,
       updatedCount: 0,
-      unchangedCount: 13,
+      unchangedCount: 16,
     });
   });
 

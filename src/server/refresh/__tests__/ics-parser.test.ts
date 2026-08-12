@@ -4,42 +4,46 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseIcs, parseIcsDocument } from "../ics-parser";
 
-const certifiedGreenlineIcs = readFileSync(
+const certifiedVinylCollectivIcs = readFileSync(
   resolve(
     process.cwd(),
-    "src/server/refresh/__tests__/fixtures/greenline-luma.ics",
+    "src/server/refresh/__tests__/fixtures/vinyl-collectiv-luma.ics",
   ),
   "utf8",
 );
 
 describe("parseIcs", () => {
-  it("parses the sanitized Greenline Luma subscription fixture", () => {
-    const result = parseIcsDocument(certifiedGreenlineIcs);
+  it("parses the sanitized Vinyl Collectiv Luma subscription fixture", () => {
+    const result = parseIcsDocument(certifiedVinylCollectivIcs);
 
     expect(result.warnings).toEqual([]);
-    expect(result.events).toHaveLength(13);
-    expect(result.events[0]).toMatchObject({
-      uid: "evt-R4jlVGB5Ii1x5tZ@events.lu.ma",
-      summary: "greenline ep8",
-      dtStart: "2025-06-06T04:45:00.000Z",
-      dtEnd: "2025-06-06T10:00:00.000Z",
-      location: "3201 S State St, Chicago, IL 60616, USA",
-      url: "https://luma.com/b5cpkvd7",
+    expect(result.events).toHaveLength(16);
+    expect(result.events.at(-1)).toMatchObject({
+      uid: "evt-M2v4qf6qcktf7tJ@events.lu.ma",
+      summary:
+        "Bring a Record, Catch a Vibe: One-Year Anniversary Edition @ Marc Nolan",
+      dtStart: "2026-08-14T00:00:00.000Z",
+      dtEnd: "2026-08-14T02:00:00.000Z",
+      location: "Marc Nolan, 171 N Sangamon St, Chicago, IL 60607, USA",
+      url: "https://luma.com/jn6gvemj",
     });
     expect(result.events.map((event) => event.url)).toEqual([
-      "https://luma.com/b5cpkvd7",
-      "https://luma.com/3ydv0is1",
-      "https://luma.com/lak4s7ux",
-      "https://luma.com/ysx4nuz2",
-      "https://luma.com/7w0xk1s2",
-      "https://luma.com/qgcb154h",
-      "https://luma.com/uyzlea3v",
-      "https://luma.com/ke01u2ox",
-      "https://luma.com/d9t5fi64",
-      "https://luma.com/agofeco8",
-      "https://luma.com/40nulu2n",
-      "https://luma.com/dn42ztgl",
-      "https://luma.com/6ljwnq0g",
+      "https://luma.com/q7o9mi7c",
+      "https://luma.com/fdr3xbk7",
+      "https://luma.com/ovb79mv1",
+      "https://luma.com/kk74qm2j",
+      "https://luma.com/yhzmf2r2",
+      "https://luma.com/r9qvh3ji",
+      "https://luma.com/ric1zksj",
+      "https://luma.com/ltj6q44c",
+      "https://luma.com/1iswowv5",
+      "https://luma.com/5aqaq5r2",
+      "https://luma.com/0ncx2lmf",
+      "https://luma.com/by1xgaaf",
+      "https://luma.com/e7z4ro34",
+      "https://luma.com/5kjlg5cf",
+      "https://luma.com/2lvo0qz5",
+      "https://luma.com/jn6gvemj",
     ]);
   });
 
