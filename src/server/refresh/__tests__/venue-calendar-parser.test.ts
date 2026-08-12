@@ -85,6 +85,7 @@ describe("parseVenueCalendarTarget", () => {
           "Bring a Record, Catch a Vibe: One-Year Anniversary Edition @ Marc Nolan",
         venueName: "Marc Nolan, 171 N Sangamon St, Chicago, IL 60607, USA",
         startsAt: "2026-08-14T00:00:00.000Z",
+        endsAt: "2026-08-14T02:00:00.000Z",
         ticketUrl: "https://luma.com/jn6gvemj",
       },
       evidence: {

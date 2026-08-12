@@ -94,6 +94,7 @@ export async function parseVenueCalendarTarget(
     const title = event.summary;
     const venueName = event.location ?? "";
     const startsAt = event.dtStart;
+    const endsAt = event.dtEnd;
     const confidence = Math.max(
       0,
       Math.min(100, 82 + target.confidenceAdjustment),
@@ -103,6 +104,7 @@ export async function parseVenueCalendarTarget(
       title,
       venueName,
       startsAt,
+      endsAt,
       styles: normalizeStyleTags(event.categories),
       ticketUrl: eventUrl,
     };
