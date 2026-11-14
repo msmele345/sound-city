@@ -7,7 +7,6 @@ import {
   defaultTasteProfile,
   rankRecommendedEvents,
   type RecommendationActions,
-  type RecommendationEvent,
   type StartTimePreference,
   type TasteProfile,
   type TasteStyle,
@@ -15,6 +14,18 @@ import {
   type VenueSizePreference,
 } from "@/lib/recommendations";
 import { canonicalTechnoSubGenres } from "@/lib/style-normalization";
+
+import type {
+  ArtistDirectoryState,
+  CatalogEvent,
+  CatalogSource,
+  CatalogVenue,
+  CatalogVenueSignal,
+  EventFeedState,
+  ShowcaseArtist,
+  ShowcaseState,
+  VenueDirectoryState,
+} from "./dashboard/types";
 
 const manifest = [
   { value: "24", label: "Verified" },
@@ -59,92 +70,6 @@ const startTimeOptions: { value: StartTimePreference; label: string }[] = [
   { value: "late", label: "Late" },
   { value: "after-hours", label: "After hours" },
 ];
-
-type CatalogEvent = RecommendationEvent & {
-  id: string;
-  citySlug?: string;
-  title: string;
-  slug?: string;
-  startsAt: string;
-  venue: {
-    name: string;
-    slug?: string;
-    neighborhood: string;
-    capacity: number | null;
-  };
-  artists: { name: string; slug?: string }[];
-  styles: string[];
-  source: {
-    title: string;
-    url: string;
-    lastVerifiedAt: string;
-  };
-};
-
-type EventFeedState =
-  | { status: "loading"; events: CatalogEvent[] }
-  | { status: "ready"; events: CatalogEvent[] }
-  | { status: "error"; events: CatalogEvent[] };
-
-type CatalogSource = {
-  title: string;
-  url: string;
-  lastVerifiedAt: string;
-};
-
-type CatalogArtistLink = {
-  id: string;
-  kind: string;
-  label: string;
-  url: string;
-  source: CatalogSource;
-};
-
-type ShowcaseArtist = {
-  id: string;
-  citySlug: string;
-  name: string;
-  slug: string;
-  bio: string;
-  styles: string[];
-  showcase: boolean;
-  source: CatalogSource;
-  links: CatalogArtistLink[];
-};
-
-type ShowcaseState =
-  | { status: "loading"; artist: null }
-  | { status: "ready"; artist: ShowcaseArtist | null }
-  | { status: "error"; artist: null };
-
-type ArtistDirectoryState =
-  | { status: "loading"; artists: ShowcaseArtist[] }
-  | { status: "ready"; artists: ShowcaseArtist[] }
-  | { status: "error"; artists: ShowcaseArtist[] };
-
-type CatalogVenueSignal = {
-  id: string;
-  category: "sound" | "crowd" | "room" | "door" | "layout";
-  value: string;
-  source: CatalogSource;
-};
-
-type CatalogVenue = {
-  id: string;
-  citySlug: string;
-  name: string;
-  slug: string;
-  neighborhood: string;
-  address: string;
-  capacity: number | null;
-  source: CatalogSource;
-  signals: CatalogVenueSignal[];
-};
-
-type VenueDirectoryState =
-  | { status: "loading"; venues: CatalogVenue[] }
-  | { status: "ready"; venues: CatalogVenue[] }
-  | { status: "error"; venues: CatalogVenue[] };
 
 type LocalPersonalization = {
   profile: TasteProfile;
