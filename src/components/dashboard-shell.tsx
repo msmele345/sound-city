@@ -17,13 +17,12 @@ import {
   formatEventDate,
   formatEventTime,
   formatSignalCategory,
-  formatVerifiedDate,
 } from "./dashboard/format";
+import { SourceTrustLine } from "./dashboard/source-trust-line";
 import { useCatalog } from "./dashboard/use-catalog";
 import { styleOptions, usePersonalization } from "./dashboard/use-personalization";
 import type {
   ArtistDirectoryState,
-  CatalogSource,
   EventFeedState,
   ShowcaseState,
   VenueDirectoryState,
@@ -76,24 +75,6 @@ function MatchMeter({ score }: { score: number }) {
       </span>
       <span className="sr-only">Match {pct} percent</span>
     </span>
-  );
-}
-
-function SourceTrustLine({ source }: { source: CatalogSource }) {
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.14em]">
-      <span className="text-ink-faint">
-        Verified {formatVerifiedDate(source.lastVerifiedAt)}
-      </span>
-      <a
-        href={source.url}
-        target="_blank"
-        rel="noreferrer"
-        className="text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
-      >
-        {source.title}
-      </a>
-    </div>
   );
 }
 
