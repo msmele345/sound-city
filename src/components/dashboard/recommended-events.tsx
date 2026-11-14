@@ -8,6 +8,7 @@ import {
   type TasteProfile,
 } from "@/lib/recommendations";
 
+import { Button } from "./button";
 import { formatEventDate, formatEventTime } from "./format";
 import { MatchMeter } from "./match-meter";
 import { SourceTrustLine } from "./source-trust-line";
@@ -122,28 +123,25 @@ export function RecommendedEvents({
                 <SourceTrustLine source={item.event.source} />
                 <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
                   <MatchMeter score={item.score} />
-                  <button
-                    type="button"
+                  <Button
+                    variant="quiet"
                     aria-pressed={item.saved}
                     onClick={() => saveEvent(item.event.id)}
-                    className="shrink-0 border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
                   >
                     {item.saved ? "Saved" : "Save"}
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="quiet"
                     onClick={() => dismissEvent(item.event.id)}
-                    className="shrink-0 border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
                   >
                     Dismiss
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="quiet"
                     onClick={() => attendEvent(item.event.id)}
-                    className="shrink-0 border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-ink-dim transition-colors duration-150 hover:bg-panel hover:text-signal"
                   >
                     Mark attended
-                  </button>
+                  </Button>
                 </div>
               </div>
             </li>

@@ -8,6 +8,7 @@ import type {
   VenueSizePreference,
 } from "@/lib/recommendations";
 
+import { Chip } from "./chip";
 import { styleOptions } from "./use-personalization";
 
 const vibeOptions: { value: TasteVibe; label: string }[] = [
@@ -54,22 +55,14 @@ export function TasteProfileControls({
         </legend>
         <div className="mt-3 flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
           {styleOptions.map((style) => (
-            <label
+            <Chip
               key={style}
-              className={`inline-flex max-w-full shrink-0 cursor-pointer items-center gap-2 border border-rule px-3 py-2 text-left font-mono text-[0.7rem] uppercase tracking-[0.14em] transition-colors duration-150 ${
-                profile.styles.includes(style)
-                  ? "bg-panel text-signal"
-                  : "text-ink-dim hover:bg-panel"
-              }`}
+              pressed={profile.styles.includes(style)}
+              checked={profile.styles.includes(style)}
+              onChange={() => toggleStyle(style)}
             >
-              <input
-                type="checkbox"
-                checked={profile.styles.includes(style)}
-                onChange={() => toggleStyle(style)}
-                className="size-3 accent-signal"
-              />
               {style}
-            </label>
+            </Chip>
           ))}
         </div>
       </fieldset>
