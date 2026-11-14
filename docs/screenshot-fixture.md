@@ -25,16 +25,24 @@ The same command is saved as:
 npm run dev:screenshots
 ```
 
-`dev:screenshots` sets `DATABASE_URL` to an empty value before starting Next.js
-so a URL in `.env.local` is not loaded. Open
-[http://localhost:3000](http://localhost:3000). The Latest Events section is
-`#events`.
+Both use macOS and Linux shell syntax (`NAME=value` before the command, and an
+empty `DATABASE_URL=`). `dev:screenshots` sets `DATABASE_URL` to an empty value
+in the Next.js process. Next.js still reads `.env.local`, but it does not
+replace a variable that is already set, so a `DATABASE_URL` in that file does
+not win.
+
+Open [http://localhost:3000](http://localhost:3000). The Latest Events section
+is `#events`.
+
+Event dates are chosen once, when the in-memory store is first built in that
+process. Restart the dev server before a screenshot session so "tonight" is
+computed from the current time.
 
 The flag is `SOUND_CITY_SCREENSHOT_FIXTURE=1`. Any other value, including an
 unset variable, keeps the normal launch catalog. A non-empty `DATABASE_URL`
-always selects Postgres and ignores the flag. The fixture also stays off when
-`VERCEL_ENV` is `production` or `preview`, and when `NODE_ENV` is `production`
-(`next build` / `next start`).
+always selects Postgres and ignores the flag. An empty `DATABASE_URL` does
+not. The fixture also stays off when `VERCEL_ENV` is `production` or `preview`,
+and when `NODE_ENV` is `production` (`next build` / `next start`).
 
 ## What the catalog contains
 
