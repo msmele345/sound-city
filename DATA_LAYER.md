@@ -99,21 +99,33 @@ Drizzle everywhere.
 
 ```ts
 export function getCatalogStore() {
-  if (process.env.DATABASE_URL) {
+  const mode = selectCatalogMode();
+  if (mode === "database") {
     databaseStore ??= createDrizzleCatalogStore(createDb());
     return databaseStore;
   }
 
-  fallbackStore ??= createSeedCatalogStore();
+  if (!fallbackStore || fallbackMode !== mode) {
+    fallbackStore = createSeedCatalogStore(
+      mode === "screenshot-fixture" ? buildScreenshotCatalog() : launchCatalogData,
+    );
+    fallbackMode = mode;
+  }
+
   return fallbackStore;
 }
 ```
 
 If `DATABASE_URL` exists, the app uses Drizzle over Postgres. If it is missing,
-the app uses a cloned copy of `launchCatalogData` in process memory.
+the app uses a cloned copy of `launchCatalogData` in process memory. Setting
+`SOUND_CITY_SCREENSHOT_FIXTURE=1` serves a local screenshot catalog instead of
+that launch clone. The flag is ignored when `DATABASE_URL` is set, when
+`NODE_ENV` is `production`, and when `VERCEL_ENV` is `production` or `preview`.
+See `docs/screenshot-fixture.md`.
 
 That gives the app a useful local/test mode, but it also means local fallback
-writes are not durable.
+writes are not durable. The screenshot catalog is opt-in read data for local
+UX captures. It is not a database and it does not change production.
 
 ## Database Connection
 
