@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  defaultRecommendationActions,
-  defaultTasteProfile,
   rankRecommendedEvents,
   type RecommendationActions,
   type StartTimePreference,
@@ -21,6 +19,7 @@ import {
   formatSignalCategory,
   formatVerifiedDate,
 } from "./dashboard/format";
+import { styleOptions, usePersonalization } from "./dashboard/use-personalization";
 import type {
   ArtistDirectoryState,
   CatalogEvent,
@@ -46,17 +45,6 @@ const nav = [
   { label: "Admin", href: "/admin" },
 ];
 
-const storageKey = "sound-city.local-profile.v1";
-
-const styleOptions: TasteStyle[] = [
-  "house",
-  "techno",
-  "acid",
-  "melodic house",
-  "deep house",
-  ...canonicalTechnoSubGenres,
-];
-
 const vibeOptions: { value: TasteVibe; label: string }[] = [
   { value: "raw", label: "Raw" },
   { value: "deep", label: "Deep" },
@@ -75,56 +63,6 @@ const startTimeOptions: { value: StartTimePreference; label: string }[] = [
   { value: "late", label: "Late" },
   { value: "after-hours", label: "After hours" },
 ];
-
-type LocalPersonalization = {
-  profile: TasteProfile;
-  actions: RecommendationActions;
-};
-
-function isTasteStyle(value: string): value is TasteStyle {
-  return styleOptions.includes(value as TasteStyle);
-}
-
-function readLocalPersonalization(): LocalPersonalization {
-  if (typeof window === "undefined") {
-    return {
-      profile: defaultTasteProfile,
-      actions: defaultRecommendationActions,
-    };
-  }
-
-  try {
-    const stored = window.localStorage.getItem(storageKey);
-    if (!stored) {
-      return {
-        profile: defaultTasteProfile,
-        actions: defaultRecommendationActions,
-      };
-    }
-
-    const parsed = JSON.parse(stored) as Partial<LocalPersonalization>;
-    return {
-      profile: {
-        ...defaultTasteProfile,
-        ...parsed.profile,
-        styles:
-          parsed.profile?.styles?.filter((style): style is TasteStyle =>
-            isTasteStyle(style),
-          ) ?? defaultTasteProfile.styles,
-        discoveryLevel: Number(parsed.profile?.discoveryLevel ?? 4),
-      },
-      actions: {
-        ...defaultRecommendationActions,
-        ...parsed.actions,
-      },
-    };
-  } catch {
-    return {
-      profile: defaultTasteProfile,
-      actions: defaultRecommendationActions,
-    };
-  }
-}
 
 function MatchMeter({ score }: { score: number }) {
   const filled = Math.round(score * 10);
@@ -920,9 +858,7 @@ export function DashboardShell() {
     status: "loading",
     venues: [],
   });
-  const [personalization, setPersonalization] = useState<LocalPersonalization>(
-    () => readLocalPersonalization(),
-  );
+  const { profile, actions, setProfile, setActions } = usePersonalization();
 
   useEffect(() => {
     let active = true;
@@ -1015,10 +951,6 @@ export function DashboardShell() {
     };
   }, []);
 
-  useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(personalization));
-  }, [personalization]);
-
   return (
     <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
       <header id="dashboard" className="rise scroll-mt-6 border-b-2 border-rule-strong pb-7">
@@ -1099,14 +1031,10 @@ export function DashboardShell() {
             />
             <RecommendedEvents
               feed={feed}
-              profile={personalization.profile}
-              actions={personalization.actions}
-              onProfileChange={(profile) =>
-                setPersonalization((current) => ({ ...current, profile }))
-              }
-              onActionsChange={(actions) =>
-                setPersonalization((current) => ({ ...current, actions }))
-              }
+              profile={profile}
+              actions={actions}
+              onProfileChange={setProfile}
+              onActionsChange={setActions}
             />
           </section>
 
