@@ -17,7 +17,7 @@ const nav = [
   { label: "Dashboard", href: "/" },
   { label: "Events", href: "/events" },
   { label: "Artists", href: "/artists" },
-  { label: "Venues", href: "#venues" },
+  { label: "Venues", href: "/venues" },
   { label: "Admin", href: "/admin" },
 ];
 

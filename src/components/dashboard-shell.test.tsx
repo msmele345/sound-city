@@ -51,8 +51,8 @@ describe("DashboardShell", () => {
       within(main).getByRole("heading", { name: /artist showcase/i }),
     ).toBeInTheDocument();
     expect(
-      within(main).getByRole("heading", { name: /venue signals/i }),
-    ).toBeInTheDocument();
+      within(main).queryByRole("heading", { name: /venue signals/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("replaces the event feed with the next five events linking to the events route", async () => {
@@ -142,6 +142,24 @@ describe("DashboardShell", () => {
     expect(
       within(nav).getByRole("link", { name: /events/i }),
     ).not.toHaveAttribute("aria-current");
+  });
+
+  it("points the venues item at the venues route and drops venues from home", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+    navigationStub.pathname = "/venues";
+
+    render(<DashboardShell />);
+
+    const nav = screen.getByRole("navigation", {
+      name: /primary navigation/i,
+    });
+    const venues = within(nav).getByRole("link", { name: /venues/i });
+
+    expect(venues).toHaveAttribute("href", "/venues");
+    expect(venues).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.queryByRole("region", { name: /venue signals/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("points the artists item at the artists route", () => {
@@ -607,7 +625,7 @@ describe("DashboardShell", () => {
     expect(within(eventRow!).queryByText(/parser/i)).not.toBeInTheDocument();
   });
 
-  it("loads the artist showcase and venue directory from catalog APIs", async () => {
+  it("loads the weekly artist feature on the home page", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/events?city=chicago") {
         return Promise.resolve({
@@ -713,7 +731,6 @@ describe("DashboardShell", () => {
     render(<DashboardShell />);
 
     expect(fetchMock).toHaveBeenCalledWith("/api/catalog/showcase?city=chicago");
-    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/venues?city=chicago");
 
     const showcase = screen.getByRole("region", {
       name: /artist showcase/i,
@@ -732,22 +749,8 @@ describe("DashboardShell", () => {
     expect(
       within(showcase).getByRole("link", { name: /family matters listing/i }),
     ).toHaveAttribute("href", "https://example.com/event");
-
-    const venues = screen.getByRole("region", { name: /venue signals/i });
     expect(
-      await within(venues).findByRole("heading", { name: /smartbar/i }),
-    ).toBeInTheDocument();
-    expect(within(venues).getByText(/wrigleyville/i)).toBeInTheDocument();
-    expect(
-      within(venues).getByText(/basement room with house/i),
-    ).toBeInTheDocument();
-    expect(
-      within(venues).getByRole("heading", {
-        name: /family matters feat\. posthuman/i,
-      }),
-    ).toBeInTheDocument();
-    expect(
-      within(venues).getByRole("link", { name: /family matters listing/i }),
-    ).toHaveAttribute("href", "https://example.com/event");
+      screen.queryByRole("region", { name: /venue signals/i }),
+    ).not.toBeInTheDocument();
   });
 });
