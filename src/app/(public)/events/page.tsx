@@ -1,5 +1,17 @@
+import { Suspense } from "react";
+
 import { EventsView } from "@/components/dashboard/events-view";
 
 export default function EventsPage() {
-  return <EventsView />;
+  return (
+    <Suspense
+      fallback={
+        <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+          Loading Chicago event feed
+        </p>
+      }
+    >
+      <EventsView />
+    </Suspense>
+  );
 }

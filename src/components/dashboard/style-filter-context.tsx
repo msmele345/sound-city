@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { createContext, useContext, type ReactNode } from "react";
 
 type StyleFilterValue = {
   activeStyle: string;
@@ -10,7 +11,23 @@ type StyleFilterValue = {
 const StyleFilterContext = createContext<StyleFilterValue | null>(null);
 
 export function StyleFilterProvider({ children }: { children: ReactNode }) {
-  const [activeStyle, setActiveStyle] = useState("all");
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
+  const style = searchParams.get("style");
+  const activeStyle = style && style !== "all" ? style : "all";
+
+  function setActiveStyle(next: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next === "all") {
+      params.delete("style");
+    } else {
+      params.set("style", next);
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
   return (
     <StyleFilterContext.Provider value={{ activeStyle, setActiveStyle }}>
       {children}

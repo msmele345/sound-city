@@ -318,7 +318,6 @@ describe("DashboardShell", () => {
 
 
   it("filters events and the featured artist by canonical techno sub-genre", async () => {
-    const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/events?city=chicago") {
         return Promise.resolve({
@@ -422,16 +421,21 @@ describe("DashboardShell", () => {
       return Promise.resolve({ ok: true, json: async () => ({ venues: [] }) });
     });
 
+    navigationStub.search = "style=hard";
     renderSharedDiscovery();
 
     const latestEvents = screen.getByRole("region", { name: /latest events/i });
-    const directoryHeading = await screen.findByRole("heading", {
-      name: /artist directory/i,
-    });
-    const artistShowcase = directoryHeading.closest("section");
+    const artistShowcase = (
+      await screen.findByRole("heading", { name: /artists tagged hard/i })
+    ).closest("section");
     expect(artistShowcase).not.toBeNull();
 
-    await within(latestEvents).findByRole("heading", { name: /melodic signal/i });
+    expect(
+      await within(latestEvents).findByRole("heading", { name: /hard signal/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(latestEvents).queryByRole("heading", { name: /melodic signal/i }),
+    ).not.toBeInTheDocument();
     for (const style of ["melodic", "groovy", "hard", "trance"]) {
       expect(
         within(latestEvents).getByRole("button", { name: style }),
@@ -440,26 +444,6 @@ describe("DashboardShell", () => {
         screen.getByRole("checkbox", { name: style }),
       ).toBeInTheDocument();
     }
-
-    await user.click(
-      within(latestEvents).getByRole("button", { name: "melodic" }),
-    );
-    expect(
-      within(latestEvents).getByRole("heading", { name: /melodic signal/i }),
-    ).toBeInTheDocument();
-    expect(
-      within(latestEvents).queryByRole("heading", { name: /hard signal/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(artistShowcase!).getAllByRole("heading", { name: /melodic artist/i }),
-    ).not.toHaveLength(0);
-
-    await user.click(
-      within(latestEvents).getByRole("button", { name: "hard" }),
-    );
-    expect(
-      within(latestEvents).getByRole("heading", { name: /hard signal/i }),
-    ).toBeInTheDocument();
     expect(
       within(artistShowcase!).queryByRole("heading", { name: /melodic artist/i }),
     ).not.toBeInTheDocument();
@@ -470,7 +454,7 @@ describe("DashboardShell", () => {
   });
 
   it("does not duplicate the showcase artist in the style matches list", async () => {
-    const user = userEvent.setup();
+    navigationStub.search = "style=melodic";
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/events?city=chicago") {
         return Promise.resolve({
@@ -563,14 +547,7 @@ describe("DashboardShell", () => {
 
     renderSharedDiscovery();
 
-    const latestEvents = screen.getByRole("region", { name: /latest events/i });
-    await within(latestEvents).findByRole("heading", { name: /melodic signal/i });
-
-    await user.click(
-      within(latestEvents).getByRole("button", { name: "melodic" }),
-    );
-
-    const styleMatchesHeading = screen.getByRole("heading", {
+    const styleMatchesHeading = await screen.findByRole("heading", {
       name: /artists tagged melodic/i,
     });
     const styleMatchesList = styleMatchesHeading.closest("div");
