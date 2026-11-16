@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 
 import { formatEventDate, formatEventTime } from "./format";
@@ -52,12 +53,12 @@ export function NextUp({ feed }: { feed: EventFeedState }) {
           ))}
         </ol>
       )}
-      <a
+      <Link
         href="/events"
         className="mt-4 inline-flex font-mono text-xs uppercase tracking-[0.16em] text-signal transition-colors duration-150 hover:text-ink"
       >
         All events
-      </a>
+      </Link>
     </section>
   );
 }

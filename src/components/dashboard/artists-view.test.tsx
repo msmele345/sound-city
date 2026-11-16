@@ -190,7 +190,11 @@ describe("Artists route", () => {
     expect(artists).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: /for you/i })).toHaveAttribute(
       "href",
-      "/",
+      "/?style=hard",
+    );
+    expect(within(nav).getByRole("link", { name: /venues/i })).toHaveAttribute(
+      "href",
+      "/venues",
     );
 
     await user.click(within(showcase).getByRole("button", { name: /^melodic$/i }));

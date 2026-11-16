@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import { CatalogProvider, useCatalogData } from "./catalog-context";
 import { PersonalizationProvider } from "./personalization-context";
@@ -141,16 +142,16 @@ function isCurrentPath(pathname: string, href: string) {
 function hrefWithStyle(href: string, activeStyle: string) {
   if (
     activeStyle !== "all" &&
-    (href === "/events" || href === "/artists")
+    (href === "/" || href === "/events" || href === "/artists")
   ) {
-    return `${href}?${new URLSearchParams({ style: activeStyle }).toString()}`;
+    const query = new URLSearchParams({ style: activeStyle }).toString();
+    return href === "/" ? `/?${query}` : `${href}?${query}`;
   }
   return href;
 }
 
-function PublicNav() {
+function NavLinks({ activeStyle }: { activeStyle: string }) {
   const pathname = usePathname();
-  const { activeStyle } = useStyleFilter();
 
   return (
     <nav
@@ -165,7 +166,7 @@ function PublicNav() {
           const href = hrefWithStyle(item.href, activeStyle);
           const current = isCurrentPath(pathname, href);
           return (
-            <a
+            <Link
               key={item.label}
               href={href}
               aria-current={current ? "page" : undefined}
@@ -177,12 +178,17 @@ function PublicNav() {
                 {String(i + 1).padStart(2, "0")}
               </span>{" "}
               {item.label}
-            </a>
+            </Link>
           );
         })}
       </div>
     </nav>
   );
+}
+
+function StyleAwareNav() {
+  const { activeStyle } = useStyleFilter();
+  return <NavLinks activeStyle={activeStyle} />;
 }
 
 export function PublicShell({ children }: { children: ReactNode }) {
@@ -191,13 +197,26 @@ export function PublicShell({ children }: { children: ReactNode }) {
   return (
     <CatalogProvider>
       <PersonalizationProvider>
-        <StyleFilterProvider>
-          <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
+        <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
           {pathname === "/" ? <LargeMasthead /> : <CompactMasthead />}
 
-          <PublicNav />
+          <Suspense fallback={<NavLinks activeStyle="all" />}>
+            <StyleFilterProvider>
+              <StyleAwareNav />
+            </StyleFilterProvider>
+          </Suspense>
 
-          <main className="mt-10 min-w-0">{children}</main>
+          <main className="mt-10 min-w-0">
+            <Suspense
+              fallback={
+                <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+                  Loading view
+                </p>
+              }
+            >
+              <StyleFilterProvider>{children}</StyleFilterProvider>
+            </Suspense>
+          </main>
 
           <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t-2 border-rule-strong pt-4 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint">
             <span>Source-verified &middot; Chicago underground</span>
@@ -206,8 +225,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
             </a>
             <span>End of manifest</span>
           </footer>
-          </div>
-        </StyleFilterProvider>
+        </div>
       </PersonalizationProvider>
     </CatalogProvider>
   );

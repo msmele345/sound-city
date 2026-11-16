@@ -1,9 +1,34 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 
 import { navigationStub } from "@/test/navigation-stub";
 
-import { DashboardShell } from "./dashboard-shell";
+vi.mock("next/link", () => ({
+  default: function NextLink({
+    href,
+    children,
+    onClick,
+    ...props
+  }: AnchorHTMLAttributes<HTMLAnchorElement> & {
+    href: string;
+    children?: ReactNode;
+  }) {
+    return (
+      <a
+        {...props}
+        href={href}
+        onClick={(event) => {
+          onClick?.(event);
+          event.preventDefault();
+        }}
+      >
+        {children}
+      </a>
+    );
+  },
+}));
+
 import { ArtistsView } from "./dashboard/artists-view";
 import { EventsView } from "./dashboard/events-view";
 import { HomeView } from "./dashboard/home-view";
@@ -19,6 +44,14 @@ function renderSharedDiscovery() {
   );
 }
 
+function renderHome() {
+  return render(
+    <PublicShell>
+      <HomeView />
+    </PublicShell>,
+  );
+}
+
 const fetchMock = vi.fn();
 
 beforeEach(() => {
@@ -27,14 +60,14 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
-describe("DashboardShell", () => {
+describe("public home", () => {
   it("presents the launch dashboard regions for discovery", () => {
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({ city: { slug: "chicago" }, events: [] }),
     });
 
-    render(<DashboardShell />);
+    renderHome();
 
     expect(
       screen.getByRole("heading", { name: /sound city/i }),
@@ -80,7 +113,7 @@ describe("DashboardShell", () => {
       }),
     });
 
-    render(<DashboardShell />);
+    renderHome();
 
     expect(
       screen.queryByRole("region", { name: /latest events/i }),
@@ -104,7 +137,7 @@ describe("DashboardShell", () => {
   it("hides masthead counts while the catalog is loading", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 
-    render(<DashboardShell />);
+    renderHome();
 
     const header = screen.getByRole("banner");
     expect(within(header).queryByText(/^events$/i)).not.toBeInTheDocument();
@@ -204,7 +237,7 @@ describe("DashboardShell", () => {
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
 
-    render(<DashboardShell />);
+    renderHome();
 
     const header = screen.getByRole("banner");
     const events = await within(header).findByText(/^events$/i);
@@ -218,10 +251,31 @@ describe("DashboardShell", () => {
     expect(within(header).queryByText("24")).not.toBeInTheDocument();
   });
 
+  it("navigates the primary nav and next-up link without a full page load", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+
+    renderHome();
+
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+    for (const name of [/for you/i, /events/i, /artists/i, /venues/i]) {
+      const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+      fireEvent(within(nav).getByRole("link", { name }), click);
+      expect(click.defaultPrevented).toBe(true);
+    }
+
+    const allEvents = new MouseEvent("click", { bubbles: true, cancelable: true });
+    fireEvent(screen.getByRole("link", { name: /all events/i }), allEvents);
+    expect(allEvents.defaultPrevented).toBe(true);
+
+    const admin = new MouseEvent("click", { bubbles: true, cancelable: true });
+    fireEvent(screen.getByRole("link", { name: /^admin$/i }), admin);
+    expect(admin.defaultPrevented).toBe(false);
+  });
+
   it("moves admin out of the primary nav into the footer", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 
-    render(<DashboardShell />);
+    renderHome();
 
     const nav = screen.getByRole("navigation", {
       name: /primary navigation/i,
@@ -239,7 +293,7 @@ describe("DashboardShell", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
     navigationStub.pathname = "/";
 
-    render(<DashboardShell />);
+    renderHome();
 
     const nav = screen.getByRole("navigation", {
       name: /primary navigation/i,
@@ -257,7 +311,7 @@ describe("DashboardShell", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
     navigationStub.pathname = "/venues";
 
-    render(<DashboardShell />);
+    renderHome();
 
     const nav = screen.getByRole("navigation", {
       name: /primary navigation/i,
@@ -275,7 +329,7 @@ describe("DashboardShell", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
     navigationStub.pathname = "/artists";
 
-    render(<DashboardShell />);
+    renderHome();
 
     const nav = screen.getByRole("navigation", {
       name: /primary navigation/i,
@@ -290,7 +344,7 @@ describe("DashboardShell", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
     navigationStub.pathname = "/events";
 
-    render(<DashboardShell />);
+    renderHome();
 
     const nav = screen.getByRole("navigation", {
       name: /primary navigation/i,
@@ -305,7 +359,7 @@ describe("DashboardShell", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
     navigationStub.pathname = "/admin";
 
-    render(<DashboardShell />);
+    renderHome();
 
     const nav = screen.getByRole("navigation", {
       name: /primary navigation/i,
@@ -610,7 +664,7 @@ describe("DashboardShell", () => {
       }),
     });
 
-    const { unmount } = render(<DashboardShell />);
+    const { unmount } = renderHome();
 
     await user.click(await screen.findByRole("checkbox", { name: /acid/i }));
 
@@ -645,7 +699,7 @@ describe("DashboardShell", () => {
     expect(stored.actions.dismissedEventIds).toContain("event_house_room");
 
     unmount();
-    render(<DashboardShell />);
+    renderHome();
 
     expect(await screen.findByRole("checkbox", { name: /acid/i })).toBeChecked();
     const restoredRecommendations = screen.getByRole("region", {
@@ -689,7 +743,7 @@ describe("DashboardShell", () => {
       }),
     });
 
-    render(<DashboardShell />);
+    renderHome();
 
     const recommended = screen.getByRole("region", {
       name: /for you/i,
@@ -810,7 +864,7 @@ describe("DashboardShell", () => {
       });
     });
 
-    render(<DashboardShell />);
+    renderHome();
 
     expect(fetchMock).toHaveBeenCalledWith("/api/catalog/showcase?city=chicago");
 
