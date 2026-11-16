@@ -108,7 +108,7 @@ export function VenueDirectory({
   }
 
   return (
-    <ol className="mt-1">
+    <ol className="mt-4 grid grid-cols-1 lg:grid-cols-2 lg:gap-8">
       {directory.venues.map((venue, i) => {
         const upcomingEvents =
           feed.status === "ready"
@@ -120,7 +120,7 @@ export function VenueDirectory({
             : [];
 
         return (
-          <li key={venue.id} className="border-b border-rule py-5">
+          <li key={venue.id} className="border-b border-rule py-5 lg:border lg:p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <h3 className="font-display text-3xl uppercase leading-none text-ink">
                 {venue.name}
