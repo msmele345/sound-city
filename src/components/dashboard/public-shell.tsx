@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 
 import { CatalogProvider, useCatalogData } from "./catalog-context";
 import { PersonalizationProvider } from "./personalization-context";
-import { StyleFilterProvider } from "./style-filter-context";
+import { StyleFilterProvider, useStyleFilter } from "./style-filter-context";
 
 const nav = [
   { label: "For You", href: "/" },
@@ -128,13 +128,61 @@ function CompactMasthead() {
 }
 
 function isCurrentPath(pathname: string, href: string) {
-  if (!href || href.startsWith("#")) {
+  const path = href.split("?")[0] ?? href;
+  if (!path || path.startsWith("#")) {
     return false;
   }
-  if (href === "/") {
+  if (path === "/") {
     return pathname === "/";
   }
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
+
+function hrefWithStyle(href: string, activeStyle: string) {
+  if (
+    activeStyle !== "all" &&
+    (href === "/events" || href === "/artists")
+  ) {
+    return `${href}?${new URLSearchParams({ style: activeStyle }).toString()}`;
+  }
+  return href;
+}
+
+function PublicNav() {
+  const pathname = usePathname();
+  const { activeStyle } = useStyleFilter();
+
+  return (
+    <nav
+      aria-label="Primary navigation"
+      className="sticky top-0 z-30 mt-6 border-b border-rule bg-bg"
+    >
+      <div
+        className="rise grid grid-cols-2 font-mono text-xs uppercase tracking-[0.2em] sm:flex sm:flex-wrap sm:items-stretch"
+        style={{ animationDelay: "70ms" }}
+      >
+        {nav.map((item, i) => {
+          const href = hrefWithStyle(item.href, activeStyle);
+          const current = isCurrentPath(pathname, href);
+          return (
+            <a
+              key={item.label}
+              href={href}
+              aria-current={current ? "page" : undefined}
+              className={`min-w-0 border-r border-rule px-3 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal sm:px-4 ${
+                current ? "bg-panel text-signal" : "text-ink-dim"
+              }`}
+            >
+              <span className="text-ink-faint">
+                {String(i + 1).padStart(2, "0")}
+              </span>{" "}
+              {item.label}
+            </a>
+          );
+        })}
+      </div>
+    </nav>
+  );
 }
 
 export function PublicShell({ children }: { children: ReactNode }) {
@@ -147,39 +195,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
           {pathname === "/" ? <LargeMasthead /> : <CompactMasthead />}
 
-          <nav
-            aria-label="Primary navigation"
-            className="sticky top-0 z-30 mt-6 border-b border-rule bg-bg"
-          >
-            <div
-              className="rise grid grid-cols-2 font-mono text-xs uppercase tracking-[0.2em] sm:flex sm:flex-wrap sm:items-stretch"
-              style={{ animationDelay: "70ms" }}
-            >
-            {nav.map((item, i) => {
-              const current = isCurrentPath(pathname, item.href);
-              return (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  aria-disabled={item.href ? undefined : "true"}
-                  aria-current={current ? "page" : undefined}
-                  className={`min-w-0 border-r border-rule px-3 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal sm:px-4 ${
-                    current
-                      ? "bg-panel text-signal"
-                      : item.href
-                        ? "text-ink-dim"
-                        : "cursor-not-allowed text-ink-faint"
-                  }`}
-                >
-                  <span className="text-ink-faint">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>{" "}
-                  {item.label}
-                </a>
-              );
-            })}
-            </div>
-          </nav>
+          <PublicNav />
 
           <main className="mt-10 min-w-0">{children}</main>
 
