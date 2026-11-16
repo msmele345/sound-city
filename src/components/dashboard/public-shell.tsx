@@ -18,7 +18,6 @@ const nav = [
   { label: "Events", href: "/events" },
   { label: "Artists", href: "/artists" },
   { label: "Venues", href: "/venues" },
-  { label: "Admin", href: "/admin" },
 ];
 
 function isCurrentPath(pathname: string, href: string) {
@@ -112,6 +111,9 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
           <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t-2 border-rule-strong pt-4 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint">
             <span>Source-verified &middot; Chicago underground</span>
+            <a href="/admin" className="transition-colors duration-150 hover:text-ink">
+              Admin
+            </a>
             <span>End of manifest</span>
           </footer>
           </div>

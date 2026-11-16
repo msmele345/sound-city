@@ -101,7 +101,7 @@ describe("DashboardShell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("points enabled primary navigation items at existing page sections", () => {
+  it("moves admin out of the primary nav into the footer", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 
     render(<DashboardShell />);
@@ -109,18 +109,10 @@ describe("DashboardShell", () => {
     const nav = screen.getByRole("navigation", {
       name: /primary navigation/i,
     });
-    const enabledLinks = within(nav)
-      .getAllByRole("link")
-      .filter((link) => link.getAttribute("aria-disabled") !== "true");
+    expect(within(nav).queryByRole("link", { name: /admin/i })).not.toBeInTheDocument();
 
-    for (const link of enabledLinks) {
-      const href = link.getAttribute("href");
-      if (href?.startsWith("#")) {
-        expect(document.querySelector(href)).not.toBeNull();
-      }
-    }
-
-    expect(within(nav).getByText(/admin/i).closest("a")).toHaveAttribute(
+    const footer = screen.getByRole("contentinfo");
+    expect(within(footer).getByRole("link", { name: /^admin$/i })).toHaveAttribute(
       "href",
       "/admin",
     );
@@ -202,10 +194,6 @@ describe("DashboardShell", () => {
       name: /primary navigation/i,
     });
 
-    expect(within(nav).getByRole("link", { name: /admin/i })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
     expect(
       within(nav).getByRole("link", { name: /for you/i }),
     ).not.toHaveAttribute("aria-current");
