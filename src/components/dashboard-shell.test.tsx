@@ -101,6 +101,123 @@ describe("DashboardShell", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("hides masthead counts while the catalog is loading", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+
+    render(<DashboardShell />);
+
+    const header = screen.getByRole("banner");
+    expect(within(header).queryByText(/^events$/i)).not.toBeInTheDocument();
+    expect(within(header).queryByText(/^venues$/i)).not.toBeInTheDocument();
+    expect(within(header).queryByText(/^neighborhoods$/i)).not.toBeInTheDocument();
+  });
+
+  it("shows upcoming event, venue, and neighborhood counts from the catalog", async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/catalog/events?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            events: [
+              {
+                id: "event_1",
+                title: "Night One",
+                startsAt: "2026-05-22T02:00:00.000Z",
+                venue: { name: "smartbar", neighborhood: "Wrigleyville" },
+                artists: [{ name: "Posthuman" }],
+                styles: ["techno"],
+                source: {
+                  title: "Listing",
+                  url: "https://example.com/1",
+                  lastVerifiedAt: "2026-05-15",
+                },
+              },
+              {
+                id: "event_2",
+                title: "Night Two",
+                startsAt: "2026-05-23T02:00:00.000Z",
+                venue: { name: "Spybar", neighborhood: "West Loop" },
+                artists: [{ name: "Lemtom" }],
+                styles: ["house"],
+                source: {
+                  title: "Listing",
+                  url: "https://example.com/2",
+                  lastVerifiedAt: "2026-05-15",
+                },
+              },
+              {
+                id: "event_3",
+                title: "Night Three",
+                startsAt: "2026-05-24T02:00:00.000Z",
+                venue: { name: "smartbar", neighborhood: "Wrigleyville" },
+                artists: [{ name: "Posthuman" }],
+                styles: ["techno"],
+                source: {
+                  title: "Listing",
+                  url: "https://example.com/3",
+                  lastVerifiedAt: "2026-05-15",
+                },
+              },
+            ],
+          }),
+        });
+      }
+
+      if (url === "/api/catalog/venues?city=chicago") {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            venues: [
+              {
+                id: "venue_smartbar",
+                name: "smartbar",
+                slug: "smartbar",
+                neighborhood: "Wrigleyville",
+                address: "3730 N Clark St",
+                capacity: 400,
+                source: {
+                  title: "smartbar",
+                  url: "https://example.com/smartbar",
+                  lastVerifiedAt: "2026-05-15",
+                },
+                signals: [],
+              },
+              {
+                id: "venue_spybar",
+                name: "Spybar",
+                slug: "spybar",
+                neighborhood: "West Loop",
+                address: "646 N Franklin St",
+                capacity: 200,
+                source: {
+                  title: "Spybar",
+                  url: "https://example.com/spybar",
+                  lastVerifiedAt: "2026-05-15",
+                },
+                signals: [],
+              },
+            ],
+          }),
+        });
+      }
+
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    });
+
+    render(<DashboardShell />);
+
+    const header = screen.getByRole("banner");
+    const events = await within(header).findByText(/^events$/i);
+    expect(events.closest("div")).toHaveTextContent("03");
+    expect(within(header).getByText(/^venues$/i).closest("div")).toHaveTextContent(
+      "02",
+    );
+    expect(
+      within(header).getByText(/^neighborhoods$/i).closest("div"),
+    ).toHaveTextContent("02");
+    expect(within(header).queryByText("24")).not.toBeInTheDocument();
+  });
+
   it("moves admin out of the primary nav into the footer", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 

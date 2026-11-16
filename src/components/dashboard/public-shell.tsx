@@ -3,15 +3,9 @@
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { CatalogProvider } from "./catalog-context";
+import { CatalogProvider, useCatalogData } from "./catalog-context";
 import { PersonalizationProvider } from "./personalization-context";
 import { StyleFilterProvider } from "./style-filter-context";
-
-const manifest = [
-  { value: "24", label: "Verified" },
-  { value: "09", label: "Neighborhoods" },
-  { value: "07", label: "Underground" },
-];
 
 const nav = [
   { label: "For You", href: "/" },
@@ -20,19 +14,65 @@ const nav = [
   { label: "Venues", href: "/venues" },
 ];
 
-function ManifestReadout({ align = "start" }: { align?: "start" | "end" }) {
+function catalogCounts(
+  events: { length: number },
+  venues: { neighborhood: string }[],
+) {
+  const neighborhoods = new Set(
+    venues
+      .map((venue) => venue.neighborhood.trim())
+      .filter((neighborhood) => neighborhood.length > 0),
+  );
+  return [
+    { value: String(events.length).padStart(2, "0"), label: "Events" },
+    { value: String(venues.length).padStart(2, "0"), label: "Venues" },
+    {
+      value: String(neighborhoods.size).padStart(2, "0"),
+      label: "Neighborhoods",
+    },
+  ];
+}
+
+function ManifestReadout({
+  align = "start",
+  compact = false,
+}: {
+  align?: "start" | "end";
+  compact?: boolean;
+}) {
+  const { feed, venueDirectory } = useCatalogData();
+  if (feed.status !== "ready" || venueDirectory.status !== "ready") {
+    return null;
+  }
+
+  const counts = catalogCounts(feed.events, venueDirectory.venues);
+
   return (
     <div className={align === "end" ? "shrink-0 lg:text-right" : "shrink-0"}>
-      <p className="font-mono text-[0.7rem] uppercase tracking-[0.22em] text-ink-faint">
-        CHI&middot;HT / VOL.01
-      </p>
-      <dl className={`mt-3 flex gap-6 ${align === "end" ? "lg:justify-end" : ""}`}>
-        {manifest.map((item) => (
+      {compact ? null : (
+        <p className="font-mono text-[0.7rem] uppercase tracking-[0.22em] text-ink-faint">
+          CHI&middot;HT / VOL.01
+        </p>
+      )}
+      <dl
+        className={`flex gap-5 ${compact ? "" : "mt-3 gap-6"} ${
+          align === "end" ? "lg:justify-end" : ""
+        }`}
+      >
+        {counts.map((item) => (
           <div key={item.label}>
-            <dd className="font-mono text-2xl font-semibold tabular-nums text-ink">
+            <dd
+              className={`font-mono font-semibold tabular-nums text-ink ${
+                compact ? "text-xl leading-none" : "text-2xl"
+              }`}
+            >
               {item.value}
             </dd>
-            <dt className="font-mono text-[0.62rem] uppercase tracking-[0.16em] text-ink-faint">
+            <dt
+              className={`font-mono text-[0.62rem] uppercase tracking-[0.16em] text-ink-faint ${
+                compact ? "mt-1" : ""
+              }`}
+            >
               {item.label}
             </dt>
           </div>
@@ -81,18 +121,7 @@ function CompactMasthead() {
             Chicago / House + Techno
           </p>
         </div>
-        <dl className="flex gap-5">
-          {manifest.map((item) => (
-            <div key={item.label}>
-              <dd className="font-mono text-xl font-semibold tabular-nums leading-none text-ink">
-                {item.value}
-              </dd>
-              <dt className="mt-1 font-mono text-[0.62rem] uppercase tracking-[0.16em] text-ink-faint">
-                {item.label}
-              </dt>
-            </div>
-          ))}
-        </dl>
+        <ManifestReadout compact />
       </div>
     </header>
   );
