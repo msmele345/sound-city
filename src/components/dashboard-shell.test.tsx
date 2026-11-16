@@ -42,7 +42,7 @@ describe("DashboardShell", () => {
 
     const main = screen.getByRole("main");
     expect(
-      within(main).getByRole("heading", { name: /recommended tonight/i }),
+      within(main).getByRole("heading", { name: /for you/i }),
     ).toBeInTheDocument();
     expect(
       within(main).getByRole("heading", { name: /next up/i }),
@@ -135,7 +135,7 @@ describe("DashboardShell", () => {
     const nav = screen.getByRole("navigation", {
       name: /primary navigation/i,
     });
-    const dashboard = within(nav).getByRole("link", { name: /dashboard/i });
+    const dashboard = within(nav).getByRole("link", { name: /for you/i });
 
     expect(dashboard).toHaveAttribute("href", "/");
     expect(dashboard).toHaveAttribute("aria-current", "page");
@@ -207,7 +207,7 @@ describe("DashboardShell", () => {
       "page",
     );
     expect(
-      within(nav).getByRole("link", { name: /dashboard/i }),
+      within(nav).getByRole("link", { name: /for you/i }),
     ).not.toHaveAttribute("aria-current");
   });
 
@@ -533,7 +533,7 @@ describe("DashboardShell", () => {
     await user.click(await screen.findByRole("checkbox", { name: /acid/i }));
 
     const recommended = screen.getByRole("region", {
-      name: /recommended tonight/i,
+      name: /for you/i,
     });
     const acidRow = within(recommended)
       .getByRole("heading", { name: /acid room/i })
@@ -567,7 +567,7 @@ describe("DashboardShell", () => {
 
     expect(await screen.findByRole("checkbox", { name: /acid/i })).toBeChecked();
     const restoredRecommendations = screen.getByRole("region", {
-      name: /recommended tonight/i,
+      name: /for you/i,
     });
     expect(
       within(restoredRecommendations).queryByRole("heading", {
@@ -610,7 +610,7 @@ describe("DashboardShell", () => {
     render(<DashboardShell />);
 
     const recommended = screen.getByRole("region", {
-      name: /recommended tonight/i,
+      name: /for you/i,
     });
     const eventHeading = await within(recommended).findByRole("heading", {
       name: /recommended source test/i,

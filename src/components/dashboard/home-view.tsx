@@ -22,7 +22,7 @@ export function HomeView() {
       >
         <SectionMark
           id="recommended-heading"
-          title="Recommended Tonight"
+          title="For You"
           index="Discovery queue / 02"
         />
         <RecommendedEvents

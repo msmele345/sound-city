@@ -14,7 +14,7 @@ const manifest = [
 ];
 
 const nav = [
-  { label: "Dashboard", href: "/" },
+  { label: "For You", href: "/" },
   { label: "Events", href: "/events" },
   { label: "Artists", href: "/artists" },
   { label: "Venues", href: "/venues" },
