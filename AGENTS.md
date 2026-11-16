@@ -19,6 +19,7 @@ components, read @docs/ux-redesign.md for the design invariants, the
 
 # Run Commands:
 - npm run dev
+- npm run dev:screenshots # local UX screenshots only; see docs/screenshot-fixture.md
 - npm test
 - npm run build
 - npx vercel --yes # for deploying current branch to vercel preview

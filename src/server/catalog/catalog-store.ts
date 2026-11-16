@@ -1,6 +1,10 @@
 import { launchCatalogData } from "./launch-data";
 import { createDrizzleCatalogStore } from "./drizzle-catalog-store";
 import { createDb } from "../db/client";
+import {
+  buildScreenshotCatalog,
+  selectCatalogMode,
+} from "./screenshot-fixture";
 import type {
   ArtistLinkRecord,
   ArtistRecord,
@@ -210,14 +214,22 @@ export function createSeedCatalogStore(
 }
 
 let fallbackStore: CatalogStore | null = null;
+let fallbackMode: "launch" | "screenshot-fixture" | null = null;
 let databaseStore: CatalogStore | null = null;
 
 export function getCatalogStore() {
-  if (process.env.DATABASE_URL) {
+  const mode = selectCatalogMode();
+  if (mode === "database") {
     databaseStore ??= createDrizzleCatalogStore(createDb());
     return databaseStore;
   }
 
-  fallbackStore ??= createSeedCatalogStore();
+  if (!fallbackStore || fallbackMode !== mode) {
+    fallbackStore = createSeedCatalogStore(
+      mode === "screenshot-fixture" ? buildScreenshotCatalog() : launchCatalogData,
+    );
+    fallbackMode = mode;
+  }
+
   return fallbackStore;
 }

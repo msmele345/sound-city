@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:screenshots": "DATABASE_URL= SOUND_CITY_SCREENSHOT_FIXTURE=1 next dev",
     "build": "next build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint",
