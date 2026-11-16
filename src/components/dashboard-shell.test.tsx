@@ -84,6 +84,21 @@ describe("DashboardShell", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
+  it("points the events item at the events route", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+    navigationStub.pathname = "/events";
+
+    render(<DashboardShell />);
+
+    const nav = screen.getByRole("navigation", {
+      name: /primary navigation/i,
+    });
+    const events = within(nav).getByRole("link", { name: /events/i });
+
+    expect(events).toHaveAttribute("href", "/events");
+    expect(events).toHaveAttribute("aria-current", "page");
+  });
+
   it("does not keep the first nav item current on another route", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
     navigationStub.pathname = "/admin";
