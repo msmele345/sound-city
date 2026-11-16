@@ -101,10 +101,7 @@ describe("taste profile hydration", () => {
         });
       });
 
-      const mismatches = reported.filter((message) =>
-        /hydrat|didn't match|did not match|server rendered/i.test(message),
-      );
-      expect(mismatches).toEqual([]);
+      expect(reported).toEqual([]);
 
       expect(
         within(container).getByRole("checkbox", { name: /^acid$/i }),
@@ -121,8 +118,10 @@ describe("taste profile hydration", () => {
         saved,
       );
     } finally {
+      await act(async () => {
+        root?.unmount();
+      });
       consoleError.mockRestore();
-      root?.unmount();
       container.remove();
     }
   });

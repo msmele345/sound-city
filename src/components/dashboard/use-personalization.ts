@@ -73,13 +73,26 @@ function readLocalPersonalization(): LocalPersonalization {
 }
 
 export function usePersonalization() {
-  const [personalization, setPersonalization] = useState<LocalPersonalization>(
-    () => readLocalPersonalization(),
-  );
+  const [personalization, setPersonalization] = useState<LocalPersonalization>({
+    profile: defaultTasteProfile,
+    actions: defaultRecommendationActions,
+  });
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    // The first render stays on the defaults so server HTML and the client
+    // hydrate match. The stored profile is applied after mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is an external store read after hydration
+    setPersonalization(readLocalPersonalization());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
     window.localStorage.setItem(storageKey, JSON.stringify(personalization));
-  }, [personalization]);
+  }, [hydrated, personalization]);
 
   function setProfile(profile: TasteProfile) {
     setPersonalization((current) => ({ ...current, profile }));
