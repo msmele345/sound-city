@@ -1,3 +1,4 @@
+import { StrictMode, createElement, type ReactNode } from "react";
 import { renderHook } from "@testing-library/react";
 
 import { usePersonalization } from "./use-personalization";
@@ -56,6 +57,61 @@ describe("usePersonalization", () => {
     const { result } = renderHook(() => usePersonalization());
 
     expect(result.current.profile.styles).toEqual(["house", "techno"]);
+  });
+
+  it("applies a saved profile after mount without replacing it with the defaults", () => {
+    const saved = {
+      profile: {
+        styles: ["acid"],
+        vibe: "deep",
+        venueSize: "warehouse",
+        startTime: "after-hours",
+        discoveryLevel: 2,
+      },
+      actions: {
+        savedEventIds: ["event_saved"],
+        dismissedEventIds: ["event_dismissed"],
+        attendedEventIds: ["event_attended"],
+      },
+    };
+    window.localStorage.setItem(storageKey, JSON.stringify(saved));
+
+    const { result } = renderHook(() => usePersonalization());
+
+    expect(result.current.profile).toEqual(saved.profile);
+    expect(result.current.actions).toEqual(saved.actions);
+    expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}")).toEqual(
+      saved,
+    );
+  });
+
+  it("applies a saved profile after mount in Strict Mode", () => {
+    const saved = {
+      profile: {
+        styles: ["acid"],
+        vibe: "deep",
+        venueSize: "warehouse",
+        startTime: "after-hours",
+        discoveryLevel: 2,
+      },
+      actions: {
+        savedEventIds: ["event_saved"],
+        dismissedEventIds: ["event_dismissed"],
+        attendedEventIds: ["event_attended"],
+      },
+    };
+    window.localStorage.setItem(storageKey, JSON.stringify(saved));
+
+    const { result } = renderHook(() => usePersonalization(), {
+      wrapper: ({ children }: { children: ReactNode }) =>
+        createElement(StrictMode, null, children),
+    });
+
+    expect(result.current.profile).toEqual(saved.profile);
+    expect(result.current.actions).toEqual(saved.actions);
+    expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}")).toEqual(
+      saved,
+    );
   });
 
   it("merges partial stored data with defaults", () => {
