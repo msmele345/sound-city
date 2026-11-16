@@ -51,6 +51,21 @@ export function ArtistStyleMatches({
               <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
                 {artist.styles.join(" / ")}
               </p>
+              {artist.links.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {artist.links.map((link) => (
+                    <a
+                      key={link.id}
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-signal transition-colors duration-150 hover:bg-panel hover:text-ink"
+                    >
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              ) : null}
               <SourceTrustLine source={artist.source} />
             </li>
           ))}

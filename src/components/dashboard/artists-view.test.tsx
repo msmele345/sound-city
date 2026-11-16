@@ -64,7 +64,15 @@ describe("Artists route", () => {
                 name: "Local Selector",
                 slug: "local-selector",
                 showcase: false,
-                links: [],
+                links: [
+                  {
+                    id: "link_local_bandcamp",
+                    kind: "bandcamp",
+                    label: "Bandcamp",
+                    url: "https://example.com/local",
+                    source: posthuman.source,
+                  },
+                ],
               },
             ],
           }),
@@ -95,6 +103,9 @@ describe("Artists route", () => {
     expect(
       within(showcase).getByRole("heading", { name: /local selector/i }),
     ).toBeInTheDocument();
+    expect(
+      within(showcase).getByRole("link", { name: /bandcamp/i }),
+    ).toHaveAttribute("href", "https://example.com/local");
     expect(
       within(showcase).getAllByRole("heading", { name: /^posthuman$/i }),
     ).toHaveLength(1);
