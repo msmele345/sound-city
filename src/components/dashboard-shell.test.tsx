@@ -1,6 +1,8 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import { navigationStub } from "@/test/navigation-stub";
+
 import { DashboardShell } from "./dashboard-shell";
 
 const fetchMock = vi.fn();
@@ -62,6 +64,43 @@ describe("DashboardShell", () => {
       "href",
       "/admin",
     );
+  });
+
+  it("marks the nav item for the current url", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+    navigationStub.pathname = "/";
+
+    render(<DashboardShell />);
+
+    const nav = screen.getByRole("navigation", {
+      name: /primary navigation/i,
+    });
+    const dashboard = within(nav).getByRole("link", { name: /dashboard/i });
+
+    expect(dashboard).toHaveAttribute("href", "/");
+    expect(dashboard).toHaveAttribute("aria-current", "page");
+    expect(
+      within(nav).getByRole("link", { name: /events/i }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("does not keep the first nav item current on another route", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+    navigationStub.pathname = "/admin";
+
+    render(<DashboardShell />);
+
+    const nav = screen.getByRole("navigation", {
+      name: /primary navigation/i,
+    });
+
+    expect(within(nav).getByRole("link", { name: /admin/i })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      within(nav).getByRole("link", { name: /dashboard/i }),
+    ).not.toHaveAttribute("aria-current");
   });
 
   it("loads upcoming Chicago events from the catalog API", async () => {

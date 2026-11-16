@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { CatalogProvider } from "./catalog-context";
@@ -12,14 +13,26 @@ const manifest = [
 ];
 
 const nav = [
-  { label: "Dashboard", href: "#dashboard" },
+  { label: "Dashboard", href: "/" },
   { label: "Events", href: "#events" },
   { label: "Artists", href: "#artists" },
   { label: "Venues", href: "#venues" },
   { label: "Admin", href: "/admin" },
 ];
 
+function isCurrentPath(pathname: string, href: string) {
+  if (!href || href.startsWith("#")) {
+    return false;
+  }
+  if (href === "/") {
+    return pathname === "/";
+  }
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function PublicShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+
   return (
     <CatalogProvider>
       <PersonalizationProvider>
@@ -68,24 +81,29 @@ export function PublicShell({ children }: { children: ReactNode }) {
             className="rise mt-6 grid grid-cols-2 border-b border-rule font-mono text-xs uppercase tracking-[0.2em] sm:flex sm:flex-wrap sm:items-stretch"
             style={{ animationDelay: "70ms" }}
           >
-            {nav.map((item, i) => (
-              <a
-                key={item.label}
-                href={item.href}
-                aria-disabled={item.href ? undefined : "true"}
-                aria-current={i === 0 ? "page" : undefined}
-                className={`min-w-0 border-r border-rule px-3 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal sm:px-4 ${
-                  i === 0
-                    ? "bg-panel text-signal"
-                    : item.href
-                      ? "text-ink-dim"
-                      : "cursor-not-allowed text-ink-faint"
-                }`}
-              >
-                <span className="text-ink-faint">{String(i + 1).padStart(2, "0")}</span>{" "}
-                {item.label}
-              </a>
-            ))}
+            {nav.map((item, i) => {
+              const current = isCurrentPath(pathname, item.href);
+              return (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  aria-disabled={item.href ? undefined : "true"}
+                  aria-current={current ? "page" : undefined}
+                  className={`min-w-0 border-r border-rule px-3 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal sm:px-4 ${
+                    current
+                      ? "bg-panel text-signal"
+                      : item.href
+                        ? "text-ink-dim"
+                        : "cursor-not-allowed text-ink-faint"
+                  }`}
+                >
+                  <span className="text-ink-faint">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>{" "}
+                  {item.label}
+                </a>
+              );
+            })}
           </nav>
 
           <main className="mt-10 min-w-0">{children}</main>
