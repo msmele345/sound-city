@@ -1,7 +1,6 @@
 "use client";
 
 import { ArtistShowcase } from "./artist-showcase";
-import { ArtistStyleMatches } from "./artist-style-matches";
 import { useCatalogData } from "./catalog-context";
 import { NextUp } from "./next-up";
 import { usePersonalizationData } from "./personalization-context";
@@ -12,7 +11,7 @@ import { VenueDirectory } from "./venue-directory";
 
 export function HomeView() {
   const { activeStyle } = useStyleFilter();
-  const { feed, showcase, artistDirectory, venueDirectory } = useCatalogData();
+  const { feed, showcase, venueDirectory } = useCatalogData();
   const { profile, actions, setProfile, setActions } = usePersonalizationData();
 
   return (
@@ -51,13 +50,6 @@ export function HomeView() {
             showcase={showcase}
             feed={feed}
             activeStyle={activeStyle}
-          />
-          <ArtistStyleMatches
-            directory={artistDirectory}
-            activeStyle={activeStyle}
-            excludeArtistId={
-              showcase.status === "ready" ? showcase.artist?.id : undefined
-            }
           />
         </section>
 

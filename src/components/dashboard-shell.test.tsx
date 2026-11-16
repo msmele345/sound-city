@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { navigationStub } from "@/test/navigation-stub";
 
 import { DashboardShell } from "./dashboard-shell";
+import { ArtistsView } from "./dashboard/artists-view";
 import { EventsView } from "./dashboard/events-view";
 import { HomeView } from "./dashboard/home-view";
 import { PublicShell } from "./dashboard/public-shell";
@@ -13,6 +14,7 @@ function renderSharedDiscovery() {
     <PublicShell>
       <HomeView />
       <EventsView />
+      <ArtistsView />
     </PublicShell>,
   );
 }
@@ -140,6 +142,21 @@ describe("DashboardShell", () => {
     expect(
       within(nav).getByRole("link", { name: /events/i }),
     ).not.toHaveAttribute("aria-current");
+  });
+
+  it("points the artists item at the artists route", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+    navigationStub.pathname = "/artists";
+
+    render(<DashboardShell />);
+
+    const nav = screen.getByRole("navigation", {
+      name: /primary navigation/i,
+    });
+    const artists = within(nav).getByRole("link", { name: /artists/i });
+
+    expect(artists).toHaveAttribute("href", "/artists");
+    expect(artists).toHaveAttribute("aria-current", "page");
   });
 
   it("points the events item at the events route", () => {
@@ -285,7 +302,11 @@ describe("DashboardShell", () => {
     renderSharedDiscovery();
 
     const latestEvents = screen.getByRole("region", { name: /latest events/i });
-    const artistShowcase = screen.getByRole("region", { name: /artist showcase/i });
+    const directoryHeading = await screen.findByRole("heading", {
+      name: /artist directory/i,
+    });
+    const artistShowcase = directoryHeading.closest("section");
+    expect(artistShowcase).not.toBeNull();
 
     await within(latestEvents).findByRole("heading", { name: /melodic signal/i });
     for (const style of ["melodic", "groovy", "hard", "trance"]) {
@@ -307,7 +328,7 @@ describe("DashboardShell", () => {
       within(latestEvents).queryByRole("heading", { name: /hard signal/i }),
     ).not.toBeInTheDocument();
     expect(
-      within(artistShowcase).getAllByRole("heading", { name: /melodic artist/i }),
+      within(artistShowcase!).getAllByRole("heading", { name: /melodic artist/i }),
     ).not.toHaveLength(0);
 
     await user.click(
@@ -317,11 +338,11 @@ describe("DashboardShell", () => {
       within(latestEvents).getByRole("heading", { name: /hard signal/i }),
     ).toBeInTheDocument();
     expect(
-      within(artistShowcase).queryByRole("heading", { name: /melodic artist/i }),
+      within(artistShowcase!).queryByRole("heading", { name: /melodic artist/i }),
     ).not.toBeInTheDocument();
     expect(artistShowcase).toHaveTextContent(/no featured artist matches hard/i);
     expect(
-      within(artistShowcase).getByRole("heading", { name: /hard artist/i }),
+      within(artistShowcase!).getByRole("heading", { name: /hard artist/i }),
     ).toBeInTheDocument();
   });
 
