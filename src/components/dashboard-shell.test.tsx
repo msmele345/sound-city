@@ -4,6 +4,18 @@ import userEvent from "@testing-library/user-event";
 import { navigationStub } from "@/test/navigation-stub";
 
 import { DashboardShell } from "./dashboard-shell";
+import { EventsView } from "./dashboard/events-view";
+import { HomeView } from "./dashboard/home-view";
+import { PublicShell } from "./dashboard/public-shell";
+
+function renderSharedDiscovery() {
+  return render(
+    <PublicShell>
+      <HomeView />
+      <EventsView />
+    </PublicShell>,
+  );
+}
 
 const fetchMock = vi.fn();
 
@@ -31,7 +43,7 @@ describe("DashboardShell", () => {
       within(main).getByRole("heading", { name: /recommended tonight/i }),
     ).toBeInTheDocument();
     expect(
-      within(main).getByRole("heading", { name: /latest events/i }),
+      within(main).getByRole("heading", { name: /next up/i }),
     ).toBeInTheDocument();
     expect(
       within(main).getByRole("heading", { name: /artist showcase/i }),
@@ -39,6 +51,52 @@ describe("DashboardShell", () => {
     expect(
       within(main).getByRole("heading", { name: /venue signals/i }),
     ).toBeInTheDocument();
+  });
+
+  it("replaces the event feed with the next five events linking to the events route", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: ["Six", "One", "Two", "Three", "Four", "Five"].map((name) => ({
+          id: `event_${name.toLowerCase()}`,
+          title: `Night ${name}`,
+          startsAt: `2026-05-${
+            { One: "22", Two: "23", Three: "24", Four: "25", Five: "26", Six: "27" }[
+              name
+            ]
+          }T02:00:00.000Z`,
+          venue: { name: "smartbar", neighborhood: "Wrigleyville" },
+          artists: [{ name: "Posthuman" }],
+          styles: ["techno"],
+          source: {
+            title: "Resident Advisor listing",
+            url: "https://ra.co/events/2412925",
+            lastVerifiedAt: "2026-05-15",
+          },
+        })),
+      }),
+    });
+
+    render(<DashboardShell />);
+
+    expect(
+      screen.queryByRole("region", { name: /latest events/i }),
+    ).not.toBeInTheDocument();
+
+    const nextUp = screen.getByRole("region", { name: /next up/i });
+    expect(
+      within(nextUp).getByRole("link", { name: /all events/i }),
+    ).toHaveAttribute("href", "/events");
+    expect(
+      await within(nextUp).findByRole("heading", { name: /night one/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(nextUp).getByRole("heading", { name: /night five/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(nextUp).queryByRole("heading", { name: /night six/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("points enabled primary navigation items at existing page sections", () => {
@@ -118,112 +176,6 @@ describe("DashboardShell", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
-  it("loads upcoming Chicago events from the catalog API", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        city: { slug: "chicago" },
-        events: [
-          {
-            id: "event_family_matters_posthuman",
-            title: "Family Matters feat. Posthuman",
-            startsAt: "2026-05-22T02:00:00.000Z",
-            venue: {
-              name: "smartbar",
-              neighborhood: "Wrigleyville",
-            },
-            artists: [{ name: "Posthuman" }],
-            styles: ["techno", "house"],
-            source: {
-              title: "Resident Advisor listing",
-              url: "https://ra.co/events/2412925",
-              lastVerifiedAt: "2026-05-15",
-            },
-          },
-        ],
-      }),
-    });
-
-    render(<DashboardShell />);
-
-    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/events?city=chicago");
-    const latestEvents = screen.getByRole("region", {
-      name: /latest events/i,
-    });
-    const eventHeading = await within(latestEvents).findByRole("heading", {
-      name: /family matters feat\. posthuman/i,
-    });
-    const eventRow = eventHeading.closest("li");
-    expect(eventRow).not.toBeNull();
-    expect(within(eventRow!).getByText(/smartbar/i)).toBeInTheDocument();
-    expect(within(eventRow!).getByText(/wrigleyville/i)).toBeInTheDocument();
-    expect(within(eventRow!).getAllByText(/posthuman/i)).toHaveLength(2);
-    expect(within(eventRow!).getByText(/techno \/ house/i)).toBeInTheDocument();
-    expect(
-      within(eventRow!).getByRole("link", { name: /resident advisor listing/i }),
-    ).toHaveAttribute("href", "https://ra.co/events/2412925");
-  });
-
-  it("filters loaded events by style", async () => {
-    const user = userEvent.setup();
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        city: { slug: "chicago" },
-        events: [
-          {
-            id: "event_house",
-            title: "House Night",
-            startsAt: "2026-05-23T02:00:00.000Z",
-            venue: { name: "Podlasie Club", neighborhood: "Avondale" },
-            artists: [{ name: "Local House Selector" }],
-            styles: ["house"],
-            source: {
-              title: "House listing",
-              url: "https://example.com/house",
-              lastVerifiedAt: "2026-05-15",
-            },
-          },
-          {
-            id: "event_techno",
-            title: "Techno Night",
-            startsAt: "2026-05-24T02:00:00.000Z",
-            venue: { name: "smartbar", neighborhood: "Wrigleyville" },
-            artists: [{ name: "Local Techno Selector" }],
-            styles: ["techno"],
-            source: {
-              title: "Techno listing",
-              url: "https://example.com/techno",
-              lastVerifiedAt: "2026-05-15",
-            },
-          },
-        ],
-      }),
-    });
-
-    render(<DashboardShell />);
-
-    const latestEvents = screen.getByRole("region", {
-      name: /latest events/i,
-    });
-    expect(
-      await within(latestEvents).findByRole("heading", { name: /house night/i }),
-    ).toBeInTheDocument();
-    expect(
-      within(latestEvents).getByRole("heading", { name: /techno night/i }),
-    ).toBeInTheDocument();
-
-    await user.click(
-      within(latestEvents).getByRole("button", { name: /techno/i }),
-    );
-
-    expect(
-      within(latestEvents).queryByRole("heading", { name: /house night/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(latestEvents).getByRole("heading", { name: /techno night/i }),
-    ).toBeInTheDocument();
-  });
 
   it("filters events and the featured artist by canonical techno sub-genre", async () => {
     const user = userEvent.setup();
@@ -330,7 +282,7 @@ describe("DashboardShell", () => {
       return Promise.resolve({ ok: true, json: async () => ({ venues: [] }) });
     });
 
-    render(<DashboardShell />);
+    renderSharedDiscovery();
 
     const latestEvents = screen.getByRole("region", { name: /latest events/i });
     const artistShowcase = screen.getByRole("region", { name: /artist showcase/i });
@@ -465,7 +417,7 @@ describe("DashboardShell", () => {
       return Promise.resolve({ ok: true, json: async () => ({ venues: [] }) });
     });
 
-    render(<DashboardShell />);
+    renderSharedDiscovery();
 
     const latestEvents = screen.getByRole("region", { name: /latest events/i });
     await within(latestEvents).findByRole("heading", { name: /melodic signal/i });
@@ -491,35 +443,6 @@ describe("DashboardShell", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows loading, empty, and error states for the event feed", async () => {
-    fetchMock.mockReturnValue(new Promise(() => undefined));
-
-    const { unmount } = render(<DashboardShell />);
-
-    expect(screen.getByText(/loading chicago event feed/i)).toBeInTheDocument();
-    unmount();
-
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ city: { slug: "chicago" }, events: [] }),
-    });
-
-    const emptyView = render(<DashboardShell />);
-    expect(
-      await screen.findByText(/no upcoming chicago events are verified yet/i),
-    ).toBeInTheDocument();
-    emptyView.unmount();
-
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({ error: "City not found" }),
-    });
-
-    render(<DashboardShell />);
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      /event feed is unavailable/i,
-    );
-  });
 
   it("persists local taste preferences and recommendation actions", async () => {
     const user = userEvent.setup();

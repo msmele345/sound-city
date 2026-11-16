@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { CatalogProvider } from "./catalog-context";
 import { PersonalizationProvider } from "./personalization-context";
+import { StyleFilterProvider } from "./style-filter-context";
 
 const manifest = [
   { value: "24", label: "Verified" },
@@ -36,7 +37,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
   return (
     <CatalogProvider>
       <PersonalizationProvider>
-        <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
+        <StyleFilterProvider>
+          <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
           <header id="dashboard" className="rise scroll-mt-6 border-b-2 border-rule-strong pb-7">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
@@ -112,7 +114,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
             <span>Source-verified &middot; Chicago underground</span>
             <span>End of manifest</span>
           </footer>
-        </div>
+          </div>
+        </StyleFilterProvider>
       </PersonalizationProvider>
     </CatalogProvider>
   );

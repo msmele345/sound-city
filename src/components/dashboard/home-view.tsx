@@ -1,18 +1,17 @@
 "use client";
 
-import { useState } from "react";
-
 import { ArtistShowcase } from "./artist-showcase";
 import { ArtistStyleMatches } from "./artist-style-matches";
 import { useCatalogData } from "./catalog-context";
-import { EventDiscoveryFeed } from "./event-discovery-feed";
+import { NextUp } from "./next-up";
 import { usePersonalizationData } from "./personalization-context";
 import { RecommendedEvents } from "./recommended-events";
 import { SectionMark } from "./section-mark";
+import { useStyleFilter } from "./style-filter-context";
 import { VenueDirectory } from "./venue-directory";
 
 export function HomeView() {
-  const [activeStyle, setActiveStyle] = useState("all");
+  const { activeStyle } = useStyleFilter();
   const { feed, showcase, artistDirectory, venueDirectory } = useCatalogData();
   const { profile, actions, setProfile, setActions } = usePersonalizationData();
 
@@ -38,18 +37,7 @@ export function HomeView() {
           />
         </section>
 
-        <section id="events" aria-labelledby="latest-heading" className="min-w-0 scroll-mt-6">
-          <SectionMark
-            id="latest-heading"
-            title="Latest Events"
-            index="Source verified / 03"
-          />
-          <EventDiscoveryFeed
-            feed={feed}
-            activeStyle={activeStyle}
-            onStyleChange={setActiveStyle}
-          />
-        </section>
+        <NextUp feed={feed} />
       </div>
 
       <aside className="flex min-w-0 flex-col gap-12 lg:border-l-2 lg:border-rule-strong lg:pl-12">

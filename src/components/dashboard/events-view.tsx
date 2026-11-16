@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-
 import { useCatalogData } from "./catalog-context";
 import { EventDiscoveryFeed } from "./event-discovery-feed";
 import { SectionMark } from "./section-mark";
+import { useStyleFilter } from "./style-filter-context";
 
 export function EventsView() {
-  const [activeStyle, setActiveStyle] = useState("all");
+  const { activeStyle, setActiveStyle } = useStyleFilter();
   const { feed } = useCatalogData();
 
   return (
