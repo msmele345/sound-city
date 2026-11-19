@@ -31,6 +31,12 @@ const startTimeOptions: { value: StartTimePreference; label: string }[] = [
   { value: "after-hours", label: "After hours" },
 ];
 
+function discoveryValueText(level: number) {
+  if (level <= 1) return "1 of 5, Mainstream";
+  if (level >= 5) return "5 of 5, Underground";
+  return `${level} of 5, between Mainstream and Underground`;
+}
+
 function optionLabel<Value extends string>(
   options: { value: Value; label: string }[],
   value: Value,
@@ -115,13 +121,26 @@ export function TasteProfileControls({
         />
       </div>
 
-      <label className="mt-4 block font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
-        Discovery level
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <label
+            htmlFor="discovery-level"
+            className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint"
+          >
+            Discovery level
+          </label>
+          <span className="font-mono text-sm tabular-nums text-ink">
+            {profile.discoveryLevel}
+          </span>
+        </div>
         <input
+          id="discovery-level"
           type="range"
           min="1"
           max="5"
+          step="1"
           value={profile.discoveryLevel}
+          aria-valuetext={discoveryValueText(profile.discoveryLevel)}
           onChange={(event) =>
             onProfileChange({
               ...profile,
@@ -130,7 +149,11 @@ export function TasteProfileControls({
           }
           className="mt-2 w-full min-w-0 accent-signal"
         />
-      </label>
+        <div className="mt-1 flex justify-between gap-3 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-ink-dim">
+          <span>Mainstream</span>
+          <span>Underground</span>
+        </div>
+      </div>
     </div>
   );
 }

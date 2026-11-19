@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import {
@@ -158,6 +158,34 @@ describe("taste profile panel", () => {
     expect(
       screen.getByText(
         "house, techno · Raw · Small room · After hours · Discovery 4",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("labels the discovery slider from mainstream to underground", async () => {
+    const user = userEvent.setup();
+    renderQueue();
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    const slider = screen.getByRole("slider", { name: /discovery level/i });
+    expect(screen.getByText("Mainstream")).toBeInTheDocument();
+    expect(screen.getByText("Underground")).toBeInTheDocument();
+    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(slider).toHaveAttribute(
+      "aria-valuetext",
+      "4 of 5, between Mainstream and Underground",
+    );
+
+    fireEvent.change(slider, { target: { value: "5" } });
+
+    expect(slider).toHaveAttribute(
+      "aria-valuetext",
+      "5 of 5, Underground",
+    );
+    expect(screen.getByText("5")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "house, techno · Raw · Small room · Late · Discovery 5",
       ),
     ).toBeInTheDocument();
   });
