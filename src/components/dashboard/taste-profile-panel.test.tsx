@@ -136,4 +136,29 @@ describe("taste profile panel", () => {
       ),
     ).toBeInTheDocument();
   });
+
+  it("chooses a start time from a segmented control", async () => {
+    const user = userEvent.setup();
+    renderQueue();
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(
+      screen.queryByRole("combobox", { name: /start time/i }),
+    ).not.toBeInTheDocument();
+    const startTime = screen.getByRole("radiogroup", { name: /start time/i });
+    expect(within(startTime).getByRole("radio", { name: /^late$/i })).toBeChecked();
+
+    await user.click(
+      within(startTime).getByRole("radio", { name: /after hours/i }),
+    );
+
+    expect(
+      within(startTime).getByRole("radio", { name: /after hours/i }),
+    ).toBeChecked();
+    expect(
+      screen.getByText(
+        "house, techno · Raw · Small room · After hours · Discovery 4",
+      ),
+    ).toBeInTheDocument();
+  });
 });

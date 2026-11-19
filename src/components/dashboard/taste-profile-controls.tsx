@@ -106,25 +106,13 @@ export function TasteProfileControls({
       </div>
 
       <div className="mt-4">
-        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
-          Start time
-          <select
-            value={profile.startTime}
-            onChange={(event) =>
-              onProfileChange({
-                ...profile,
-                startTime: event.target.value as StartTimePreference,
-              })
-            }
-            className="mt-2 w-full border border-rule bg-bg px-3 py-2 text-xs uppercase tracking-[0.12em] text-ink"
-          >
-            {startTimeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SegmentedControl
+          label="Start time"
+          name="taste-start-time"
+          value={profile.startTime}
+          options={startTimeOptions}
+          onChange={(startTime) => onProfileChange({ ...profile, startTime })}
+        />
       </div>
 
       <label className="mt-4 block font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
