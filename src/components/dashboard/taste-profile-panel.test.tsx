@@ -60,6 +60,7 @@ describe("taste profile panel", () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
     await user.click(screen.getByRole("checkbox", { name: /^acid$/i }));
 
     expect(
@@ -67,5 +68,27 @@ describe("taste profile panel", () => {
         "house, techno, acid · Raw · Small room · Late · Discovery 4",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("keeps the taste controls behind Tune until it is opened", async () => {
+    const user = userEvent.setup();
+    renderQueue();
+
+    const tune = screen.getByRole("button", { name: /^tune$/i });
+    expect(tune).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("checkbox", { name: /^house$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /acid room/i }),
+    ).toBeInTheDocument();
+
+    await user.click(tune);
+
+    expect(tune).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("checkbox", { name: /^house$/i })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: /^acid$/i }),
+    ).not.toBeChecked();
   });
 });
