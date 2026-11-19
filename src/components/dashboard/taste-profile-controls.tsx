@@ -30,6 +30,23 @@ const startTimeOptions: { value: StartTimePreference; label: string }[] = [
   { value: "after-hours", label: "After hours" },
 ];
 
+function optionLabel<Value extends string>(
+  options: { value: Value; label: string }[],
+  value: Value,
+) {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
+export function tasteSummary(profile: TasteProfile) {
+  return [
+    profile.styles.join(", "),
+    optionLabel(vibeOptions, profile.vibe),
+    optionLabel(venueSizeOptions, profile.venueSize),
+    optionLabel(startTimeOptions, profile.startTime),
+    `Discovery ${profile.discoveryLevel}`,
+  ].join(" · ");
+}
+
 export function TasteProfileControls({
   profile,
   onProfileChange,
@@ -48,7 +65,7 @@ export function TasteProfileControls({
   }
 
   return (
-    <div className="mt-5 min-w-0 max-w-[calc(100vw-2.5rem)] border-y border-rule py-4 sm:max-w-none">
+    <div className="min-w-0">
       <fieldset>
         <legend className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint">
           Styles
