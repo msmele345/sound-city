@@ -9,6 +9,7 @@ import type {
 } from "@/lib/recommendations";
 
 import { Chip } from "./chip";
+import { SegmentedControl } from "./segmented-control";
 import { styleOptions } from "./use-personalization";
 
 const vibeOptions: { value: TasteVibe; label: string }[] = [
@@ -84,27 +85,17 @@ export function TasteProfileControls({
         </div>
       </fieldset>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
-          Vibe
-          <select
-            value={profile.vibe}
-            onChange={(event) =>
-              onProfileChange({
-                ...profile,
-                vibe: event.target.value as TasteVibe,
-              })
-            }
-            className="mt-2 w-full border border-rule bg-bg px-3 py-2 text-xs uppercase tracking-[0.12em] text-ink"
-          >
-            {vibeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="mt-4">
+        <SegmentedControl
+          label="Vibe"
+          name="taste-vibe"
+          value={profile.vibe}
+          options={vibeOptions}
+          onChange={(vibe) => onProfileChange({ ...profile, vibe })}
+        />
+      </div>
 
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
           Venue size
           <select

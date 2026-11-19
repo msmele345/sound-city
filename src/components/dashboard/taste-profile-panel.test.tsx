@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import {
@@ -90,5 +90,25 @@ describe("taste profile panel", () => {
     expect(
       screen.getByRole("checkbox", { name: /^acid$/i }),
     ).not.toBeChecked();
+  });
+
+  it("chooses a vibe from a segmented control", async () => {
+    const user = userEvent.setup();
+    renderQueue();
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(
+      screen.queryByRole("combobox", { name: /vibe/i }),
+    ).not.toBeInTheDocument();
+    const vibe = screen.getByRole("radiogroup", { name: /vibe/i });
+    expect(within(vibe).getByRole("radio", { name: /^raw$/i })).toBeChecked();
+
+    await user.click(within(vibe).getByRole("radio", { name: /^deep$/i }));
+
+    expect(within(vibe).getByRole("radio", { name: /^deep$/i })).toBeChecked();
+    expect(within(vibe).getByRole("radio", { name: /^raw$/i })).not.toBeChecked();
+    expect(
+      screen.getByText("house, techno · Deep · Small room · Late · Discovery 4"),
+    ).toBeInTheDocument();
   });
 });
