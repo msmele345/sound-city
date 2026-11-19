@@ -1,13 +1,15 @@
 "use client";
 
-import type {
-  StartTimePreference,
-  TasteProfile,
-  TasteStyle,
-  TasteVibe,
-  VenueSizePreference,
+import {
+  defaultTasteProfile,
+  type StartTimePreference,
+  type TasteProfile,
+  type TasteStyle,
+  type TasteVibe,
+  type VenueSizePreference,
 } from "@/lib/recommendations";
 
+import { Button } from "./button";
 import { Chip } from "./chip";
 import { SegmentedControl } from "./segmented-control";
 import { styleOptions } from "./use-personalization";
@@ -153,6 +155,12 @@ export function TasteProfileControls({
           <span>Mainstream</span>
           <span>Underground</span>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <Button onClick={() => onProfileChange(defaultTasteProfile)}>
+          Reset to defaults
+        </Button>
       </div>
     </div>
   );

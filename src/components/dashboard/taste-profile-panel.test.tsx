@@ -10,6 +10,7 @@ import {
 
 import { RecommendedEvents } from "./recommended-events";
 import type { CatalogEvent } from "./types";
+import { usePersonalization } from "./use-personalization";
 
 const event: CatalogEvent = {
   id: "event_acid_room",
@@ -45,6 +46,23 @@ function renderQueue(profile: TasteProfile = defaultTasteProfile) {
 
   return render(<Harness />);
 }
+
+function StoredQueue() {
+  const { profile, actions, setProfile, setActions } = usePersonalization();
+  return (
+    <RecommendedEvents
+      feed={{ status: "ready", events: [event] }}
+      profile={profile}
+      actions={actions}
+      onProfileChange={setProfile}
+      onActionsChange={setActions}
+    />
+  );
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 describe("taste profile panel", () => {
   it("summarizes styles, vibe, venue size, start time, and discovery level above the recommendations", async () => {
@@ -188,5 +206,28 @@ describe("taste profile panel", () => {
         "house, techno · Raw · Small room · Late · Discovery 5",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("resets the taste profile to the defaults", async () => {
+    const user = userEvent.setup();
+    render(<StoredQueue />);
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+    await user.click(screen.getByRole("radio", { name: /^deep$/i }));
+    await user.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await user.click(screen.getByRole("button", { name: /reset to defaults/i }));
+
+    expect(
+      screen.getByText("house, techno · Raw · Small room · Late · Discovery 4"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /^raw$/i })).toBeChecked();
+    expect(screen.getByRole("button", { name: /^saved$/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(JSON.parse(window.localStorage.getItem("sound-city.local-profile.v1") ?? "{}")).toMatchObject({
+      profile: defaultTasteProfile,
+      actions: { savedEventIds: ["event_acid_room"] },
+    });
   });
 });
