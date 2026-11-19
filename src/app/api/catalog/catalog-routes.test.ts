@@ -4,6 +4,7 @@ import { DELETE, GET as getAdminCatalog, POST } from "@/app/api/admin/catalog/ro
 
 import { GET as getArtists } from "./artists/route";
 import { GET as getEvents } from "./events/route";
+import * as eventsRoute from "./events/route";
 import { GET as getShowcase } from "./showcase/route";
 import { GET as getVenues } from "./venues/route";
 
@@ -190,6 +191,26 @@ describe("catalog route handlers", () => {
 
     afterEach(() => {
       vi.useRealTimers();
+    });
+
+    it("reads the Chicago cutoff when the request arrives and does not cache it", async () => {
+      vi.useFakeTimers({
+        now: new Date("2026-05-22T04:00:00.000Z"),
+        toFake: ["Date"],
+      });
+
+      const during = await getEvents(requestFor("/api/catalog/events?city=chicago"));
+      const duringBody = await during.json();
+
+      vi.setSystemTime(new Date("2026-05-22T12:00:00.000Z"));
+      const later = await getEvents(requestFor("/api/catalog/events?city=chicago"));
+      const laterBody = await later.json();
+
+      expect(eventsRoute.dynamic).toBe("force-dynamic");
+      expect(during.headers.get("cache-control")).toMatch(/no-store/i);
+      expect(later.headers.get("cache-control")).toMatch(/no-store/i);
+      expect(eventTitles(duringBody.events)).toContain("Family Matters feat. Posthuman");
+      expect(eventTitles(laterBody.events)).not.toContain("Family Matters feat. Posthuman");
     });
 
     it("omits a show that started more than six Chicago hours ago and keeps a later one", async () => {
