@@ -95,27 +95,17 @@ export function TasteProfileControls({
         />
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
-          Venue size
-          <select
-            value={profile.venueSize}
-            onChange={(event) =>
-              onProfileChange({
-                ...profile,
-                venueSize: event.target.value as VenueSizePreference,
-              })
-            }
-            className="mt-2 w-full border border-rule bg-bg px-3 py-2 text-xs uppercase tracking-[0.12em] text-ink"
-          >
-            {venueSizeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="mt-4">
+        <SegmentedControl
+          label="Venue size"
+          name="taste-venue-size"
+          value={profile.venueSize}
+          options={venueSizeOptions}
+          onChange={(venueSize) => onProfileChange({ ...profile, venueSize })}
+        />
+      </div>
 
+      <div className="mt-4">
         <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
           Start time
           <select

@@ -111,4 +111,29 @@ describe("taste profile panel", () => {
       screen.getByText("house, techno · Deep · Small room · Late · Discovery 4"),
     ).toBeInTheDocument();
   });
+
+  it("chooses a venue size from a segmented control", async () => {
+    const user = userEvent.setup();
+    renderQueue();
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(
+      screen.queryByRole("combobox", { name: /venue size/i }),
+    ).not.toBeInTheDocument();
+    const venueSize = screen.getByRole("radiogroup", { name: /venue size/i });
+    expect(
+      within(venueSize).getByRole("radio", { name: /small room/i }),
+    ).toBeChecked();
+
+    await user.click(within(venueSize).getByRole("radio", { name: /warehouse/i }));
+
+    expect(
+      within(venueSize).getByRole("radio", { name: /warehouse/i }),
+    ).toBeChecked();
+    expect(
+      screen.getByText(
+        "house, techno · Raw · Warehouse · Late · Discovery 4",
+      ),
+    ).toBeInTheDocument();
+  });
 });
