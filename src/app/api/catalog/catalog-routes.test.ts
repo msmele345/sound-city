@@ -9,6 +9,10 @@ function requestFor(path: string) {
   return new NextRequest(new URL(path, "http://localhost:3000"));
 }
 
+function eventTitles(events: { title: string }[]) {
+  return events.map((event) => event.title);
+}
+
 describe("catalog route handlers", () => {
   const originalAdminSecret = process.env.ADMIN_SECRET;
   const originalDatabaseUrl = process.env.DATABASE_URL;
@@ -90,6 +94,29 @@ describe("catalog route handlers", () => {
     expect(showcase.artist).toMatchObject({
       citySlug: "chicago",
       showcase: true,
+    });
+  });
+
+  describe("events that have already finished their Chicago night", () => {
+    // 7:00 AM CDT on May 22. Family Matters started at 9:00 PM CDT on May 21
+    // (2026-05-22T02:00:00.000Z), ten hours earlier. Lemtom is still ahead.
+    const sevenAmChicago = new Date("2026-05-22T12:00:00.000Z");
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("omits a show that started more than six Chicago hours ago and keeps a later one", async () => {
+      vi.useFakeTimers({ now: sevenAmChicago, toFake: ["Date"] });
+
+      const response = await getEvents(requestFor("/api/catalog/events?city=chicago"));
+      const body = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(eventTitles(body.events)).not.toContain("Family Matters feat. Posthuman");
+      expect(eventTitles(body.events)).toEqual(
+        expect.arrayContaining(["Lemtom at Spybar", "Jeremy Olander Open-to-Close"]),
+      );
     });
   });
 });
