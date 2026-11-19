@@ -2,10 +2,9 @@
 
 import { useMemo } from "react";
 
-import { canonicalTechnoSubGenres } from "@/lib/style-normalization";
-
 import { formatEventDate, formatEventTime } from "./format";
 import { SourceTrustLine } from "./source-trust-line";
+import { StyleFilterControl, styleFilterOptions } from "./style-filter-control";
 import type { EventFeedState } from "./types";
 
 export function EventDiscoveryFeed({
@@ -22,15 +21,7 @@ export function EventDiscoveryFeed({
       feed.events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
     [feed.events],
   );
-  const styles = useMemo(
-    () => [
-      ...new Set([
-        ...canonicalTechnoSubGenres,
-        ...events.flatMap((event) => event.styles).toSorted(),
-      ]),
-    ],
-    [events],
-  );
+  const styles = useMemo(() => styleFilterOptions(events), [events]);
   const visibleEvents = useMemo(
     () =>
       activeStyle === "all"
@@ -65,24 +56,11 @@ export function EventDiscoveryFeed({
 
   return (
     <>
-      <div
-        aria-label="Filter events by style"
-        className="mt-4 flex flex-col items-start border-y border-rule font-mono text-[0.7rem] uppercase tracking-[0.16em] sm:flex-row sm:flex-wrap"
-      >
-        {["all", ...styles].map((style) => (
-          <button
-            key={style}
-            type="button"
-            aria-pressed={activeStyle === style}
-            onClick={() => onStyleChange(style)}
-            className={`shrink-0 border-r border-rule px-3 py-2 transition-colors duration-150 hover:bg-panel hover:text-signal ${
-              activeStyle === style ? "bg-panel text-signal" : "text-ink-dim"
-            }`}
-          >
-            {style}
-          </button>
-        ))}
-      </div>
+      <StyleFilterControl
+        styles={styles}
+        activeStyle={activeStyle}
+        onStyleChange={onStyleChange}
+      />
       {visibleEvents.length === 0 ? (
         <p className="border-b border-rule py-5 text-sm text-ink-dim">
           No verified events match that style.

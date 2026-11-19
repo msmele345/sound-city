@@ -1,6 +1,80 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+import { Button } from "./button";
 import { formatEventDate, formatEventTime, formatSignalCategory } from "./format";
 import { SourceTrustLine } from "./source-trust-line";
-import type { EventFeedState, VenueDirectoryState } from "./types";
+import type { CatalogEvent, EventFeedState, VenueDirectoryState } from "./types";
+
+function VenueEvent({ event }: { event: CatalogEvent }) {
+  return (
+    <li className="border-t border-rule py-3">
+      <h4 className="font-display text-xl uppercase leading-none text-ink">
+        {event.title}
+      </h4>
+      <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
+        {formatEventDate(event.startsAt)}
+        <span className="text-ink-faint"> / </span>
+        {formatEventTime(event.startsAt)}
+      </p>
+      <SourceTrustLine source={event.source} />
+    </li>
+  );
+}
+
+function VenueUpcoming({
+  events,
+  feedStatus,
+}: {
+  events: CatalogEvent[];
+  feedStatus: EventFeedState["status"];
+}) {
+  const [open, setOpen] = useState(false);
+  const sorted = useMemo(
+    () => events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
+    [events],
+  );
+  const next = sorted[0];
+  const rest = sorted.slice(1);
+
+  return (
+    <div className="mt-4 border-t border-rule pt-4">
+      <h4 className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">
+        Upcoming events
+      </h4>
+      {feedStatus === "loading" ? (
+        <p className="mt-3 text-sm text-ink-dim">
+          Waiting on verified event feed.
+        </p>
+      ) : !next ? (
+        <p className="mt-3 text-sm text-ink-dim">
+          No upcoming events are attached to this venue yet.
+        </p>
+      ) : (
+        <>
+          <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-ink-dim">
+            {sorted.length} upcoming
+          </p>
+          <ol className="mt-2">
+            <VenueEvent event={next} />
+            {open
+              ? rest.map((event) => <VenueEvent key={event.id} event={event} />)
+              : null}
+          </ol>
+          {rest.length > 0 ? (
+            <Button
+              aria-expanded={open}
+              onClick={() => setOpen((current) => !current)}
+            >
+              {open ? "Hide the rest" : `Show ${rest.length} more`}
+            </Button>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
 
 export function VenueDirectory({
   directory,
@@ -34,7 +108,7 @@ export function VenueDirectory({
   }
 
   return (
-    <ol className="mt-1">
+    <ol className="mt-4 grid grid-cols-1 lg:grid-cols-2 lg:gap-8">
       {directory.venues.map((venue, i) => {
         const upcomingEvents =
           feed.status === "ready"
@@ -46,7 +120,7 @@ export function VenueDirectory({
             : [];
 
         return (
-          <li key={venue.id} className="border-b border-rule py-5">
+          <li key={venue.id} className="border-b border-rule py-5 lg:border lg:p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
               <h3 className="font-display text-3xl uppercase leading-none text-ink">
                 {venue.name}
@@ -86,36 +160,7 @@ export function VenueDirectory({
               </dl>
             ) : null}
 
-            <div className="mt-4 border-t border-rule pt-4">
-              <h4 className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">
-                Upcoming events
-              </h4>
-              {feed.status === "loading" ? (
-                <p className="mt-3 text-sm text-ink-dim">
-                  Waiting on verified event feed.
-                </p>
-              ) : upcomingEvents.length === 0 ? (
-                <p className="mt-3 text-sm text-ink-dim">
-                  No upcoming events are attached to this venue yet.
-                </p>
-              ) : (
-                <ol className="mt-2">
-                  {upcomingEvents.map((event) => (
-                    <li key={event.id} className="border-t border-rule py-3">
-                      <h4 className="font-display text-xl uppercase leading-none text-ink">
-                        {event.title}
-                      </h4>
-                      <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
-                        {formatEventDate(event.startsAt)}
-                        <span className="text-ink-faint"> / </span>
-                        {formatEventTime(event.startsAt)}
-                      </p>
-                      <SourceTrustLine source={event.source} />
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </div>
+            <VenueUpcoming events={upcomingEvents} feedStatus={feed.status} />
 
             <a
               href={venue.source.url}
