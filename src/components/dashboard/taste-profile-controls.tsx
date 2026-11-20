@@ -1,14 +1,17 @@
 "use client";
 
-import type {
-  StartTimePreference,
-  TasteProfile,
-  TasteStyle,
-  TasteVibe,
-  VenueSizePreference,
+import {
+  defaultTasteProfile,
+  type StartTimePreference,
+  type TasteProfile,
+  type TasteStyle,
+  type TasteVibe,
+  type VenueSizePreference,
 } from "@/lib/recommendations";
 
+import { Button } from "./button";
 import { Chip } from "./chip";
+import { SegmentedControl } from "./segmented-control";
 import { styleOptions } from "./use-personalization";
 
 const vibeOptions: { value: TasteVibe; label: string }[] = [
@@ -30,6 +33,29 @@ const startTimeOptions: { value: StartTimePreference; label: string }[] = [
   { value: "after-hours", label: "After hours" },
 ];
 
+function discoveryValueText(level: number) {
+  if (level <= 1) return "1 of 5, Mainstream";
+  if (level >= 5) return "5 of 5, Underground";
+  return `${level} of 5, between Mainstream and Underground`;
+}
+
+function optionLabel<Value extends string>(
+  options: { value: Value; label: string }[],
+  value: Value,
+) {
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
+export function tasteSummary(profile: TasteProfile) {
+  return [
+    profile.styles.join(", "),
+    optionLabel(vibeOptions, profile.vibe),
+    optionLabel(venueSizeOptions, profile.venueSize),
+    optionLabel(startTimeOptions, profile.startTime),
+    `Discovery ${profile.discoveryLevel}`,
+  ].join(" · ");
+}
+
 export function TasteProfileControls({
   profile,
   onProfileChange,
@@ -48,7 +74,7 @@ export function TasteProfileControls({
   }
 
   return (
-    <div className="mt-5 min-w-0 max-w-[calc(100vw-2.5rem)] border-y border-rule py-4 sm:max-w-none">
+    <div className="min-w-0">
       <fieldset>
         <legend className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint">
           Styles
@@ -67,75 +93,56 @@ export function TasteProfileControls({
         </div>
       </fieldset>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
-          Vibe
-          <select
-            value={profile.vibe}
-            onChange={(event) =>
-              onProfileChange({
-                ...profile,
-                vibe: event.target.value as TasteVibe,
-              })
-            }
-            className="mt-2 w-full border border-rule bg-bg px-3 py-2 text-xs uppercase tracking-[0.12em] text-ink"
-          >
-            {vibeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
-          Venue size
-          <select
-            value={profile.venueSize}
-            onChange={(event) =>
-              onProfileChange({
-                ...profile,
-                venueSize: event.target.value as VenueSizePreference,
-              })
-            }
-            className="mt-2 w-full border border-rule bg-bg px-3 py-2 text-xs uppercase tracking-[0.12em] text-ink"
-          >
-            {venueSizeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="min-w-0 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
-          Start time
-          <select
-            value={profile.startTime}
-            onChange={(event) =>
-              onProfileChange({
-                ...profile,
-                startTime: event.target.value as StartTimePreference,
-              })
-            }
-            className="mt-2 w-full border border-rule bg-bg px-3 py-2 text-xs uppercase tracking-[0.12em] text-ink"
-          >
-            {startTimeOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="mt-4">
+        <SegmentedControl
+          label="Vibe"
+          name="taste-vibe"
+          value={profile.vibe}
+          options={vibeOptions}
+          onChange={(vibe) => onProfileChange({ ...profile, vibe })}
+        />
       </div>
 
-      <label className="mt-4 block font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint">
-        Discovery level
+      <div className="mt-4">
+        <SegmentedControl
+          label="Venue size"
+          name="taste-venue-size"
+          value={profile.venueSize}
+          options={venueSizeOptions}
+          onChange={(venueSize) => onProfileChange({ ...profile, venueSize })}
+        />
+      </div>
+
+      <div className="mt-4">
+        <SegmentedControl
+          label="Start time"
+          name="taste-start-time"
+          value={profile.startTime}
+          options={startTimeOptions}
+          onChange={(startTime) => onProfileChange({ ...profile, startTime })}
+        />
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <label
+            htmlFor="discovery-level"
+            className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint"
+          >
+            Discovery level
+          </label>
+          <span className="font-mono text-sm tabular-nums text-ink">
+            {profile.discoveryLevel}
+          </span>
+        </div>
         <input
+          id="discovery-level"
           type="range"
           min="1"
           max="5"
+          step="1"
           value={profile.discoveryLevel}
+          aria-valuetext={discoveryValueText(profile.discoveryLevel)}
           onChange={(event) =>
             onProfileChange({
               ...profile,
@@ -144,7 +151,17 @@ export function TasteProfileControls({
           }
           className="mt-2 w-full min-w-0 accent-signal"
         />
-      </label>
+        <div className="mt-1 flex justify-between gap-3 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-ink-dim">
+          <span>Mainstream</span>
+          <span>Underground</span>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <Button onClick={() => onProfileChange(defaultTasteProfile)}>
+          Reset to defaults
+        </Button>
+      </div>
     </div>
   );
 }

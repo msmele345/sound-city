@@ -372,6 +372,7 @@ describe("public home", () => {
 
 
   it("filters events and the featured artist by canonical techno sub-genre", async () => {
+    const user = userEvent.setup();
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/events?city=chicago") {
         return Promise.resolve({
@@ -490,6 +491,7 @@ describe("public home", () => {
     expect(
       within(latestEvents).queryByRole("heading", { name: /melodic signal/i }),
     ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
     for (const style of ["melodic", "groovy", "hard", "trance"]) {
       expect(
         within(latestEvents).getByRole("button", { name: style }),
@@ -666,6 +668,7 @@ describe("public home", () => {
 
     const { unmount } = renderHome();
 
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
     await user.click(await screen.findByRole("checkbox", { name: /acid/i }));
 
     const recommended = screen.getByRole("region", {
@@ -701,6 +704,7 @@ describe("public home", () => {
     unmount();
     renderHome();
 
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
     expect(await screen.findByRole("checkbox", { name: /acid/i })).toBeChecked();
     const restoredRecommendations = screen.getByRole("region", {
       name: /for you/i,

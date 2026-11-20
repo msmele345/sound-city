@@ -12,7 +12,7 @@ import { Button } from "./button";
 import { formatEventDate, formatEventTime } from "./format";
 import { MatchMeter } from "./match-meter";
 import { SourceTrustLine } from "./source-trust-line";
-import { TasteProfileControls } from "./taste-profile-controls";
+import { TasteProfilePanel } from "./taste-profile-panel";
 import type { EventFeedState } from "./types";
 
 function updateIds(ids: string[], id: string, mode: "add" | "remove") {
@@ -73,7 +73,7 @@ export function RecommendedEvents({
 
   return (
     <>
-      <TasteProfileControls
+      <TasteProfilePanel
         profile={profile}
         onProfileChange={onProfileChange}
       />
