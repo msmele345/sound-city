@@ -17,6 +17,7 @@ const nav = [
   { label: "Events", href: "/events" },
   { label: "Artists", href: "/artists" },
   { label: "Venues", href: "/venues" },
+  { label: "Saved", href: "/saved" },
 ];
 
 function catalogCounts(
@@ -186,6 +187,8 @@ function hrefWithStyle(href: string, activeStyle: string) {
 
 function NavLinks({ activeStyle }: { activeStyle: string }) {
   const pathname = usePathname();
+  const { actions } = usePersonalizationData();
+  const savedCount = String(actions.savedEventIds.length).padStart(2, "0");
 
   return (
     <nav
@@ -212,6 +215,9 @@ function NavLinks({ activeStyle }: { activeStyle: string }) {
                 {String(i + 1).padStart(2, "0")}
               </span>{" "}
               {item.label}
+              {item.href === "/saved" ? (
+                <span aria-live="polite"> {savedCount}</span>
+              ) : null}
             </Link>
           );
         })}

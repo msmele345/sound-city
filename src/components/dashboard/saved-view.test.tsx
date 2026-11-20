@@ -18,6 +18,61 @@ beforeEach(() => {
 });
 
 describe("Saved route", () => {
+  it("shows Saved in the nav with a live count", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_future", "event_past"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+          savedSnapshots: [
+            {
+              id: "event_past",
+              title: "Old Night",
+              startsAt: "2020-01-01T03:00:00.000Z",
+              venueName: "Spybar",
+              neighborhood: "River West",
+              sourceUrl: "https://example.com/old",
+            },
+            {
+              id: "event_future",
+              title: "Lemtom",
+              startsAt: "2030-05-24T03:00:00.000Z",
+              venueName: "smartbar",
+              neighborhood: "Wrigleyville",
+              sourceUrl: "https://example.com/lemtom",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+    const savedLink = within(nav).getByRole("link", { name: /saved/i });
+    expect(savedLink).toHaveAttribute("href", "/saved");
+    expect(savedLink).toHaveAttribute("aria-current", "page");
+    expect(savedLink).toHaveTextContent("02");
+
+    const row = (
+      await screen.findByRole("heading", { name: /^lemtom$/i })
+    ).closest("li");
+    await user.click(within(row!).getByRole("button", { name: /^saved$/i }));
+
+    expect(savedLink).toHaveTextContent("01");
+  });
+
   it("points each empty list back to For You", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
