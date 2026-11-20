@@ -5,6 +5,16 @@ import { usePersonalization } from "./use-personalization";
 
 const storageKey = "sound-city.local-profile.v1";
 
+function storedEvent(id: string) {
+  return {
+    id,
+    title: id,
+    startsAt: "2026-05-23T03:00:00.000Z",
+    venue: { name: "Room", neighborhood: "West Loop" },
+    source: { url: `https://example.com/${id}` },
+  };
+}
+
 beforeEach(() => {
   window.localStorage.clear();
 });
@@ -183,11 +193,11 @@ describe("usePersonalization", () => {
   it("toggles an event in and out of saved", () => {
     const { result } = renderHook(() => usePersonalization());
 
-    act(() => result.current.toggleSaved("event_1"));
+    act(() => result.current.toggleSaved(storedEvent("event_1")));
 
     expect(result.current.actions.savedEventIds).toEqual(["event_1"]);
 
-    act(() => result.current.toggleSaved("event_1"));
+    act(() => result.current.toggleSaved(storedEvent("event_1")));
 
     expect(result.current.actions.savedEventIds).toEqual([]);
   });
@@ -195,7 +205,7 @@ describe("usePersonalization", () => {
   it("dismisses an event and clears it from saved", () => {
     const { result } = renderHook(() => usePersonalization());
 
-    act(() => result.current.toggleSaved("event_1"));
+    act(() => result.current.toggleSaved(storedEvent("event_1")));
     act(() => result.current.dismiss("event_1"));
 
     expect(result.current.actions.dismissedEventIds).toEqual(["event_1"]);
@@ -214,11 +224,74 @@ describe("usePersonalization", () => {
   it("marks an event attended and clears it from saved", () => {
     const { result } = renderHook(() => usePersonalization());
 
-    act(() => result.current.toggleSaved("event_1"));
-    act(() => result.current.attend("event_1"));
+    act(() => result.current.toggleSaved(storedEvent("event_1")));
+    act(() => result.current.attend(storedEvent("event_1")));
 
     expect(result.current.actions.attendedEventIds).toEqual(["event_1"]);
     expect(result.current.actions.savedEventIds).toEqual([]);
+  });
+
+  it("stores a snapshot when an event is saved or marked attended", () => {
+    const { result } = renderHook(() => usePersonalization());
+    const event = {
+      id: "event_lemtom",
+      title: "Lemtom",
+      startsAt: "2026-05-24T03:00:00.000Z",
+      venue: { name: "Spybar", neighborhood: "River West" },
+      source: { url: "https://example.com/lemtom" },
+    };
+    const snapshot = {
+      id: "event_lemtom",
+      title: "Lemtom",
+      startsAt: "2026-05-24T03:00:00.000Z",
+      venueName: "Spybar",
+      neighborhood: "River West",
+      sourceUrl: "https://example.com/lemtom",
+    };
+
+    act(() => result.current.toggleSaved(event));
+
+    expect(result.current.actions.savedEventIds).toEqual(["event_lemtom"]);
+    expect(result.current.actions.savedSnapshots).toEqual([snapshot]);
+    expect(JSON.parse(window.localStorage.getItem(storageKey) ?? "{}").actions).toMatchObject({
+      savedEventIds: ["event_lemtom"],
+      savedSnapshots: [snapshot],
+    });
+
+    act(() => result.current.attend(event));
+
+    expect(result.current.actions.savedEventIds).toEqual([]);
+    expect(result.current.actions.savedSnapshots).toBeUndefined();
+    expect(result.current.actions.attendedEventIds).toEqual(["event_lemtom"]);
+    expect(result.current.actions.attendedSnapshots).toEqual([snapshot]);
+  });
+
+  it("loads stored actions that hold only ids", () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_saved"],
+          dismissedEventIds: ["event_dismissed"],
+          attendedEventIds: ["event_attended"],
+        },
+      }),
+    );
+
+    const { result } = renderHook(() => usePersonalization());
+
+    expect(result.current.actions).toEqual({
+      savedEventIds: ["event_saved"],
+      dismissedEventIds: ["event_dismissed"],
+      attendedEventIds: ["event_attended"],
+    });
+    expect(
+      JSON.parse(window.localStorage.getItem(storageKey) ?? "{}").actions,
+    ).toEqual({
+      savedEventIds: ["event_saved"],
+      dismissedEventIds: ["event_dismissed"],
+      attendedEventIds: ["event_attended"],
+    });
   });
 
   it("resets the profile to the defaults and keeps actions", () => {
@@ -233,7 +306,7 @@ describe("usePersonalization", () => {
         discoveryLevel: 1,
       }),
     );
-    act(() => result.current.toggleSaved("event_1"));
+    act(() => result.current.toggleSaved(storedEvent("event_1")));
     act(() => result.current.resetProfile());
 
     expect(result.current.profile).toEqual({

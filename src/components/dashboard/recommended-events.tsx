@@ -11,6 +11,7 @@ import {
 import { EventRow } from "./event-row";
 import { TasteProfilePanel } from "./taste-profile-panel";
 import type { EventFeedState } from "./types";
+import type { PersonalizationEvent } from "./use-personalization";
 
 export function RecommendedEvents({
   feed,
@@ -27,9 +28,9 @@ export function RecommendedEvents({
   actions: RecommendationActions;
   onProfileChange(profile: TasteProfile): void;
   onReset(): void;
-  onToggleSaved(id: string): void;
+  onToggleSaved(event: PersonalizationEvent): void;
   onDismiss(id: string): void;
-  onAttend(id: string): void;
+  onAttend(event: PersonalizationEvent): void;
 }) {
   const recommendations = useMemo(
     () => rankRecommendedEvents(feed.events, { profile, actions }).slice(0, 5),
@@ -67,9 +68,9 @@ export function RecommendedEvents({
               reason={item.reason}
               score={item.score}
               saved={item.saved}
-              onSave={() => onToggleSaved(item.event.id)}
+              onSave={() => onToggleSaved(item.event)}
               onDismiss={() => onDismiss(item.event.id)}
-              onAttend={() => onAttend(item.event.id)}
+              onAttend={() => onAttend(item.event)}
             />
           ))}
         </ol>

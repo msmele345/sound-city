@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   defaultRecommendationActions,
   defaultTasteProfile,
+  type EventSnapshot,
   type RecommendationActions,
   type StartTimePreference,
   type TasteProfile,
@@ -28,6 +29,14 @@ export const styleOptions: TasteStyle[] = [
 type LocalPersonalization = {
   profile: TasteProfile;
   actions: RecommendationActions;
+};
+
+export type PersonalizationEvent = {
+  id: string;
+  title: string;
+  startsAt: string;
+  venue: { name: string; neighborhood: string };
+  source: { url: string };
 };
 
 function isTasteStyle(value: string): value is TasteStyle {
@@ -94,10 +103,7 @@ function readLocalPersonalization(): LocalPersonalization {
         ),
         discoveryLevel: Number(parsed.profile?.discoveryLevel ?? 4),
       },
-      actions: {
-        ...defaultRecommendationActions,
-        ...parsed.actions,
-      },
+      actions: readActions(parsed.actions),
     };
   } catch {
     return {
@@ -146,36 +152,53 @@ export function usePersonalization() {
     }));
   }
 
-  function toggleSaved(id: string) {
-    updateActions((actions) => ({
-      ...actions,
-      savedEventIds: actions.savedEventIds.includes(id)
-        ? removeId(actions.savedEventIds, id)
-        : addId(actions.savedEventIds, id),
-    }));
+  function toggleSaved(event: PersonalizationEvent) {
+    const snapshot = snapshotFromEvent(event);
+    updateActions((actions) => {
+      const saved = actions.savedEventIds.includes(event.id);
+      return compactActions({
+        ...actions,
+        savedEventIds: saved
+          ? removeId(actions.savedEventIds, event.id)
+          : addId(actions.savedEventIds, event.id),
+        savedSnapshots: saved
+          ? withoutSnapshot(actions.savedSnapshots, event.id)
+          : withSnapshot(actions.savedSnapshots, snapshot),
+      });
+    });
   }
 
   function dismiss(id: string) {
-    updateActions((actions) => ({
-      ...actions,
-      savedEventIds: removeId(actions.savedEventIds, id),
-      dismissedEventIds: addId(actions.dismissedEventIds, id),
-    }));
+    updateActions((actions) =>
+      compactActions({
+        ...actions,
+        savedEventIds: removeId(actions.savedEventIds, id),
+        savedSnapshots: withoutSnapshot(actions.savedSnapshots, id),
+        dismissedEventIds: addId(actions.dismissedEventIds, id),
+      }),
+    );
   }
 
   function restore(id: string) {
-    updateActions((actions) => ({
-      ...actions,
-      dismissedEventIds: removeId(actions.dismissedEventIds, id),
-    }));
+    updateActions((actions) =>
+      compactActions({
+        ...actions,
+        dismissedEventIds: removeId(actions.dismissedEventIds, id),
+      }),
+    );
   }
 
-  function attend(id: string) {
-    updateActions((actions) => ({
-      ...actions,
-      savedEventIds: removeId(actions.savedEventIds, id),
-      attendedEventIds: addId(actions.attendedEventIds, id),
-    }));
+  function attend(event: PersonalizationEvent) {
+    const snapshot = snapshotFromEvent(event);
+    updateActions((actions) =>
+      compactActions({
+        ...actions,
+        savedEventIds: removeId(actions.savedEventIds, event.id),
+        savedSnapshots: withoutSnapshot(actions.savedSnapshots, event.id),
+        attendedEventIds: addId(actions.attendedEventIds, event.id),
+        attendedSnapshots: withSnapshot(actions.attendedSnapshots, snapshot),
+      }),
+    );
   }
 
   function resetProfile() {
@@ -204,4 +227,75 @@ function addId(ids: string[], id: string) {
 
 function removeId(ids: string[], id: string) {
   return ids.filter((current) => current !== id);
+}
+
+function snapshotFromEvent(event: PersonalizationEvent): EventSnapshot {
+  return {
+    id: event.id,
+    title: event.title,
+    startsAt: event.startsAt,
+    venueName: event.venue.name,
+    neighborhood: event.venue.neighborhood,
+    sourceUrl: event.source.url,
+  };
+}
+
+function withSnapshot(snapshots: EventSnapshot[] | undefined, snapshot: EventSnapshot) {
+  return [...(snapshots ?? []).filter((item) => item.id !== snapshot.id), snapshot];
+}
+
+function withoutSnapshot(snapshots: EventSnapshot[] | undefined, id: string) {
+  return (snapshots ?? []).filter((item) => item.id !== id);
+}
+
+function compactActions(actions: RecommendationActions): RecommendationActions {
+  const next: RecommendationActions = {
+    savedEventIds: actions.savedEventIds,
+    dismissedEventIds: actions.dismissedEventIds,
+    attendedEventIds: actions.attendedEventIds,
+  };
+  if (actions.savedSnapshots?.length) {
+    next.savedSnapshots = actions.savedSnapshots;
+  }
+  if (actions.attendedSnapshots?.length) {
+    next.attendedSnapshots = actions.attendedSnapshots;
+  }
+  return next;
+}
+
+function stringIds(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((id): id is string => typeof id === "string")
+    : [];
+}
+
+function readSnapshots(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+  const snapshots = value.filter(isEventSnapshot);
+  return snapshots.length > 0 ? snapshots : undefined;
+}
+
+function isEventSnapshot(value: unknown): value is EventSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const snapshot = value as EventSnapshot;
+  return (
+    typeof snapshot.id === "string" &&
+    typeof snapshot.title === "string" &&
+    typeof snapshot.startsAt === "string" &&
+    typeof snapshot.venueName === "string" &&
+    typeof snapshot.neighborhood === "string" &&
+    typeof snapshot.sourceUrl === "string"
+  );
+}
+
+function readActions(actions: Partial<RecommendationActions> | undefined) {
+  return compactActions({
+    ...defaultRecommendationActions,
+    ...actions,
+    savedEventIds: stringIds(actions?.savedEventIds),
+    dismissedEventIds: stringIds(actions?.dismissedEventIds),
+    attendedEventIds: stringIds(actions?.attendedEventIds),
+    savedSnapshots: readSnapshots(actions?.savedSnapshots),
+    attendedSnapshots: readSnapshots(actions?.attendedSnapshots),
+  });
 }

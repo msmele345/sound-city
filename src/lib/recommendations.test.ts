@@ -142,4 +142,40 @@ describe("rankRecommendedEvents", () => {
     );
     expect(recommendations[1].score).toBe(recommendations[2].score);
   });
+
+  it("reads saved, dismissed, and attended from ids, not snapshots", () => {
+    const saved = event({ id: "event_saved_id" });
+    const snapshotOnly = event({ id: "event_snapshot_only" });
+    const dismissed = event({ id: "event_dismissed_id" });
+
+    const recommendations = rankRecommendedEvents([saved, snapshotOnly, dismissed], {
+      profile: defaultTasteProfile,
+      actions: {
+        savedEventIds: ["event_saved_id"],
+        dismissedEventIds: ["event_dismissed_id"],
+        attendedEventIds: [],
+        savedSnapshots: [
+          {
+            id: "event_snapshot_only",
+            title: "Snapshot Only",
+            startsAt: snapshotOnly.startsAt,
+            venueName: "Room",
+            neighborhood: "West Loop",
+            sourceUrl: "https://example.com/snapshot",
+          },
+        ],
+      },
+    });
+
+    expect(recommendations.map((item) => item.event.id)).toEqual([
+      "event_saved_id",
+      "event_snapshot_only",
+    ]);
+    expect(recommendations.find((item) => item.event.id === "event_saved_id")?.saved).toBe(
+      true,
+    );
+    expect(
+      recommendations.find((item) => item.event.id === "event_snapshot_only")?.saved,
+    ).toBe(false);
+  });
 });
