@@ -1,0 +1,138 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Luma//Personal//EN
+X-WR-CALNAME:Personal
+X-WR-CALDESC:Luma Calendar
+REFRESH-INTERVAL;VALUE=DURATION:PT12H
+X-PUBLISHED-TTL:PT12H
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+BEGIN:VEVENT
+DTSTART:20250815T000000Z
+DTEND:20250815T020000Z
+UID:evt-a9JzXWrDHfObtm9@events.lu.ma
+SUMMARY:The Vinyl Collectiv – Chicago Meetup Vol. 1
+DESCRIPTION:Get up-to-date information at: https://luma.com/q7o9mi7c\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-a9JzXWrDHfObtm9
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20250829T000000Z
+DTEND:20250829T020000Z
+UID:evt-IqoV0eURLsbOv1Z@events.lu.ma
+SUMMARY:The Vinyl Collectiv – Chicago Meetup Vol. 2
+DESCRIPTION:Get up-to-date information at: https://luma.com/fdr3xbk7\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-IqoV0eURLsbOv1Z
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20250919T000000Z
+DTEND:20250919T020000Z
+UID:evt-SypE8qF2HJwE2hj@events.lu.ma
+SUMMARY:The Vinyl Collectiv & Miyagi Records – Chicago Meetup Vol. 3
+DESCRIPTION:Get up-to-date information at: https://luma.com/ovb79mv1\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-SypE8qF2HJwE2hj
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20251009T000000Z
+DTEND:20251009T020000Z
+UID:evt-Stxo0Iq8BL7XLuX@events.lu.ma
+SUMMARY:The Vinyl Collectiv & Sleeping Village – Chicago Meetup Vol. 4
+DESCRIPTION:Get up-to-date information at: https://luma.com/kk74qm2j\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-Stxo0Iq8BL7XLuX
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20251107T010000Z
+DTEND:20251107T030000Z
+UID:evt-kplLAttE3foCBhp@events.lu.ma
+SUMMARY:The Vinyl Collectiv Presents: DJ on Deck @ Wax Vinyl Bar
+DESCRIPTION:Get up-to-date information at: https://luma.com/yhzmf2r2\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-kplLAttE3foCBhp
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20251114T000000Z
+DTEND:20251114T020000Z
+UID:evt-VclaSzzroKdhPBL@events.lu.ma
+SUMMARY:The Vinyl Collectiv & Bridgeport Records – Bring a Record Catch a Vibe Vol. 5
+DESCRIPTION:Get up-to-date information at: https://luma.com/r9qvh3ji\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-VclaSzzroKdhPBL
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20251205T020000Z
+DTEND:20251205T050000Z
+UID:evt-6xb2vdSfFpplR73@events.lu.ma
+SUMMARY:The Vinyl Collectiv Presents: Bring a Record, Catch a Vibe (Vol.6) Ft. Jamie 3:26
+DESCRIPTION:Get up-to-date information at: https://luma.com/ric1zksj\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-6xb2vdSfFpplR73
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20251218T010000Z
+DTEND:20251218T040000Z
+UID:evt-Eru8VxW12Ovp940@events.lu.ma
+SUMMARY:The Vinyl Collectiv Presents: Bring a Record, Catch a Vibe (Vol.7) Ft. Blind Barber & DJ Twelve Gage
+DESCRIPTION:Get up-to-date information at: https://luma.com/ltj6q44c\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-Eru8VxW12Ovp940
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260131T010000Z
+DTEND:20260131T030000Z
+UID:evt-2XMOwy8AcW0ezMy@events.lu.ma
+SUMMARY:The Vinyl Collectiv Presents: Bring a Record, Catch a Vibe at Signal Records!!!
+DESCRIPTION:Get up-to-date information at: https://luma.com/1iswowv5\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-2XMOwy8AcW0ezMy
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260227T010000Z
+DTEND:20260227T030000Z
+UID:evt-aq7amTwdhFmLAQB@events.lu.ma
+SUMMARY:The Vinyl Collectiv Presents: Bring a Record, Catch a Vibe at Midwest Coast Brewing!!!
+DESCRIPTION:Get up-to-date information at: https://luma.com/5aqaq5r2\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-aq7amTwdhFmLAQB
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260321T000000Z
+DTEND:20260321T020000Z
+UID:evt-yhnXPwRaeirHNmR@events.lu.ma
+SUMMARY:The Vinyl Collectiv Presents: Bring a Record, Catch a Vibe at The Silver Room!!
+DESCRIPTION:Get up-to-date information at: https://luma.com/0ncx2lmf\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-yhnXPwRaeirHNmR
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260427T000000Z
+DTEND:20260427T030000Z
+UID:evt-usc5DbxcFKuAjdo@events.lu.ma
+SUMMARY:In-Session: Lord Jah-Monte Ogbon — As Of Now
+DESCRIPTION:Get up-to-date information at: https://luma.com/by1xgaaf\n\nAddress:\n825 N California Ave\nChicago, Illinois\nUnited States\n\nHosted by Virginia Shipp
+LOCATION:825 N California Ave, Chicago, IL 60622, USA
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260509T000000Z
+DTEND:20260509T020000Z
+UID:evt-TzcJJ4kMWwG2d9j@events.lu.ma
+SUMMARY:The Vinyl Collectiv Presents: Bring a Record, Catch a Vibe at Signal Records!!!
+DESCRIPTION:Get up-to-date information at: https://luma.com/e7z4ro34\n\nAddress:\nCheck event page for more details.\n\nHosted by Virginia Shipp
+LOCATION:https://luma.com/event/evt-TzcJJ4kMWwG2d9j
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260605T000000Z
+DTEND:20260605T020000Z
+UID:evt-qHV72nnzw6AkTKX@events.lu.ma
+SUMMARY:The Vinyl Collectiv Presents: Bring A Record, Catch A Vibe @ Marc Nolan
+DESCRIPTION:Get up-to-date information at: https://luma.com/5kjlg5cf\n\nAddress:\nMarc Nolan\nChicago, IL\nUnited States\n\nHosted by Virginia Shipp
+LOCATION:Marc Nolan, 171 N Sangamon St, Chicago, IL 60607, USA
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260731T170000Z
+DTEND:20260731T200000Z
+UID:evt-JiiNQ6jAjq43LJQ@events.lu.ma
+SUMMARY:The Vinyl Collectiv X SILK Presents: Sounds Before The Grounds At Reckless Records
+DESCRIPTION:Get up-to-date information at: https://luma.com/2lvo0qz5\n\nAddress:\nReckless Records\nChicago, IL\nUnited States\n\nHosted by Virginia Shipp
+LOCATION:Reckless Records, 33 S Wabash Ave, Chicago, IL 60603, USA
+END:VEVENT
+BEGIN:VEVENT
+DTSTART:20260814T000000Z
+DTEND:20260814T020000Z
+UID:evt-M2v4qf6qcktf7tJ@events.lu.ma
+SUMMARY:Bring a Record, Catch a Vibe: One-Year Anniversary Edition @ Marc Nolan
+DESCRIPTION:Get up-to-date information at: https://luma.com/jn6gvemj\n\nAddress:\nMarc Nolan\nChicago, IL\nUnited States\n\nHosted by Virginia Shipp
+LOCATION:Marc Nolan, 171 N Sangamon St, Chicago, IL 60607, USA
+END:VEVENT
+END:VCALENDAR

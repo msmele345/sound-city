@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createSeedCatalogStore } from "../../catalog/catalog-store";
@@ -13,6 +16,14 @@ import { createSeedRefreshStore } from "../store";
 import type { RefreshStore } from "../refresh-store";
 import type { Fetcher } from "../types";
 import type { CatalogStore } from "../../catalog/catalog-store";
+
+const certifiedVinylCollectivIcs = readFileSync(
+  resolve(
+    process.cwd(),
+    "src/server/refresh/__tests__/fixtures/vinyl-collectiv-luma.ics",
+  ),
+  "utf8",
+);
 
 async function createDevTarget(store: RefreshStore) {
   const owner = await store.createSourceOwner({
@@ -960,6 +971,82 @@ describe("refresh engine", () => {
     const updated = await store.getSourceTarget(target.id);
     expect(updated!.lastSuccessfulRunAt).not.toBeNull();
     expect(updated!.failureCount).toBe(0);
+  });
+
+  it("runs the certified Vinyl Collectiv fixture through the engine and suppresses an unchanged repeat", async () => {
+    const store = createSeedRefreshStore();
+    const owner = await store.createSourceOwner({
+      cityId: "city_chicago",
+      name: "The Vinyl Collectiv",
+      slug: "the-vinyl-collectiv",
+      kind: "promoter",
+      notes: "",
+    });
+    const target = await store.createSourceTarget({
+      ownerId: owner.id,
+      cityId: "city_chicago",
+      url: "https://api.lu.ma/ics/get?entity=calendar&id=cal-h8F4UvqlCzCPatc",
+      sourceType: "official-venue-calendar",
+      parserStrategy: "venue-calendar",
+      trustLevel: "primary",
+      enabled: true,
+      confidenceAdjustment: 0,
+      healthStatus: "healthy",
+      refreshCadence: "manual",
+      notes: "",
+    });
+    const fetcher: Fetcher = async () => ({
+      body: certifiedVinylCollectivIcs,
+      contentType: "text/calendar",
+      status: 200,
+    });
+
+    const first = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+
+    expect(first.run).toMatchObject({
+      status: "succeeded",
+      sourceTargetsChecked: 1,
+      sourceTargetsFailed: 0,
+      draftsCreated: 16,
+    });
+    expect(first.reviewItems).toHaveLength(16);
+    expect(first.reviewItems.at(-1)).toMatchObject({
+      lane: "new-event",
+      sourceTargetId: target.id,
+      parserVersion: "venue-calendar@1",
+      normalizedDraft: expect.objectContaining({
+        title:
+          "Bring a Record, Catch a Vibe: One-Year Anniversary Edition @ Marc Nolan",
+        venueName: "Marc Nolan, 171 N Sangamon St, Chicago, IL 60607, USA",
+        endsAt: "2026-08-14T02:00:00.000Z",
+      }),
+    });
+
+    const second = await runManualRefresh(store, {
+      cityId: "city_chicago",
+      triggeredBy: "admin-secret",
+      fetcher,
+    });
+    const [secondOutcome] = await store.listRefreshTargetOutcomes(second.run.id);
+
+    expect(second.run).toMatchObject({
+      status: "succeeded",
+      draftsCreated: 0,
+      updatesProposed: 0,
+    });
+    expect(second.reviewItems).toEqual([]);
+    expect(secondOutcome).toMatchObject({
+      sourceTargetId: target.id,
+      status: "unchanged",
+      candidateCount: 16,
+      createdCount: 0,
+      updatedCount: 0,
+      unchangedCount: 16,
+    });
   });
 
   it("retains valid ICS events and persists malformed sibling warnings once", async () => {
