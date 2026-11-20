@@ -114,6 +114,30 @@ describe("taste profile panel", () => {
     expect(screen.getByRole("checkbox", { name: /^house$/i })).toBeChecked();
   });
 
+  it("selects the default option when a saved vibe, venue size, or start time is unknown", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "sound-city.local-profile.v1",
+      JSON.stringify({
+        profile: { vibe: "nope", venueSize: "ballroom", startTime: "noon" },
+      }),
+    );
+    render(<StoredQueue />);
+
+    expect(
+      screen.getByText("house, techno · Raw · Small room · Late · Discovery 4"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/nope/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ballroom/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^noon$/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(screen.getByRole("radio", { name: /^raw$/i })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /small room/i })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /^late$/i })).toBeChecked();
+  });
+
   it("summarizes styles, vibe, venue size, start time, and discovery level above the recommendations", async () => {
     const user = userEvent.setup();
     renderQueue();

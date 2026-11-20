@@ -6,8 +6,11 @@ import {
   defaultRecommendationActions,
   defaultTasteProfile,
   type RecommendationActions,
+  type StartTimePreference,
   type TasteProfile,
   type TasteStyle,
+  type TasteVibe,
+  type VenueSizePreference,
 } from "@/lib/recommendations";
 import { canonicalTechnoSubGenres } from "@/lib/style-normalization";
 
@@ -29,6 +32,20 @@ type LocalPersonalization = {
 
 function isTasteStyle(value: string): value is TasteStyle {
   return styleOptions.includes(value as TasteStyle);
+}
+
+const vibeValues = ["raw", "deep", "melodic", "high-energy"] as const;
+const venueSizeValues = ["small-room", "midsize-club", "warehouse"] as const;
+const startTimeValues = ["early", "late", "after-hours"] as const;
+
+function knownChoice<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  fallback: T,
+): T {
+  return typeof value === "string" && allowed.includes(value as T)
+    ? (value as T)
+    : fallback;
 }
 
 function readLocalPersonalization(): LocalPersonalization {
@@ -60,6 +77,21 @@ function readLocalPersonalization(): LocalPersonalization {
           storedStyles && storedStyles.length > 0
             ? storedStyles
             : defaultTasteProfile.styles,
+        vibe: knownChoice<TasteVibe>(
+          parsed.profile?.vibe,
+          vibeValues,
+          defaultTasteProfile.vibe,
+        ),
+        venueSize: knownChoice<VenueSizePreference>(
+          parsed.profile?.venueSize,
+          venueSizeValues,
+          defaultTasteProfile.venueSize,
+        ),
+        startTime: knownChoice<StartTimePreference>(
+          parsed.profile?.startTime,
+          startTimeValues,
+          defaultTasteProfile.startTime,
+        ),
         discoveryLevel: Number(parsed.profile?.discoveryLevel ?? 4),
       },
       actions: {

@@ -136,6 +136,25 @@ describe("usePersonalization", () => {
     );
   });
 
+  it("falls back to the default vibe, venue size, and start time when a saved value is unknown", () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        profile: {
+          vibe: "nope",
+          venueSize: "ballroom",
+          startTime: "noon",
+        },
+      }),
+    );
+
+    const { result } = renderHook(() => usePersonalization());
+
+    expect(result.current.profile.vibe).toBe("raw");
+    expect(result.current.profile.venueSize).toBe("small-room");
+    expect(result.current.profile.startTime).toBe("late");
+  });
+
   it("merges partial stored data with defaults", () => {
     window.localStorage.setItem(
       storageKey,
