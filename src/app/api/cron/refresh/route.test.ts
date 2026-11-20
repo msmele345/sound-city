@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 
-import { POST as POSTAdminCatalog } from "@/app/api/admin/catalog/route";
+import {
+  GET as GETAdminCatalog,
+  POST as POSTAdminCatalog,
+} from "@/app/api/admin/catalog/route";
 import { GET as GETRefreshRuns } from "@/app/api/admin/refresh-runs/route";
 import { GET as GETReviewItems } from "@/app/api/admin/review-items/route";
 import {
@@ -8,7 +11,6 @@ import {
   PATCH as PATCHSourceTarget,
   POST as POSTSourceTarget,
 } from "@/app/api/admin/source-targets/route";
-import { GET as GETCatalogEvents } from "@/app/api/catalog/events/route";
 import { getRefreshStore } from "@/server/refresh/refresh-store";
 
 import { GET } from "./route";
@@ -456,8 +458,10 @@ describe("Cron refresh route", () => {
     expect(createdResponse.status).toBe(201);
     const { event } = await createdResponse.json();
 
-    const beforeResponse = await GETCatalogEvents(
-      requestAt("/api/catalog/events?city=chicago"),
+    // The fixture starts in 2020, so the public catalog hides it. Admin
+    // listings still return it, which is what the refresh must leave in place.
+    const beforeResponse = await GETAdminCatalog(
+      requestAt("/api/admin/catalog?city=chicago"),
     );
     const before = (await beforeResponse.json()).events.find(
       (candidate: { id: string }) => candidate.id === event.id,
@@ -498,8 +502,8 @@ describe("Cron refresh route", () => {
       ]),
     );
 
-    const afterResponse = await GETCatalogEvents(
-      requestAt("/api/catalog/events?city=chicago"),
+    const afterResponse = await GETAdminCatalog(
+      requestAt("/api/admin/catalog?city=chicago"),
     );
     const after = (await afterResponse.json()).events.find(
       (candidate: { id: string }) => candidate.id === event.id,
