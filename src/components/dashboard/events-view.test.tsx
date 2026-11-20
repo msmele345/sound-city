@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import EventsPage from "@/app/(public)/events/page";
 import { navigationStub } from "@/test/navigation-stub";
 
+import { HomeView } from "./home-view";
 import { PublicShell } from "./public-shell";
 
 const fetchMock = vi.fn();
@@ -231,6 +232,70 @@ describe("Events route", () => {
       "aria-pressed",
       "false",
     );
+  });
+
+  it("keeps a dismissed event in the feed with restore and removes it from recommendations", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: [
+          {
+            id: "event_lemtom",
+            title: "Lemtom",
+            startsAt: "2026-05-24T03:00:00.000Z",
+            venue: { name: "Spybar", neighborhood: "River West", capacity: 200 },
+            artists: [{ name: "Lemtom" }],
+            styles: ["house"],
+            source: {
+              title: "Resident Advisor listing",
+              url: "https://example.com/lemtom",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    render(
+      <PublicShell>
+        <HomeView />
+        <EventsPage />
+      </PublicShell>,
+    );
+
+    const feed = screen.getByRole("region", { name: /latest events/i });
+    const row = (await within(feed).findByRole("heading", { name: /^lemtom$/i })).closest(
+      "li",
+    );
+    expect(row).not.toBeNull();
+    const recommended = screen.getByRole("region", { name: /for you/i });
+    expect(
+      within(recommended).getByRole("heading", { name: /^lemtom$/i }),
+    ).toBeInTheDocument();
+
+    await user.click(within(row!).getByRole("button", { name: /^dismiss$/i }));
+
+    expect(within(feed).getByRole("heading", { name: /^lemtom$/i })).toBeInTheDocument();
+    expect(within(row!).getByRole("button", { name: /^restore$/i })).toBeInTheDocument();
+    expect(
+      within(row!).queryByRole("button", { name: /^dismiss$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(recommended).queryByRole("heading", { name: /^lemtom$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem("sound-city.local-profile.v1") ?? "{}")
+        .actions.dismissedEventIds,
+    ).toContain("event_lemtom");
+
+    await user.click(within(row!).getByRole("button", { name: /^restore$/i }));
+
+    expect(within(row!).getByRole("button", { name: /^dismiss$/i })).toBeInTheDocument();
+    expect(
+      within(recommended).getByRole("heading", { name: /^lemtom$/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows loading, empty, and error states for the event feed", async () => {

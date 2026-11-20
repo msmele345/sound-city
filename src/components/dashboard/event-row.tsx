@@ -34,8 +34,10 @@ type EventRowProps = {
   reason?: string;
   score?: number;
   saved?: boolean;
+  dismissed?: boolean;
   onSave?: () => void;
   onDismiss?: () => void;
+  onRestore?: () => void;
   onAttend?: () => void;
   /** Nested upcoming rows. Venue lists omit the venue name; artist lists include it. */
   compact?: "venue" | "artist";
@@ -48,8 +50,10 @@ export function EventRow({
   reason,
   score,
   saved = false,
+  dismissed = false,
   onSave,
   onDismiss,
+  onRestore,
   onAttend,
   compact = "venue",
 }: EventRowProps) {
@@ -107,7 +111,11 @@ export function EventRow({
 
   if (variant === "feed") {
     return (
-      <li className="grid gap-4 border-b border-rule py-5 sm:grid-cols-[5.5rem_1fr] sm:gap-6">
+      <li
+        className={`grid gap-4 border-b border-rule py-5 sm:grid-cols-[5.5rem_1fr] sm:gap-6${
+          dismissed ? " opacity-50" : ""
+        }`}
+      >
         <div className="font-mono uppercase text-ink-faint">
           <p className="text-xs tracking-[0.18em]">
             {formatEventDate(event.startsAt)}
@@ -143,6 +151,15 @@ export function EventRow({
             <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
               {saved ? "Saved" : "Save"}
             </Button>
+            {dismissed ? (
+              <Button variant="quiet" onClick={onRestore}>
+                Restore
+              </Button>
+            ) : (
+              <Button variant="quiet" onClick={onDismiss}>
+                Dismiss
+              </Button>
+            )}
           </div>
         </div>
       </li>

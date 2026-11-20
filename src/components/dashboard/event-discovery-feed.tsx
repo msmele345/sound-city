@@ -16,7 +16,7 @@ export function EventDiscoveryFeed({
   activeStyle: string;
   onStyleChange(style: string): void;
 }) {
-  const { actions, toggleSaved } = usePersonalizationData();
+  const { actions, toggleSaved, dismiss, restore } = usePersonalizationData();
   const events = useMemo(
     () =>
       feed.events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
@@ -75,7 +75,10 @@ export function EventDiscoveryFeed({
               variant="feed"
               index={i}
               saved={actions.savedEventIds.includes(event.id)}
+              dismissed={actions.dismissedEventIds.includes(event.id)}
               onSave={() => toggleSaved(event)}
+              onDismiss={() => dismiss(event.id)}
+              onRestore={() => restore(event.id)}
             />
           ))}
         </ol>
