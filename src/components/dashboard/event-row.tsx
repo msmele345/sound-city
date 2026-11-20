@@ -139,6 +139,11 @@ export function EventRow({
             <span className="text-ink-faint">{event.styles.join(" / ")}</span>
           </div>
           <SourceTrustLine source={event.source} />
+          <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
+              {saved ? "Saved" : "Save"}
+            </Button>
+          </div>
         </div>
       </li>
     );

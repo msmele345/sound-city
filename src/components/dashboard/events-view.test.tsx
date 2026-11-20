@@ -181,6 +181,58 @@ describe("Events route", () => {
     });
   });
 
+  it("saves and unsaves an event from the feed", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: [
+          {
+            id: "event_lemtom",
+            title: "Lemtom",
+            startsAt: "2026-05-24T03:00:00.000Z",
+            venue: { name: "Spybar", neighborhood: "River West" },
+            artists: [{ name: "Lemtom" }],
+            styles: ["house"],
+            source: {
+              title: "Resident Advisor listing",
+              url: "https://example.com/lemtom",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    renderEvents();
+
+    const latestEvents = screen.getByRole("region", { name: /latest events/i });
+    const row = (
+      await within(latestEvents).findByRole("heading", { name: /^lemtom$/i })
+    ).closest("li");
+    expect(row).not.toBeNull();
+
+    await user.click(within(row!).getByRole("button", { name: /^save$/i }));
+
+    expect(within(row!).getByRole("button", { name: /^saved$/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(row!).getByRole("heading", { name: /^lemtom$/i })).toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem("sound-city.local-profile.v1") ?? "{}")
+        .actions.savedEventIds,
+    ).toContain("event_lemtom");
+
+    await user.click(within(row!).getByRole("button", { name: /^saved$/i }));
+
+    expect(within(row!).getByRole("button", { name: /^save$/i })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
+
   it("shows loading, empty, and error states for the event feed", async () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 

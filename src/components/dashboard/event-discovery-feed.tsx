@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import { EventRow } from "./event-row";
+import { usePersonalizationData } from "./personalization-context";
 import { StyleFilterControl, styleFilterOptions } from "./style-filter-control";
 import type { EventFeedState } from "./types";
 
@@ -15,6 +16,7 @@ export function EventDiscoveryFeed({
   activeStyle: string;
   onStyleChange(style: string): void;
 }) {
+  const { actions, toggleSaved } = usePersonalizationData();
   const events = useMemo(
     () =>
       feed.events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
@@ -67,7 +69,14 @@ export function EventDiscoveryFeed({
       ) : (
         <ol className="mt-1">
           {visibleEvents.map((event, i) => (
-            <EventRow key={event.id} event={event} variant="feed" index={i} />
+            <EventRow
+              key={event.id}
+              event={event}
+              variant="feed"
+              index={i}
+              saved={actions.savedEventIds.includes(event.id)}
+              onSave={() => toggleSaved(event)}
+            />
           ))}
         </ol>
       )}
