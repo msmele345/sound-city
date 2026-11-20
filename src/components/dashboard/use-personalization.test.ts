@@ -46,6 +46,28 @@ describe("usePersonalization", () => {
     });
   });
 
+  it("falls back to the default styles when the saved list is empty", () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ profile: { styles: [] } }),
+    );
+
+    const { result } = renderHook(() => usePersonalization());
+
+    expect(result.current.profile.styles).toEqual(["house", "techno"]);
+  });
+
+  it("falls back to the default styles when every saved style is invalid", () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ profile: { styles: ["not-a-style", "also-not"] } }),
+    );
+
+    const { result } = renderHook(() => usePersonalization());
+
+    expect(result.current.profile.styles).toEqual(["house", "techno"]);
+  });
+
   it("filters unknown styles out of a stored profile", () => {
     window.localStorage.setItem(
       storageKey,

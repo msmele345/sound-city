@@ -49,14 +49,17 @@ function readLocalPersonalization(): LocalPersonalization {
     }
 
     const parsed = JSON.parse(stored) as Partial<LocalPersonalization>;
+    const storedStyles = parsed.profile?.styles?.filter(
+      (style): style is TasteStyle => isTasteStyle(style),
+    );
     return {
       profile: {
         ...defaultTasteProfile,
         ...parsed.profile,
         styles:
-          parsed.profile?.styles?.filter((style): style is TasteStyle =>
-            isTasteStyle(style),
-          ) ?? defaultTasteProfile.styles,
+          storedStyles && storedStyles.length > 0
+            ? storedStyles
+            : defaultTasteProfile.styles,
         discoveryLevel: Number(parsed.profile?.discoveryLevel ?? 4),
       },
       actions: {

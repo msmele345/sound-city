@@ -52,7 +52,10 @@ export function tasteSummary(profile: TasteProfile) {
     optionLabel(venueSizeOptions, profile.venueSize),
     optionLabel(startTimeOptions, profile.startTime),
     `Discovery ${profile.discoveryLevel}`,
-  ].join(" · ");
+  ]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .join(" · ");
 }
 
 export function TasteProfileControls({

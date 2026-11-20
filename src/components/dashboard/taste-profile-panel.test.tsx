@@ -9,6 +9,7 @@ import {
 } from "@/lib/recommendations";
 
 import { RecommendedEvents } from "./recommended-events";
+import { tasteSummary } from "./taste-profile-controls";
 import type { CatalogEvent } from "./types";
 import { usePersonalization } from "./use-personalization";
 
@@ -72,6 +73,47 @@ beforeEach(() => {
 });
 
 describe("taste profile panel", () => {
+  it("skips empty parts of the taste summary", () => {
+    expect(
+      tasteSummary({ ...defaultTasteProfile, styles: [] }),
+    ).toBe("Raw · Small room · Late · Discovery 4");
+  });
+
+  it("checks a default style when saved styles are empty", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "sound-city.local-profile.v1",
+      JSON.stringify({ profile: { styles: [] } }),
+    );
+    render(<StoredQueue />);
+
+    expect(
+      screen.getByText("house, techno · Raw · Small room · Late · Discovery 4"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(screen.getByRole("checkbox", { name: /^house$/i })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^techno$/i })).toBeChecked();
+  });
+
+  it("checks a default style when every saved style is invalid", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "sound-city.local-profile.v1",
+      JSON.stringify({ profile: { styles: ["not-a-style"] } }),
+    );
+    render(<StoredQueue />);
+
+    expect(
+      screen.getByText("house, techno · Raw · Small room · Late · Discovery 4"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(screen.getByRole("checkbox", { name: /^house$/i })).toBeChecked();
+  });
+
   it("summarizes styles, vibe, venue size, start time, and discovery level above the recommendations", async () => {
     const user = userEvent.setup();
     renderQueue();
