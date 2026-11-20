@@ -12,67 +12,36 @@ import { EventRow } from "./event-row";
 import { TasteProfilePanel } from "./taste-profile-panel";
 import type { EventFeedState } from "./types";
 
-function updateIds(ids: string[], id: string, mode: "add" | "remove") {
-  const next = new Set(ids);
-  if (mode === "add") {
-    next.add(id);
-  } else {
-    next.delete(id);
-  }
-  return [...next];
-}
-
 export function RecommendedEvents({
   feed,
   profile,
   actions,
   onProfileChange,
-  onActionsChange,
+  onReset,
+  onToggleSaved,
+  onDismiss,
+  onAttend,
 }: {
   feed: EventFeedState;
   profile: TasteProfile;
   actions: RecommendationActions;
   onProfileChange(profile: TasteProfile): void;
-  onActionsChange(actions: RecommendationActions): void;
+  onReset(): void;
+  onToggleSaved(id: string): void;
+  onDismiss(id: string): void;
+  onAttend(id: string): void;
 }) {
   const recommendations = useMemo(
     () => rankRecommendedEvents(feed.events, { profile, actions }).slice(0, 5),
     [actions, feed.events, profile],
   );
 
-  function saveEvent(id: string) {
-    const isSaved = actions.savedEventIds.includes(id);
-    onActionsChange({
-      ...actions,
-      savedEventIds: updateIds(
-        actions.savedEventIds,
-        id,
-        isSaved ? "remove" : "add",
-      ),
-    });
-  }
-
-  function dismissEvent(id: string) {
-    onActionsChange({
-      ...actions,
-      savedEventIds: updateIds(actions.savedEventIds, id, "remove"),
-      dismissedEventIds: updateIds(actions.dismissedEventIds, id, "add"),
-    });
-  }
-
-  function attendEvent(id: string) {
-    onActionsChange({
-      ...actions,
-      savedEventIds: updateIds(actions.savedEventIds, id, "remove"),
-      attendedEventIds: updateIds(actions.attendedEventIds, id, "add"),
-    });
-  }
-
   return (
     <>
       <TasteProfilePanel
         profile={profile}
         onProfileChange={onProfileChange}
+        onReset={onReset}
       />
 
       {feed.status === "loading" ? (
@@ -98,9 +67,9 @@ export function RecommendedEvents({
               reason={item.reason}
               score={item.score}
               saved={item.saved}
-              onSave={() => saveEvent(item.event.id)}
-              onDismiss={() => dismissEvent(item.event.id)}
-              onAttend={() => attendEvent(item.event.id)}
+              onSave={() => onToggleSaved(item.event.id)}
+              onDismiss={() => onDismiss(item.event.id)}
+              onAttend={() => onAttend(item.event.id)}
             />
           ))}
         </ol>

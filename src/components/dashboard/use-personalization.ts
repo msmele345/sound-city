@@ -102,10 +102,71 @@ export function usePersonalization() {
     setPersonalization((current) => ({ ...current, actions }));
   }
 
+  function updateActions(
+    recipe: (actions: RecommendationActions) => RecommendationActions,
+  ) {
+    setPersonalization((current) => ({
+      ...current,
+      actions: recipe(current.actions),
+    }));
+  }
+
+  function toggleSaved(id: string) {
+    updateActions((actions) => ({
+      ...actions,
+      savedEventIds: actions.savedEventIds.includes(id)
+        ? removeId(actions.savedEventIds, id)
+        : addId(actions.savedEventIds, id),
+    }));
+  }
+
+  function dismiss(id: string) {
+    updateActions((actions) => ({
+      ...actions,
+      savedEventIds: removeId(actions.savedEventIds, id),
+      dismissedEventIds: addId(actions.dismissedEventIds, id),
+    }));
+  }
+
+  function restore(id: string) {
+    updateActions((actions) => ({
+      ...actions,
+      dismissedEventIds: removeId(actions.dismissedEventIds, id),
+    }));
+  }
+
+  function attend(id: string) {
+    updateActions((actions) => ({
+      ...actions,
+      savedEventIds: removeId(actions.savedEventIds, id),
+      attendedEventIds: addId(actions.attendedEventIds, id),
+    }));
+  }
+
+  function resetProfile() {
+    setPersonalization((current) => ({
+      ...current,
+      profile: defaultTasteProfile,
+    }));
+  }
+
   return {
     profile: personalization.profile,
     actions: personalization.actions,
     setProfile,
     setActions,
+    toggleSaved,
+    dismiss,
+    restore,
+    attend,
+    resetProfile,
   };
+}
+
+function addId(ids: string[], id: string) {
+  return ids.includes(id) ? ids : [...ids, id];
+}
+
+function removeId(ids: string[], id: string) {
+  return ids.filter((current) => current !== id);
 }

@@ -15,9 +15,11 @@ const controlsId = "taste-profile-controls";
 export function TasteProfilePanel({
   profile,
   onProfileChange,
+  onReset,
 }: {
   profile: TasteProfile;
   onProfileChange(profile: TasteProfile): void;
+  onReset(): void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -40,6 +42,7 @@ export function TasteProfilePanel({
         <TasteProfileControls
           profile={profile}
           onProfileChange={onProfileChange}
+          onReset={onReset}
         />
       </div>
     </div>

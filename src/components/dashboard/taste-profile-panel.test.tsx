@@ -39,7 +39,10 @@ function renderQueue(profile: TasteProfile = defaultTasteProfile) {
         profile={current}
         actions={defaultRecommendationActions}
         onProfileChange={setCurrent}
-        onActionsChange={() => undefined}
+        onReset={() => setCurrent(defaultTasteProfile)}
+        onToggleSaved={() => undefined}
+        onDismiss={() => undefined}
+        onAttend={() => undefined}
       />
     );
   }
@@ -48,14 +51,18 @@ function renderQueue(profile: TasteProfile = defaultTasteProfile) {
 }
 
 function StoredQueue() {
-  const { profile, actions, setProfile, setActions } = usePersonalization();
+  const { profile, actions, setProfile, resetProfile, toggleSaved, dismiss, attend } =
+    usePersonalization();
   return (
     <RecommendedEvents
       feed={{ status: "ready", events: [event] }}
       profile={profile}
       actions={actions}
       onProfileChange={setProfile}
-      onActionsChange={setActions}
+      onReset={resetProfile}
+      onToggleSaved={toggleSaved}
+      onDismiss={dismiss}
+      onAttend={attend}
     />
   );
 }

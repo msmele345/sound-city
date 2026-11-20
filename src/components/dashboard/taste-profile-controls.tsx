@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  defaultTasteProfile,
   type StartTimePreference,
   type TasteProfile,
   type TasteStyle,
@@ -59,9 +58,11 @@ export function tasteSummary(profile: TasteProfile) {
 export function TasteProfileControls({
   profile,
   onProfileChange,
+  onReset,
 }: {
   profile: TasteProfile;
   onProfileChange(profile: TasteProfile): void;
+  onReset(): void;
 }) {
   function toggleStyle(style: TasteStyle) {
     const styles = profile.styles.includes(style)
@@ -158,9 +159,7 @@ export function TasteProfileControls({
       </div>
 
       <div className="mt-4">
-        <Button onClick={() => onProfileChange(defaultTasteProfile)}>
-          Reset to defaults
-        </Button>
+        <Button onClick={onReset}>Reset to defaults</Button>
       </div>
     </div>
   );

@@ -24,9 +24,13 @@ const saved = {
 } as const;
 
 function TasteProfileHarness() {
-  const { profile, setProfile } = usePersonalization();
+  const { profile, setProfile, resetProfile } = usePersonalization();
   return (
-    <TasteProfileControls profile={profile} onProfileChange={setProfile} />
+    <TasteProfileControls
+      profile={profile}
+      onProfileChange={setProfile}
+      onReset={resetProfile}
+    />
   );
 }
 

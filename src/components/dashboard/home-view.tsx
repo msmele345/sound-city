@@ -11,7 +11,15 @@ import { useStyleFilter } from "./style-filter-context";
 export function HomeView() {
   const { activeStyle } = useStyleFilter();
   const { feed, showcase } = useCatalogData();
-  const { profile, actions, setProfile, setActions } = usePersonalizationData();
+  const {
+    profile,
+    actions,
+    setProfile,
+    resetProfile,
+    toggleSaved,
+    dismiss,
+    attend,
+  } = usePersonalizationData();
 
   return (
     <div className="grid min-w-0 gap-x-12 gap-y-12 lg:grid-cols-[1.65fr_0.7fr]">
@@ -30,7 +38,10 @@ export function HomeView() {
           profile={profile}
           actions={actions}
           onProfileChange={setProfile}
-          onActionsChange={setActions}
+          onReset={resetProfile}
+          onToggleSaved={toggleSaved}
+          onDismiss={dismiss}
+          onAttend={attend}
         />
       </section>
 

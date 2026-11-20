@@ -1,5 +1,5 @@
 import { StrictMode, createElement, type ReactNode } from "react";
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 
 import { usePersonalization } from "./use-personalization";
 
@@ -137,5 +137,71 @@ describe("usePersonalization", () => {
       dismissedEventIds: [],
       attendedEventIds: [],
     });
+  });
+
+  it("toggles an event in and out of saved", () => {
+    const { result } = renderHook(() => usePersonalization());
+
+    act(() => result.current.toggleSaved("event_1"));
+
+    expect(result.current.actions.savedEventIds).toEqual(["event_1"]);
+
+    act(() => result.current.toggleSaved("event_1"));
+
+    expect(result.current.actions.savedEventIds).toEqual([]);
+  });
+
+  it("dismisses an event and clears it from saved", () => {
+    const { result } = renderHook(() => usePersonalization());
+
+    act(() => result.current.toggleSaved("event_1"));
+    act(() => result.current.dismiss("event_1"));
+
+    expect(result.current.actions.dismissedEventIds).toEqual(["event_1"]);
+    expect(result.current.actions.savedEventIds).toEqual([]);
+  });
+
+  it("restores a dismissed event", () => {
+    const { result } = renderHook(() => usePersonalization());
+
+    act(() => result.current.dismiss("event_1"));
+    act(() => result.current.restore("event_1"));
+
+    expect(result.current.actions.dismissedEventIds).toEqual([]);
+  });
+
+  it("marks an event attended and clears it from saved", () => {
+    const { result } = renderHook(() => usePersonalization());
+
+    act(() => result.current.toggleSaved("event_1"));
+    act(() => result.current.attend("event_1"));
+
+    expect(result.current.actions.attendedEventIds).toEqual(["event_1"]);
+    expect(result.current.actions.savedEventIds).toEqual([]);
+  });
+
+  it("resets the profile to the defaults and keeps actions", () => {
+    const { result } = renderHook(() => usePersonalization());
+
+    act(() =>
+      result.current.setProfile({
+        styles: ["acid"],
+        vibe: "deep",
+        venueSize: "warehouse",
+        startTime: "after-hours",
+        discoveryLevel: 1,
+      }),
+    );
+    act(() => result.current.toggleSaved("event_1"));
+    act(() => result.current.resetProfile());
+
+    expect(result.current.profile).toEqual({
+      styles: ["house", "techno"],
+      vibe: "raw",
+      venueSize: "small-room",
+      startTime: "late",
+      discoveryLevel: 4,
+    });
+    expect(result.current.actions.savedEventIds).toEqual(["event_1"]);
   });
 });
