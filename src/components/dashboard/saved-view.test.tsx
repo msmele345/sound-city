@@ -92,4 +92,101 @@ describe("Saved route", () => {
     ).not.toBeInTheDocument();
     expect(within(saved).getByRole("heading", { name: /old night/i })).toBeInTheDocument();
   });
+
+  it("lists attended events from snapshots and upcoming dismissed events from the catalog", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: [],
+          dismissedEventIds: ["event_dismissed", "event_gone", "event_past_dismissed"],
+          attendedEventIds: ["event_attended"],
+          attendedSnapshots: [
+            {
+              id: "event_attended",
+              title: "Attended Night",
+              startsAt: "2020-06-01T03:00:00.000Z",
+              venueName: "Spybar",
+              neighborhood: "River West",
+              sourceUrl: "https://example.com/attended",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        events: [
+          {
+            id: "event_dismissed",
+            title: "Dismissed Night",
+            startsAt: "2030-05-24T03:00:00.000Z",
+            venue: { name: "smartbar", neighborhood: "Wrigleyville", capacity: 400 },
+            artists: [{ name: "Lemtom" }],
+            styles: ["house"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/dismissed",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+          {
+            id: "event_past_dismissed",
+            title: "Already Over",
+            startsAt: "2020-01-01T03:00:00.000Z",
+            venue: { name: "Spybar", neighborhood: "River West", capacity: 200 },
+            artists: [],
+            styles: ["techno"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/past",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    const attended = within(saved).getByRole("heading", { name: /^attended$/i });
+    const attendedEvent = within(saved).getByRole("heading", { name: /attended night/i });
+    expect(
+      attended.compareDocumentPosition(attendedEvent) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(saved).getByRole("link", { name: /attended night/i })).toHaveAttribute(
+      "href",
+      "https://example.com/attended",
+    );
+    const attendedRow = attendedEvent.closest("li");
+    expect(attendedRow).not.toBeNull();
+    expect(
+      within(attendedRow!).getByRole("button", { name: /^attended$/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    const dismissed = within(saved).getByRole("heading", { name: /^dismissed$/i });
+    const dismissedEvent = await within(saved).findByRole("heading", {
+      name: /dismissed night/i,
+    });
+    expect(
+      dismissed.compareDocumentPosition(dismissedEvent) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(saved).queryByRole("heading", { name: /already over/i }),
+    ).not.toBeInTheDocument();
+    expect(within(saved).queryByText(/event_gone/i)).not.toBeInTheDocument();
+    const dismissedRow = dismissedEvent.closest("li");
+    expect(dismissedRow).not.toBeNull();
+    await user.click(within(dismissedRow!).getByRole("button", { name: /^restore$/i }));
+    expect(
+      within(saved).queryByRole("heading", { name: /dismissed night/i }),
+    ).not.toBeInTheDocument();
+  });
 });

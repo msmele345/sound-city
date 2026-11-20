@@ -129,9 +129,25 @@ export function EventRow({
           {event.venue.neighborhood}
         </p>
         <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
-          <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
-            {saved ? "Saved" : "Save"}
-          </Button>
+          {onSave ? (
+            <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
+              {saved ? "Saved" : "Save"}
+            </Button>
+          ) : null}
+          {onRestore ? (
+            <Button variant="quiet" onClick={onRestore}>
+              Restore
+            </Button>
+          ) : null}
+          {onAttend ? (
+            <Button
+              variant={attended ? "pressed" : "quiet"}
+              aria-pressed={attended}
+              onClick={onAttend}
+            >
+              Attended
+            </Button>
+          ) : null}
         </div>
       </li>
     );
