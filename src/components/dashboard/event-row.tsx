@@ -4,6 +4,29 @@ import { MatchMeter } from "./match-meter";
 import { SourceTrustLine } from "./source-trust-line";
 import type { CatalogEvent } from "./types";
 
+function EventTitle({
+  event,
+  className,
+  heading: Heading,
+}: {
+  event: CatalogEvent;
+  className: string;
+  heading: "h3" | "h4" | "h5";
+}) {
+  return (
+    <Heading className={className}>
+      <a
+        href={event.source.url}
+        target="_blank"
+        rel="noreferrer"
+        className="transition-colors duration-150 hover:text-signal"
+      >
+        {event.title}
+      </a>
+    </Heading>
+  );
+}
+
 type EventRowProps = {
   event: CatalogEvent;
   variant: "recommendation" | "feed" | "compact";
@@ -41,9 +64,11 @@ export function EventRow({
         </span>
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h3 className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink sm:text-3xl">
-              {event.title}
-            </h3>
+            <EventTitle
+              event={event}
+              heading="h3"
+              className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink sm:text-3xl"
+            />
             <p className="font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
               {formatEventDate(event.startsAt)}
               <span className="text-ink-faint"> &middot; </span>
@@ -93,9 +118,11 @@ export function EventRow({
         </div>
         <div>
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h3 className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink">
-              {event.title}
-            </h3>
+            <EventTitle
+              event={event}
+              heading="h3"
+              className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink"
+            />
             <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
               {String(index + 1).padStart(2, "0")}
             </span>
@@ -121,9 +148,11 @@ export function EventRow({
 
   return (
     <li className="border-t border-rule py-3">
-      <Heading className="font-display text-xl uppercase leading-none text-ink">
-        {event.title}
-      </Heading>
+      <EventTitle
+        event={event}
+        heading={Heading}
+        className="font-display text-xl uppercase leading-none text-ink"
+      />
       <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
         {formatEventDate(event.startsAt)}
         <span className="text-ink-faint"> / </span>
