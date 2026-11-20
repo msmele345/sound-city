@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { isUpcomingPublicStart } from "@/server/catalog/public-events";
 import type { EventSnapshot } from "@/lib/recommendations";
 
@@ -63,6 +65,9 @@ export function SavedView() {
   return (
     <section id="saved" aria-labelledby="saved-heading" className="min-w-0 scroll-mt-6">
       <SectionMark id="saved-heading" title="Saved" index="Kept / 05" />
+      {upcoming.length === 0 && past.length === 0 ? (
+        <EmptyList>Nothing saved yet.</EmptyList>
+      ) : null}
       {upcoming.length > 0 ? (
         <ol className="mt-1">
           {upcoming.map((snapshot) => (
@@ -90,11 +95,13 @@ export function SavedView() {
           </ol>
         </div>
       ) : null}
-      {attended.length > 0 ? (
-        <div className="mt-8">
-          <h3 className="border-b-2 border-rule-strong pb-2 font-display text-2xl uppercase leading-none text-ink">
-            Attended
-          </h3>
+      <div className="mt-8">
+        <h3 className="border-b-2 border-rule-strong pb-2 font-display text-2xl uppercase leading-none text-ink">
+          Attended
+        </h3>
+        {attended.length === 0 ? (
+          <EmptyList>Nothing marked attended.</EmptyList>
+        ) : (
           <ol className="mt-1">
             {attended.map((snapshot) => (
               <EventRow
@@ -106,13 +113,15 @@ export function SavedView() {
               />
             ))}
           </ol>
-        </div>
-      ) : null}
-      {dismissed.length > 0 ? (
-        <div className="mt-8">
-          <h3 className="border-b-2 border-rule-strong pb-2 font-display text-2xl uppercase leading-none text-ink">
-            Dismissed
-          </h3>
+        )}
+      </div>
+      <div className="mt-8">
+        <h3 className="border-b-2 border-rule-strong pb-2 font-display text-2xl uppercase leading-none text-ink">
+          Dismissed
+        </h3>
+        {dismissed.length === 0 ? (
+          <EmptyList>Nothing dismissed.</EmptyList>
+        ) : (
           <ol className="mt-1">
             {dismissed.map((event) => (
               <EventRow
@@ -123,9 +132,23 @@ export function SavedView() {
               />
             ))}
           </ol>
-        </div>
-      ) : null}
+        )}
+      </div>
     </section>
+  );
+}
+
+function EmptyList({ children }: { children: string }) {
+  return (
+    <p className="border-b border-rule py-5 text-sm text-ink-dim">
+      {children}{" "}
+      <Link
+        href="/"
+        className="text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
+      >
+        For You
+      </Link>
+    </p>
   );
 }
 

@@ -18,6 +18,29 @@ beforeEach(() => {
 });
 
 describe("Saved route", () => {
+  it("points each empty list back to For You", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    expect(within(saved).getByText(/nothing saved yet/i)).toBeInTheDocument();
+    expect(within(saved).getByText(/nothing marked attended/i)).toBeInTheDocument();
+    expect(within(saved).getByText(/nothing dismissed/i)).toBeInTheDocument();
+    const links = within(saved).getAllByRole("link", { name: /^for you$/i });
+    expect(links).toHaveLength(3);
+    for (const link of links) {
+      expect(link).toHaveAttribute("href", "/");
+    }
+  });
+
   it("lists saved events from snapshots after they leave the catalog and groups past events", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
