@@ -3,25 +3,9 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "./button";
-import { formatEventDate, formatEventTime, formatSignalCategory } from "./format";
-import { SourceTrustLine } from "./source-trust-line";
+import { EventRow } from "./event-row";
+import { formatSignalCategory } from "./format";
 import type { CatalogEvent, EventFeedState, VenueDirectoryState } from "./types";
-
-function VenueEvent({ event }: { event: CatalogEvent }) {
-  return (
-    <li className="border-t border-rule py-3">
-      <h4 className="font-display text-xl uppercase leading-none text-ink">
-        {event.title}
-      </h4>
-      <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
-        {formatEventDate(event.startsAt)}
-        <span className="text-ink-faint"> / </span>
-        {formatEventTime(event.startsAt)}
-      </p>
-      <SourceTrustLine source={event.source} />
-    </li>
-  );
-}
 
 function VenueUpcoming({
   events,
@@ -57,9 +41,16 @@ function VenueUpcoming({
             {sorted.length} upcoming
           </p>
           <ol className="mt-2">
-            <VenueEvent event={next} />
+            <EventRow event={next} variant="compact" compact="venue" />
             {open
-              ? rest.map((event) => <VenueEvent key={event.id} event={event} />)
+              ? rest.map((event) => (
+                  <EventRow
+                    key={event.id}
+                    event={event}
+                    variant="compact"
+                    compact="venue"
+                  />
+                ))
               : null}
           </ol>
           {rest.length > 0 ? (

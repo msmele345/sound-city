@@ -1,5 +1,4 @@
-import { formatEventDate, formatEventTime } from "./format";
-import { SourceTrustLine } from "./source-trust-line";
+import { EventRow } from "./event-row";
 import type { EventFeedState, ShowcaseState } from "./types";
 
 export function ArtistShowcase({
@@ -113,19 +112,12 @@ export function ArtistShowcase({
         ) : (
           <ol className="mt-2">
             {upcomingEvents.map((event) => (
-              <li key={event.id} className="border-t border-rule py-3">
-                <h5 className="font-display text-xl uppercase leading-none text-ink">
-                  {event.title}
-                </h5>
-                <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
-                  {formatEventDate(event.startsAt)}
-                  <span className="text-ink-faint"> / </span>
-                  {formatEventTime(event.startsAt)}
-                  <span className="text-ink-faint"> / </span>
-                  {event.venue.name}
-                </p>
-                <SourceTrustLine source={event.source} />
-              </li>
+              <EventRow
+                key={event.id}
+                event={event}
+                variant="compact"
+                compact="artist"
+              />
             ))}
           </ol>
         )}
