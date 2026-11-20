@@ -14,16 +14,24 @@ export const PUBLIC_EVENT_GRACE_HOURS = 6;
  * changes the elapsed gap by the size of the transition.
  * Admin listings do not use this helper.
  */
+export function isUpcomingPublicStart(
+  startsAt: string,
+  now: Date,
+  timeZone: string,
+) {
+  const cutoff = cityWallClockMinusHours(now, timeZone, PUBLIC_EVENT_GRACE_HOURS);
+  const start = Date.parse(startsAt);
+  return Number.isFinite(start) && start > cutoff;
+}
+
 export function selectUpcomingPublicEvents(
   events: EventRecord[],
   now: Date,
   timeZone: string,
 ): EventRecord[] {
-  const cutoff = cityWallClockMinusHours(now, timeZone, PUBLIC_EVENT_GRACE_HOURS);
-  return events.filter((event) => {
-    const start = Date.parse(event.startsAt);
-    return Number.isFinite(start) && start > cutoff;
-  });
+  return events.filter((event) =>
+    isUpcomingPublicStart(event.startsAt, now, timeZone),
+  );
 }
 
 type ZonedParts = {

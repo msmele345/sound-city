@@ -29,12 +29,13 @@ function EventTitle({
 
 type EventRowProps = {
   event: CatalogEvent;
-  variant: "recommendation" | "feed" | "compact";
+  variant: "recommendation" | "feed" | "compact" | "saved";
   index?: number;
   reason?: string;
   score?: number;
   saved?: boolean;
   dismissed?: boolean;
+  attended?: boolean;
   onSave?: () => void;
   onDismiss?: () => void;
   onRestore?: () => void;
@@ -51,6 +52,7 @@ export function EventRow({
   score,
   saved = false,
   dismissed = false,
+  attended = false,
   onSave,
   onDismiss,
   onRestore,
@@ -109,6 +111,32 @@ export function EventRow({
     );
   }
 
+  if (variant === "saved") {
+    return (
+      <li className="border-b border-rule py-5">
+        <EventTitle
+          event={event}
+          heading="h3"
+          className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink"
+        />
+        <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-ink-dim">
+          {formatEventDate(event.startsAt)}
+          <span className="text-ink-faint"> / </span>
+          {formatEventTime(event.startsAt)}
+          <span className="text-ink-faint"> / </span>
+          {event.venue.name}
+          <span className="text-ink-faint"> / </span>
+          {event.venue.neighborhood}
+        </p>
+        <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
+            {saved ? "Saved" : "Save"}
+          </Button>
+        </div>
+      </li>
+    );
+  }
+
   if (variant === "feed") {
     return (
       <li
@@ -160,6 +188,13 @@ export function EventRow({
                 Dismiss
               </Button>
             )}
+            <Button
+              variant={attended ? "pressed" : "quiet"}
+              aria-pressed={attended}
+              onClick={onAttend}
+            >
+              Attended
+            </Button>
           </div>
         </div>
       </li>
