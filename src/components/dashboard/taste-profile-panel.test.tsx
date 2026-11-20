@@ -52,8 +52,15 @@ function renderQueue(profile: TasteProfile = defaultTasteProfile) {
 }
 
 function StoredQueue() {
-  const { profile, actions, setProfile, resetProfile, toggleSaved, dismiss, attend } =
-    usePersonalization();
+  const {
+    profile,
+    actions,
+    setProfile,
+    resetProfile,
+    toggleSaved,
+    dismiss,
+    toggleAttended,
+  } = usePersonalization();
   return (
     <RecommendedEvents
       feed={{ status: "ready", events: [event] }}
@@ -62,8 +69,8 @@ function StoredQueue() {
       onProfileChange={setProfile}
       onReset={resetProfile}
       onToggleSaved={toggleSaved}
-      onDismiss={dismiss}
-      onAttend={attend}
+      onDismiss={(event) => dismiss(event.id)}
+      onAttend={toggleAttended}
     />
   );
 }

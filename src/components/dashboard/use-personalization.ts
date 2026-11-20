@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   defaultRecommendationActions,
@@ -119,6 +119,13 @@ export function usePersonalization(events?: readonly PersonalizationEvent[]) {
     actions: defaultRecommendationActions,
   });
   const [hydrated, setHydrated] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const announce = useCallback((message: string) => {
+    setNotice(message);
+  }, []);
+  const clearNotice = useCallback(() => {
+    setNotice(null);
+  }, []);
 
   useEffect(() => {
     // The first render stays on the defaults so server HTML and the client
@@ -201,17 +208,25 @@ export function usePersonalization(events?: readonly PersonalizationEvent[]) {
     );
   }
 
-  function attend(event: PersonalizationEvent) {
+  function toggleAttended(event: PersonalizationEvent) {
     const snapshot = snapshotFromEvent(event);
-    updateActions((actions) =>
-      compactActions({
+    updateActions((actions) => {
+      const attended = actions.attendedEventIds.includes(event.id);
+      if (attended) {
+        return compactActions({
+          ...actions,
+          attendedEventIds: removeId(actions.attendedEventIds, event.id),
+          attendedSnapshots: withoutSnapshot(actions.attendedSnapshots, event.id),
+        });
+      }
+      return compactActions({
         ...actions,
         savedEventIds: removeId(actions.savedEventIds, event.id),
         savedSnapshots: withoutSnapshot(actions.savedSnapshots, event.id),
         attendedEventIds: addId(actions.attendedEventIds, event.id),
         attendedSnapshots: withSnapshot(actions.attendedSnapshots, snapshot),
-      }),
-    );
+      });
+    });
   }
 
   function resetProfile() {
@@ -229,8 +244,11 @@ export function usePersonalization(events?: readonly PersonalizationEvent[]) {
     toggleSaved,
     dismiss,
     restore,
-    attend,
+    toggleAttended,
     resetProfile,
+    notice,
+    announce,
+    clearNotice,
   };
 }
 

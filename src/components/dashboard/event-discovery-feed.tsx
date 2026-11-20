@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 
+import { useEventActions } from "./event-actions";
 import { EventRow } from "./event-row";
-import { usePersonalizationData } from "./personalization-context";
 import { StyleFilterControl, styleFilterOptions } from "./style-filter-control";
 import type { EventFeedState } from "./types";
 
@@ -16,7 +16,7 @@ export function EventDiscoveryFeed({
   activeStyle: string;
   onStyleChange(style: string): void;
 }) {
-  const { actions, toggleSaved, dismiss, restore } = usePersonalizationData();
+  const eventActions = useEventActions();
   const events = useMemo(
     () =>
       feed.events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
@@ -74,11 +74,13 @@ export function EventDiscoveryFeed({
               event={event}
               variant="feed"
               index={i}
-              saved={actions.savedEventIds.includes(event.id)}
-              dismissed={actions.dismissedEventIds.includes(event.id)}
-              onSave={() => toggleSaved(event)}
-              onDismiss={() => dismiss(event.id)}
-              onRestore={() => restore(event.id)}
+              saved={eventActions.actions.savedEventIds.includes(event.id)}
+              dismissed={eventActions.actions.dismissedEventIds.includes(event.id)}
+              attended={eventActions.actions.attendedEventIds.includes(event.id)}
+              onSave={() => eventActions.save(event)}
+              onDismiss={() => eventActions.dismiss(event)}
+              onRestore={() => eventActions.restore(event)}
+              onAttend={() => eventActions.attend(event)}
             />
           ))}
         </ol>

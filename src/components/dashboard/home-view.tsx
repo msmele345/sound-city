@@ -2,6 +2,7 @@
 
 import { ArtistShowcase } from "./artist-showcase";
 import { useCatalogData } from "./catalog-context";
+import { useEventActions } from "./event-actions";
 import { NextUp } from "./next-up";
 import { usePersonalizationData } from "./personalization-context";
 import { RecommendedEvents } from "./recommended-events";
@@ -11,15 +12,8 @@ import { useStyleFilter } from "./style-filter-context";
 export function HomeView() {
   const { activeStyle } = useStyleFilter();
   const { feed, showcase } = useCatalogData();
-  const {
-    profile,
-    actions,
-    setProfile,
-    resetProfile,
-    toggleSaved,
-    dismiss,
-    attend,
-  } = usePersonalizationData();
+  const { profile, setProfile, resetProfile } = usePersonalizationData();
+  const eventActions = useEventActions();
 
   return (
     <div className="grid min-w-0 gap-x-12 gap-y-12 lg:grid-cols-[1.65fr_0.7fr]">
@@ -36,12 +30,12 @@ export function HomeView() {
         <RecommendedEvents
           feed={feed}
           profile={profile}
-          actions={actions}
+          actions={eventActions.actions}
           onProfileChange={setProfile}
           onReset={resetProfile}
-          onToggleSaved={toggleSaved}
-          onDismiss={dismiss}
-          onAttend={attend}
+          onToggleSaved={eventActions.save}
+          onDismiss={eventActions.dismiss}
+          onAttend={eventActions.attend}
         />
       </section>
 

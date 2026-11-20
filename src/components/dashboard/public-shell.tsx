@@ -5,7 +5,10 @@ import { usePathname } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 
 import { CatalogProvider, useCatalogData } from "./catalog-context";
-import { PersonalizationProvider } from "./personalization-context";
+import {
+  PersonalizationProvider,
+  usePersonalizationData,
+} from "./personalization-context";
 import { StyleFilterProvider, useStyleFilter } from "./style-filter-context";
 
 const nav = [
@@ -128,6 +131,19 @@ function CompactMasthead() {
   );
 }
 
+function ActionStatus() {
+  const { notice } = usePersonalizationData();
+
+  return (
+    <div
+      role="status"
+      className="font-mono text-xs uppercase tracking-[0.14em] text-ink"
+    >
+      {notice ? <p className="border-b border-rule py-3">{notice}</p> : null}
+    </div>
+  );
+}
+
 function isCurrentPath(pathname: string, href: string) {
   const path = href.split("?")[0] ?? href;
   if (!path || path.startsWith("#")) {
@@ -205,6 +221,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
               <StyleAwareNav />
             </StyleFilterProvider>
           </Suspense>
+
+          <ActionStatus />
 
           <main className="mt-10 min-w-0">
             <Suspense

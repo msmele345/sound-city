@@ -298,6 +298,120 @@ describe("Events route", () => {
     ).toBeInTheDocument();
   });
 
+  it("toggles attended on a feed row and removes it from recommendations while pressed", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: [
+          {
+            id: "event_lemtom",
+            title: "Lemtom",
+            startsAt: "2026-05-24T03:00:00.000Z",
+            venue: { name: "Spybar", neighborhood: "River West", capacity: 200 },
+            artists: [{ name: "Lemtom" }],
+            styles: ["house"],
+            source: {
+              title: "Resident Advisor listing",
+              url: "https://example.com/lemtom",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    render(
+      <PublicShell>
+        <HomeView />
+        <EventsPage />
+      </PublicShell>,
+    );
+
+    const feed = screen.getByRole("region", { name: /latest events/i });
+    const row = (await within(feed).findByRole("heading", { name: /^lemtom$/i })).closest(
+      "li",
+    );
+    expect(row).not.toBeNull();
+    const recommended = screen.getByRole("region", { name: /for you/i });
+
+    await user.click(within(row!).getByRole("button", { name: /^attended$/i }));
+
+    expect(within(row!).getByRole("button", { name: /^attended$/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(within(feed).getByRole("heading", { name: /^lemtom$/i })).toBeInTheDocument();
+    expect(
+      within(recommended).queryByRole("heading", { name: /^lemtom$/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(recommended).queryByRole("button", { name: /^attended$/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(within(row!).getByRole("button", { name: /^attended$/i }));
+
+    expect(within(row!).getByRole("button", { name: /^attended$/i })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(
+      within(recommended).getByRole("heading", { name: /^lemtom$/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("announces each feed action in a polite status", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: [
+          {
+            id: "event_lemtom",
+            title: "Lemtom",
+            startsAt: "2026-05-24T03:00:00.000Z",
+            venue: { name: "Spybar", neighborhood: "River West", capacity: 200 },
+            artists: [{ name: "Lemtom" }],
+            styles: ["house"],
+            source: {
+              title: "Resident Advisor listing",
+              url: "https://example.com/lemtom",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    renderEvents();
+
+    const row = (
+      await screen.findByRole("heading", { name: /^lemtom$/i })
+    ).closest("li");
+    expect(row).not.toBeNull();
+
+    await user.click(within(row!).getByRole("button", { name: /^save$/i }));
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Saved Lemtom at Spybar");
+
+    await user.click(within(row!).getByRole("button", { name: /^saved$/i }));
+    expect(status).toHaveTextContent("Removed Lemtom at Spybar");
+
+    await user.click(within(row!).getByRole("button", { name: /^dismiss$/i }));
+    expect(status).toHaveTextContent("Dismissed Lemtom at Spybar");
+
+    await user.click(within(row!).getByRole("button", { name: /^restore$/i }));
+    expect(status).toHaveTextContent("Restored Lemtom at Spybar");
+
+    await user.click(within(row!).getByRole("button", { name: /^attended$/i }));
+    expect(status).toHaveTextContent("Attended Lemtom at Spybar");
+
+    await user.click(within(row!).getByRole("button", { name: /^attended$/i }));
+    expect(status).toHaveTextContent("Removed attended Lemtom at Spybar");
+  });
+
   it("shows loading, empty, and error states for the event feed", async () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 

@@ -29,7 +29,7 @@ export function RecommendedEvents({
   onProfileChange(profile: TasteProfile): void;
   onReset(): void;
   onToggleSaved(event: PersonalizationEvent): void;
-  onDismiss(id: string): void;
+  onDismiss(event: PersonalizationEvent): void;
   onAttend(event: PersonalizationEvent): void;
 }) {
   const recommendations = useMemo(
@@ -69,7 +69,7 @@ export function RecommendedEvents({
               score={item.score}
               saved={item.saved}
               onSave={() => onToggleSaved(item.event)}
-              onDismiss={() => onDismiss(item.event.id)}
+              onDismiss={() => onDismiss(item.event)}
               onAttend={() => onAttend(item.event)}
             />
           ))}

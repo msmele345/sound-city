@@ -221,11 +221,24 @@ describe("usePersonalization", () => {
     expect(result.current.actions.dismissedEventIds).toEqual([]);
   });
 
+  it("toggles attended off without restoring saved", () => {
+    const { result } = renderHook(() => usePersonalization());
+    const event = storedEvent("event_1");
+
+    act(() => result.current.toggleSaved(event));
+    act(() => result.current.toggleAttended(event));
+    act(() => result.current.toggleAttended(event));
+
+    expect(result.current.actions.attendedEventIds).toEqual([]);
+    expect(result.current.actions.attendedSnapshots).toBeUndefined();
+    expect(result.current.actions.savedEventIds).toEqual([]);
+  });
+
   it("marks an event attended and clears it from saved", () => {
     const { result } = renderHook(() => usePersonalization());
 
     act(() => result.current.toggleSaved(storedEvent("event_1")));
-    act(() => result.current.attend(storedEvent("event_1")));
+    act(() => result.current.toggleAttended(storedEvent("event_1")));
 
     expect(result.current.actions.attendedEventIds).toEqual(["event_1"]);
     expect(result.current.actions.savedEventIds).toEqual([]);
@@ -258,7 +271,7 @@ describe("usePersonalization", () => {
       savedSnapshots: [snapshot],
     });
 
-    act(() => result.current.attend(event));
+    act(() => result.current.toggleAttended(event));
 
     expect(result.current.actions.savedEventIds).toEqual([]);
     expect(result.current.actions.savedSnapshots).toBeUndefined();
