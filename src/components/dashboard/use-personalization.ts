@@ -113,7 +113,7 @@ function readLocalPersonalization(): LocalPersonalization {
   }
 }
 
-export function usePersonalization() {
+export function usePersonalization(events?: readonly PersonalizationEvent[]) {
   const [personalization, setPersonalization] = useState<LocalPersonalization>({
     profile: defaultTasteProfile,
     actions: defaultRecommendationActions,
@@ -127,6 +127,19 @@ export function usePersonalization() {
     setPersonalization(readLocalPersonalization());
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!hydrated || !events) {
+      return;
+    }
+    // Catalog details replace stored snapshots after hydration so the first
+    // render still matches the server, and a missing catalog leaves them as stored.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh is derived from the loaded catalog
+    setPersonalization((current) => {
+      const actions = refreshSnapshots(current.actions, events);
+      return actions === current.actions ? current : { ...current, actions };
+    });
+  }, [events, hydrated]);
 
   useEffect(() => {
     if (!hydrated) {
@@ -286,6 +299,48 @@ function isEventSnapshot(value: unknown): value is EventSnapshot {
     typeof snapshot.neighborhood === "string" &&
     typeof snapshot.sourceUrl === "string"
   );
+}
+
+function refreshSnapshots(
+  actions: RecommendationActions,
+  events: readonly PersonalizationEvent[],
+) {
+  const byId = new Map(events.map((event) => [event.id, event]));
+  const savedSnapshots = refreshSnapshotList(
+    actions.savedEventIds,
+    actions.savedSnapshots,
+    byId,
+  );
+  const attendedSnapshots = refreshSnapshotList(
+    actions.attendedEventIds,
+    actions.attendedSnapshots,
+    byId,
+  );
+  const next = compactActions({
+    ...actions,
+    savedSnapshots,
+    attendedSnapshots,
+  });
+  return JSON.stringify(next) === JSON.stringify(actions) ? actions : next;
+}
+
+function refreshSnapshotList(
+  ids: string[],
+  snapshots: EventSnapshot[] | undefined,
+  byId: Map<string, PersonalizationEvent>,
+) {
+  const stored = new Map((snapshots ?? []).map((snapshot) => [snapshot.id, snapshot]));
+  const next: EventSnapshot[] = [];
+  for (const id of ids) {
+    const event = byId.get(id);
+    if (event) {
+      next.push(snapshotFromEvent(event));
+      continue;
+    }
+    const snapshot = stored.get(id);
+    if (snapshot) next.push(snapshot);
+  }
+  return next;
 }
 
 function readActions(actions: Partial<RecommendationActions> | undefined) {

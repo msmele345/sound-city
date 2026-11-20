@@ -266,6 +266,127 @@ describe("usePersonalization", () => {
     expect(result.current.actions.attendedSnapshots).toEqual([snapshot]);
   });
 
+  it("refreshes saved and attended snapshots from the loaded catalog", () => {
+    const stale = {
+      id: "event_lemtom",
+      title: "Old title",
+      startsAt: "2026-05-24T03:00:00.000Z",
+      venueName: "Old room",
+      neighborhood: "Old neighborhood",
+      sourceUrl: "https://example.com/old",
+    };
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_lemtom", "event_kept"],
+          dismissedEventIds: [],
+          attendedEventIds: ["event_attended"],
+          savedSnapshots: [
+            stale,
+            {
+              id: "event_kept",
+              title: "Kept Night",
+              startsAt: "2026-01-01T03:00:00.000Z",
+              venueName: "Podlasie",
+              neighborhood: "Avondale",
+              sourceUrl: "https://example.com/kept",
+            },
+          ],
+          attendedSnapshots: [{ ...stale, id: "event_attended", title: "Old attended" }],
+        },
+      }),
+    );
+    const catalog = [
+      {
+        id: "event_lemtom",
+        title: "Lemtom",
+        startsAt: "2026-05-24T04:00:00.000Z",
+        venue: { name: "Spybar", neighborhood: "River West" },
+        source: { url: "https://example.com/lemtom" },
+      },
+      {
+        id: "event_attended",
+        title: "Attended Night",
+        startsAt: "2026-05-25T04:00:00.000Z",
+        venue: { name: "smartbar", neighborhood: "Wrigleyville" },
+        source: { url: "https://example.com/attended" },
+      },
+    ];
+
+    const { result } = renderHook(() => usePersonalization(catalog));
+
+    expect(result.current.actions.savedEventIds).toEqual([
+      "event_lemtom",
+      "event_kept",
+    ]);
+    expect(result.current.actions.savedSnapshots).toEqual([
+      {
+        id: "event_lemtom",
+        title: "Lemtom",
+        startsAt: "2026-05-24T04:00:00.000Z",
+        venueName: "Spybar",
+        neighborhood: "River West",
+        sourceUrl: "https://example.com/lemtom",
+      },
+      {
+        id: "event_kept",
+        title: "Kept Night",
+        startsAt: "2026-01-01T03:00:00.000Z",
+        venueName: "Podlasie",
+        neighborhood: "Avondale",
+        sourceUrl: "https://example.com/kept",
+      },
+    ]);
+    expect(result.current.actions.attendedSnapshots).toEqual([
+      {
+        id: "event_attended",
+        title: "Attended Night",
+        startsAt: "2026-05-25T04:00:00.000Z",
+        venueName: "smartbar",
+        neighborhood: "Wrigleyville",
+        sourceUrl: "https://example.com/attended",
+      },
+    ]);
+  });
+
+  it("fills in a snapshot for an id-only save when the catalog has that event", () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_lemtom"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+        },
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      usePersonalization([
+        {
+          id: "event_lemtom",
+          title: "Lemtom",
+          startsAt: "2026-05-24T04:00:00.000Z",
+          venue: { name: "Spybar", neighborhood: "River West" },
+          source: { url: "https://example.com/lemtom" },
+        },
+      ]),
+    );
+
+    expect(result.current.actions.savedEventIds).toEqual(["event_lemtom"]);
+    expect(result.current.actions.savedSnapshots).toEqual([
+      {
+        id: "event_lemtom",
+        title: "Lemtom",
+        startsAt: "2026-05-24T04:00:00.000Z",
+        venueName: "Spybar",
+        neighborhood: "River West",
+        sourceUrl: "https://example.com/lemtom",
+      },
+    ]);
+  });
+
   it("loads stored actions that hold only ids", () => {
     window.localStorage.setItem(
       storageKey,
