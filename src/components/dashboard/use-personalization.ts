@@ -119,9 +119,12 @@ export function usePersonalization(events?: readonly PersonalizationEvent[]) {
     actions: defaultRecommendationActions,
   });
   const [hydrated, setHydrated] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const announce = useCallback((message: string) => {
-    setNotice(message);
+  const [notice, setNotice] = useState<{
+    message: string;
+    undo?: () => void;
+  } | null>(null);
+  const announce = useCallback((message: string, undo?: () => void) => {
+    setNotice({ message, undo });
   }, []);
   const clearNotice = useCallback(() => {
     setNotice(null);

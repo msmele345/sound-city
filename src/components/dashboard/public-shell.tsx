@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, type ReactNode } from "react";
 
+import { Button } from "./button";
 import { CatalogProvider, useCatalogData } from "./catalog-context";
 import {
   PersonalizationProvider,
@@ -132,14 +133,31 @@ function CompactMasthead() {
 }
 
 function ActionStatus() {
-  const { notice } = usePersonalizationData();
+  const pathname = usePathname();
+  const { notice, clearNotice } = usePersonalizationData();
+  const seenPath = useRef(pathname);
+
+  useEffect(() => {
+    if (seenPath.current === pathname) return;
+    seenPath.current = pathname;
+    clearNotice();
+  }, [clearNotice, pathname]);
 
   return (
     <div
       role="status"
       className="font-mono text-xs uppercase tracking-[0.14em] text-ink"
     >
-      {notice ? <p className="border-b border-rule py-3">{notice}</p> : null}
+      {notice ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule py-3">
+          <p>{notice.message}</p>
+          {notice.undo ? (
+            <Button variant="quiet" onClick={notice.undo}>
+              Undo
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

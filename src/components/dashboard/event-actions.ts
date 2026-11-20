@@ -8,8 +8,14 @@ function place(event: PersonalizationEvent) {
 }
 
 export function useEventActions() {
-  const { actions, toggleSaved, dismiss, restore, toggleAttended, announce } =
-    usePersonalizationData();
+  const {
+    actions,
+    toggleSaved,
+    dismiss: dismissEvent,
+    restore,
+    toggleAttended,
+    announce,
+  } = usePersonalizationData();
 
   return {
     actions,
@@ -19,8 +25,13 @@ export function useEventActions() {
       announce(willSave ? `Saved ${place(event)}` : `Removed ${place(event)}`);
     },
     dismiss(event: PersonalizationEvent) {
-      dismiss(event.id);
-      announce(`Dismissed ${place(event)}`);
+      const wasSaved = actions.savedEventIds.includes(event.id);
+      dismissEvent(event.id);
+      announce(`Dismissed ${place(event)}`, () => {
+        restore(event.id);
+        if (wasSaved) toggleSaved(event);
+        announce(`Restored ${place(event)}`);
+      });
     },
     restore(event: PersonalizationEvent) {
       restore(event.id);
