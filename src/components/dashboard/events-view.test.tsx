@@ -25,6 +25,93 @@ function renderEvents() {
 }
 
 describe("Events route", () => {
+  it("groups the feed by day and labels today and tomorrow", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-21T18:00:00.000Z"));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: [
+          {
+            id: "event_weekend",
+            title: "Weekend",
+            startsAt: "2026-05-24T03:00:00.000Z",
+            venue: { name: "Spybar", neighborhood: "River North" },
+            artists: [],
+            styles: ["house"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/weekend",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+          {
+            id: "event_late",
+            title: "Late Set",
+            startsAt: "2026-05-22T02:00:00.000Z",
+            venue: { name: "smartbar", neighborhood: "Wrigleyville" },
+            artists: [],
+            styles: ["techno"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/late",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+          {
+            id: "event_next",
+            title: "Next Night",
+            startsAt: "2026-05-23T03:00:00.000Z",
+            venue: { name: "Podlasie Club", neighborhood: "Avondale" },
+            artists: [],
+            styles: ["house"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/next",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+          {
+            id: "event_later",
+            title: "Later Set",
+            startsAt: "2026-05-22T04:30:00.000Z",
+            venue: { name: "smartbar", neighborhood: "Wrigleyville" },
+            artists: [],
+            styles: ["techno"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/later",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    try {
+      renderEvents();
+      const feed = screen.getByRole("region", { name: /latest events/i });
+      const tonight = await within(feed).findByRole("heading", { name: /^tonight$/i });
+      const tomorrow = within(feed).getByRole("heading", { name: /^tomorrow$/i });
+      const laterDay = within(feed).getByRole("heading", { name: /^sat, may 23$/i });
+      const late = within(feed).getByRole("heading", { name: /^late set$/i });
+      const later = within(feed).getByRole("heading", { name: /^later set$/i });
+      const next = within(feed).getByRole("heading", { name: /^next night$/i });
+      const weekend = within(feed).getByRole("heading", { name: /^weekend$/i });
+
+      expect(within(feed).getAllByRole("heading", { name: /^tonight$/i })).toHaveLength(1);
+      expect(tonight.compareDocumentPosition(late) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(late.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(later.compareDocumentPosition(tomorrow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(tomorrow.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(next.compareDocumentPosition(laterDay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(laterDay.compareDocumentPosition(weekend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("loads upcoming Chicago events from the catalog API", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
