@@ -244,6 +244,81 @@ describe("Saved route", () => {
     }
   });
 
+  it("marks a past saved event attended and announces it once", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_future", "event_past"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+          savedSnapshots: [
+            {
+              id: "event_past",
+              title: "Old Night",
+              startsAt: "2020-01-01T03:00:00.000Z",
+              venueName: "Spybar",
+              neighborhood: "River West",
+              sourceUrl: "https://example.com/old",
+            },
+            {
+              id: "event_future",
+              title: "Lemtom",
+              startsAt: "2030-05-24T03:00:00.000Z",
+              venueName: "smartbar",
+              neighborhood: "Wrigleyville",
+              sourceUrl: "https://example.com/lemtom",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    const upcoming = (
+      await within(saved).findByRole("heading", { name: /^lemtom$/i })
+    ).closest("li");
+    const pastEvent = within(saved).getByRole("heading", { name: /old night/i });
+    const pastRow = pastEvent.closest("li");
+    expect(upcoming).not.toBeNull();
+    expect(pastRow).not.toBeNull();
+    expect(
+      within(upcoming!).queryByRole("button", { name: /^attended$/i }),
+    ).not.toBeInTheDocument();
+    expect(within(pastRow!).getByRole("button", { name: /^saved$/i })).toBeInTheDocument();
+
+    await user.click(within(pastRow!).getByRole("button", { name: /^attended$/i }));
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Attended Old Night at Spybar");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+    expect(nav.querySelector("[aria-live]")).toBeNull();
+
+    const attendedHeading = within(saved).getByRole("heading", { name: /^attended$/i });
+    const attendedEvent = within(saved).getByRole("heading", { name: /old night/i });
+    expect(
+      attendedHeading.compareDocumentPosition(attendedEvent) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(attendedEvent.closest("li")!).getByRole("button", { name: /^attended$/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(within(saved).queryByRole("heading", { name: /^past$/i })).not.toBeInTheDocument();
+    expect(within(saved).getByRole("heading", { name: /^lemtom$/i })).toBeInTheDocument();
+  });
+
   it("orders saved events by start time when the strings would not", async () => {
     window.localStorage.setItem(
       storageKey,

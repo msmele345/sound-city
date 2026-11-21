@@ -120,6 +120,7 @@ export function SavedView() {
                 key={snapshot.id}
                 snapshot={snapshot}
                 onSave={() => eventActions.save(eventFromSnapshot(snapshot))}
+                onAttend={() => eventActions.attend(eventFromSnapshot(snapshot))}
               />
             ))}
           </ol>
@@ -185,9 +186,11 @@ function EmptyList({ children }: { children: string }) {
 function SavedEventRow({
   snapshot,
   onSave,
+  onAttend,
 }: {
   snapshot: EventSnapshot;
   onSave(): void;
+  onAttend?: () => void;
 }) {
   return (
     <EventRow
@@ -195,6 +198,7 @@ function SavedEventRow({
       variant="saved"
       saved
       onSave={onSave}
+      onAttend={onAttend}
     />
   );
 }
