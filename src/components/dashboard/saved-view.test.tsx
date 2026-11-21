@@ -244,6 +244,70 @@ describe("Saved route", () => {
     }
   });
 
+  it("shows a saved event that is also attended as pressed", async () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_past", "event_future"],
+          dismissedEventIds: [],
+          attendedEventIds: ["event_past"],
+          savedSnapshots: [
+            {
+              id: "event_past",
+              title: "Old Night",
+              startsAt: "2020-01-01T03:00:00.000Z",
+              venueName: "Spybar",
+              neighborhood: "River West",
+              sourceUrl: "https://example.com/old",
+            },
+            {
+              id: "event_future",
+              title: "Lemtom",
+              startsAt: "2030-05-24T03:00:00.000Z",
+              venueName: "smartbar",
+              neighborhood: "Wrigleyville",
+              sourceUrl: "https://example.com/lemtom",
+            },
+          ],
+          attendedSnapshots: [
+            {
+              id: "event_past",
+              title: "Old Night",
+              startsAt: "2020-01-01T03:00:00.000Z",
+              venueName: "Spybar",
+              neighborhood: "River West",
+              sourceUrl: "https://example.com/old",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    const pastHeading = await within(saved).findByRole("heading", { name: /^past$/i });
+    const pastList = pastHeading.nextElementSibling;
+    expect(pastList).not.toBeNull();
+    expect(
+      within(pastList as HTMLElement).getByRole("button", { name: /^attended$/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const upcoming = within(saved).getByRole("heading", { name: /^lemtom$/i }).closest("li");
+    expect(upcoming).not.toBeNull();
+    expect(
+      within(upcoming!).queryByRole("button", { name: /^attended$/i }),
+    ).not.toBeInTheDocument();
+  });
+
   it("marks a past saved event attended and announces it once", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
