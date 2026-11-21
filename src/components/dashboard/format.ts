@@ -1,3 +1,5 @@
+import { parseHttpUrl } from "@/lib/http-url";
+
 import type { CatalogVenueSignal } from "./types";
 
 export function formatEventDate(startsAt: string) {
@@ -54,9 +56,9 @@ const siteNameByHost: Record<string, string> = {
 
 export function formatSourceDisplayName(title: string, sourceUrl = "") {
   const stripped = title.replace(/^review source:\s*/i, "").trim();
-  const url = httpUrl(stripped);
+  const url = parseHttpUrl(stripped);
   if (url) return siteName(url);
-  if (!stripped) return siteName(httpUrl(sourceUrl));
+  if (!stripped) return siteName(parseHttpUrl(sourceUrl));
 
   if (/resident advisor/i.test(stripped)) return "Resident Advisor";
 
@@ -77,11 +79,3 @@ function siteName(url: URL | null) {
   return siteNameByHost[host] ?? siteNameByHost[host.replace(/^[^.]+\./, "")] ?? host;
 }
 
-function httpUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" ? url : null;
-  } catch {
-    return null;
-  }
-}

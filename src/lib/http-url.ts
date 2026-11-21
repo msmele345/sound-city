@@ -1,8 +1,12 @@
-export function isHttpUrl(value: string) {
+export function parseHttpUrl(value: string) {
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
+    return url.protocol === "http:" || url.protocol === "https:" ? url : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function isHttpUrl(value: string) {
+  return parseHttpUrl(value) !== null;
 }
