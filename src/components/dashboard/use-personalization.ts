@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { isHttpUrl } from "@/lib/http-url";
 import {
   defaultRecommendationActions,
   defaultTasteProfile,
@@ -292,7 +293,7 @@ function snapshotFromEvent(event: PersonalizationEvent): EventSnapshot {
     startsAt: event.startsAt,
     venueName: event.venue.name,
     neighborhood: event.venue.neighborhood,
-    sourceUrl: event.source.url,
+    sourceUrl: isHttpUrl(event.source.url) ? event.source.url : "",
   };
 }
 
@@ -327,7 +328,10 @@ function stringIds(value: unknown) {
 
 function readSnapshots(value: unknown) {
   if (!Array.isArray(value)) return undefined;
-  const snapshots = value.filter(isEventSnapshot);
+  const snapshots = value.flatMap((item) => {
+    if (!isEventSnapshot(item)) return [];
+    return [isHttpUrl(item.sourceUrl) ? item : { ...item, sourceUrl: "" }];
+  });
   return snapshots.length > 0 ? snapshots : undefined;
 }
 

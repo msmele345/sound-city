@@ -1,3 +1,5 @@
+import { isHttpUrl } from "@/lib/http-url";
+
 import { Button } from "./button";
 import { formatEventDate, formatEventTime } from "./format";
 import { MatchMeter } from "./match-meter";
@@ -13,6 +15,10 @@ function EventTitle({
   className: string;
   heading: "h3" | "h4" | "h5";
 }) {
+  if (!isHttpUrl(event.source.url)) {
+    return <Heading className={className}>{event.title}</Heading>;
+  }
+
   return (
     <Heading className={className}>
       <a

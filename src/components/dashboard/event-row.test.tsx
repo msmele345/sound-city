@@ -50,6 +50,23 @@ describe("event row", () => {
     expect(screen.queryByText("0.80")).not.toBeInTheDocument();
   });
 
+  it("does not link a title when the source url is not http or https", () => {
+    render(
+      <ol>
+        <EventRow
+          event={{
+            ...event,
+            source: { ...event.source, url: "javascript:alert(1)" },
+          }}
+          variant="feed"
+        />
+      </ol>,
+    );
+
+    expect(screen.queryByRole("link", { name: /^lemtom$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^lemtom$/i })).toBeInTheDocument();
+  });
+
   it("links a recommendation title to the source page in a new tab", () => {
     renderRow("recommendation");
     expectSourceTitleLink();
