@@ -5,6 +5,7 @@ import Link from "next/link";
 import { isUpcomingPublicStart } from "@/server/catalog/public-events";
 import type { EventSnapshot } from "@/lib/recommendations";
 
+import { Button } from "./button";
 import { useCatalogData } from "./catalog-context";
 import { useEventActions } from "./event-actions";
 import { EventRow } from "./event-row";
@@ -51,6 +52,10 @@ export function SavedView() {
   const past = snapshots
     .filter((snapshot) => !isUpcomingPublicStart(snapshot.startsAt, now, chicago))
     .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.id));
+  const unavailableIds = eventActions.actions.savedEventIds.filter(
+    (id) => !snapshotIds.has(id),
+  );
   const dismissed =
     feed.status === "ready"
       ? feed.events
@@ -65,7 +70,7 @@ export function SavedView() {
   return (
     <section id="saved" aria-labelledby="saved-heading" className="min-w-0 scroll-mt-6">
       <SectionMark id="saved-heading" title="Saved" index="Kept / 05" />
-      {upcoming.length === 0 && past.length === 0 ? (
+      {upcoming.length === 0 && past.length === 0 && unavailableIds.length === 0 ? (
         <EmptyList>Nothing saved yet.</EmptyList>
       ) : null}
       {upcoming.length > 0 ? (
@@ -76,6 +81,23 @@ export function SavedView() {
               snapshot={snapshot}
               onSave={() => eventActions.save(eventFromSnapshot(snapshot))}
             />
+          ))}
+        </ol>
+      ) : null}
+      {unavailableIds.length > 0 ? (
+        <ol className="mt-1">
+          {unavailableIds.map((id) => (
+            <li key={id} className="border-b border-rule py-5">
+              <h3 className="font-display text-2xl uppercase leading-none text-ink">
+                Event details unavailable
+              </h3>
+              <p className="mt-2 text-sm text-ink-dim">
+                This save has no stored details and is not in the current catalog.
+              </p>
+              <div className="mt-4">
+                <Button onClick={() => eventActions.removeSaved(id)}>Remove</Button>
+              </div>
+            </li>
           ))}
         </ol>
       ) : null}

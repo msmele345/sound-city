@@ -175,6 +175,16 @@ export function usePersonalization(events?: readonly PersonalizationEvent[]) {
     }));
   }
 
+  function unsave(id: string) {
+    updateActions((actions) =>
+      compactActions({
+        ...actions,
+        savedEventIds: removeId(actions.savedEventIds, id),
+        savedSnapshots: withoutSnapshot(actions.savedSnapshots, id),
+      }),
+    );
+  }
+
   function toggleSaved(event: PersonalizationEvent) {
     const snapshot = snapshotFromEvent(event);
     updateActions((actions) => {
@@ -245,6 +255,7 @@ export function usePersonalization(events?: readonly PersonalizationEvent[]) {
     setProfile,
     setActions,
     toggleSaved,
+    unsave,
     dismiss,
     restore,
     toggleAttended,

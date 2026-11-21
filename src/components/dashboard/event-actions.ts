@@ -11,6 +11,7 @@ export function useEventActions() {
   const {
     actions,
     toggleSaved,
+    unsave,
     dismiss: dismissEvent,
     restore,
     toggleAttended,
@@ -19,6 +20,10 @@ export function useEventActions() {
 
   return {
     actions,
+    removeSaved(id: string) {
+      unsave(id);
+      announce("Removed saved event");
+    },
     save(event: PersonalizationEvent) {
       const willSave = !actions.savedEventIds.includes(event.id);
       toggleSaved(event);

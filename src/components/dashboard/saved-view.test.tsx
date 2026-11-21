@@ -73,6 +73,51 @@ describe("Saved route", () => {
     expect(savedLink).toHaveTextContent("01");
   });
 
+  it("shows an id-only save that is not in the feed and removes it", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_may_2026"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+    const savedLink = within(nav).getByRole("link", { name: /saved/i });
+    expect(savedLink).toHaveTextContent("01");
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    expect(
+      await within(saved).findByRole("heading", { name: /event details unavailable/i }),
+    ).toBeInTheDocument();
+    expect(within(saved).queryByText(/nothing saved yet/i)).not.toBeInTheDocument();
+
+    await user.click(within(saved).getByRole("button", { name: /^remove$/i }));
+
+    expect(savedLink).toHaveTextContent("00");
+    expect(
+      within(saved).queryByRole("heading", { name: /event details unavailable/i }),
+    ).not.toBeInTheDocument();
+    expect(within(saved).getByText(/nothing saved yet/i)).toBeInTheDocument();
+    expect(
+      JSON.parse(window.localStorage.getItem(storageKey) ?? "{}").actions.savedEventIds,
+    ).not.toContain("event_may_2026");
+  });
+
   it("points each empty list back to For You", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
