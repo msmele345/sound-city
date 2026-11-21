@@ -185,6 +185,10 @@ function sourceTrustTieBreaker(event: RecommendationEvent) {
   return sourceConfidence(event) * 0.6 + sourceFreshness(event) * 0.4;
 }
 
+function readableLabel(value: string) {
+  return value.replaceAll("-", " ");
+}
+
 function reasonFor(
   event: RecommendationEvent,
   profile: TasteProfile,
@@ -194,17 +198,17 @@ function reasonFor(
     profile.styles.includes(style.toLowerCase() as TasteStyle),
   );
   if (matchedStyles.length > 0) {
-    return `${matchedStyles.join(" / ")} match in a ${venueSize(
-      event.venue.capacity,
-    )} setting.`;
+    const styles = matchedStyles.map(readableLabel).join(" and ");
+    const room = readableLabel(venueSize(event.venue.capacity));
+    return `${styles.charAt(0).toUpperCase()}${styles.slice(1)} match in a ${room}.`;
   }
   if (saved) {
-    return "Saved event kept in the queue.";
+    return "This saved event stays in the queue.";
   }
   if (eventVibes(event).includes(profile.vibe)) {
-    return `${profile.vibe} room signal matches your profile.`;
+    return `The ${readableLabel(profile.vibe)} room matches your profile.`;
   }
-  return `Discovery pick from ${event.venue.neighborhood}.`;
+  return `A discovery pick from ${event.venue.neighborhood}.`;
 }
 
 export function rankRecommendedEvents(

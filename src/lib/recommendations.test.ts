@@ -79,8 +79,10 @@ describe("rankRecommendedEvents", () => {
     expect(recommendations[0].score).toBeGreaterThan(
       recommendations[1].score,
     );
-    expect(recommendations[0].reason).toMatch(/acid|techno|small-room/i);
-    expect(recommendations[1].reason).toMatch(/saved/i);
+    expect(recommendations[0].reason).toBe(
+      "Acid and techno match in a small room.",
+    );
+    expect(recommendations[1].reason).toBe("This saved event stays in the queue.");
   });
 
   it("uses source confidence and freshness only as ranking tie-breakers", () => {
@@ -141,6 +143,68 @@ describe("rankRecommendedEvents", () => {
       recommendations[1].score,
     );
     expect(recommendations[1].score).toBe(recommendations[2].score);
+    expect(recommendations[1].reason).toBe("The raw room matches your profile.");
+    expect(recommendations[2].reason).toBe("The raw room matches your profile.");
+  });
+
+  it("writes reasons as sentences with readable labels", () => {
+    const [highEnergy] = rankRecommendedEvents(
+      [
+        event({
+          id: "event_peak",
+          title: "Peak Pressure",
+          styles: ["disco"],
+          venue: {
+            name: "Spybar",
+            neighborhood: "River North",
+            capacity: 400,
+          },
+        }),
+      ],
+      {
+        profile: {
+          ...defaultTasteProfile,
+          styles: ["house"],
+          vibe: "high-energy",
+          venueSize: "midsize-club",
+        },
+        actions: {
+          savedEventIds: [],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+        },
+      },
+    );
+    const [discovery] = rankRecommendedEvents(
+      [
+        event({
+          id: "event_elsewhere",
+          title: "Quiet Billing",
+          styles: ["disco"],
+          venue: {
+            name: "Hall",
+            neighborhood: "Pilsen",
+            capacity: 900,
+          },
+        }),
+      ],
+      {
+        profile: {
+          ...defaultTasteProfile,
+          styles: ["house"],
+          vibe: "melodic",
+          venueSize: "warehouse",
+        },
+        actions: {
+          savedEventIds: [],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+        },
+      },
+    );
+
+    expect(highEnergy?.reason).toBe("The high energy room matches your profile.");
+    expect(discovery?.reason).toBe("A discovery pick from Pilsen.");
   });
 
   it("reads saved, dismissed, and attended from ids, not snapshots", () => {
