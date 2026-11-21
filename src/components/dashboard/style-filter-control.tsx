@@ -32,7 +32,7 @@ export function StyleFilterControl({
           type="button"
           aria-pressed={activeStyle === style}
           onClick={() => onStyleChange(style)}
-          className={`shrink-0 border-r border-rule px-3 py-2 transition-colors duration-150 hover:bg-panel hover:text-signal ${
+          className={`min-h-9 min-w-9 shrink-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11 border-r border-rule px-3 py-2 transition-colors duration-150 hover:bg-panel hover:text-signal ${
             activeStyle === style ? "bg-panel text-signal" : "text-ink-dim"
           }`}
         >
