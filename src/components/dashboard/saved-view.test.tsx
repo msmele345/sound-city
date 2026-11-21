@@ -174,6 +174,76 @@ describe("Saved route", () => {
     }
   });
 
+  it("splits saved events around the six-hour grace period", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-15T12:00:00.000Z"));
+    const snapshot = {
+      venueName: "Spybar",
+      neighborhood: "River North",
+      sourceUrl: "https://example.com/grace",
+    };
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_inside", "event_cutoff", "event_outside"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+          savedSnapshots: [
+            {
+              ...snapshot,
+              id: "event_outside",
+              title: "Outside Grace",
+              startsAt: "2026-06-15T05:00:00.000Z",
+            },
+            {
+              ...snapshot,
+              id: "event_cutoff",
+              title: "At Cutoff",
+              startsAt: "2026-06-15T06:00:00.000Z",
+            },
+            {
+              ...snapshot,
+              id: "event_inside",
+              title: "Inside Grace",
+              startsAt: "2026-06-15T07:00:00.000Z",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    try {
+      render(
+        <PublicShell>
+          <SavedPage />
+        </PublicShell>,
+      );
+
+      const saved = await screen.findByRole("region", { name: /^saved$/i });
+      const inside = await within(saved).findByRole("heading", { name: /inside grace/i });
+      const past = within(saved).getByRole("heading", { name: /^past$/i });
+      const outside = within(saved).getByRole("heading", { name: /outside grace/i });
+      const cutoff = within(saved).getByRole("heading", { name: /at cutoff/i });
+
+      expect(
+        inside.compareDocumentPosition(past) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        past.compareDocumentPosition(outside) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        outside.compareDocumentPosition(cutoff) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("orders saved events by start time when the strings would not", async () => {
     window.localStorage.setItem(
       storageKey,
