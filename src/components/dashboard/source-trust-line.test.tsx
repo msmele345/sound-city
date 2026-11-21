@@ -8,6 +8,15 @@ const source = {
   lastVerifiedAt: "2026-05-15",
 };
 
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-06-15T16:00:00.000Z"));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("source trust line", () => {
   it("shows the verified year when it is not the current year", () => {
     render(

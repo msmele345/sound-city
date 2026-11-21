@@ -113,50 +113,56 @@ describe("Events route", () => {
   });
 
   it("loads upcoming Chicago events from the catalog API", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        city: { slug: "chicago" },
-        events: [
-          {
-            id: "event_family_matters_posthuman",
-            title: "Family Matters feat. Posthuman",
-            startsAt: "2026-05-22T02:00:00.000Z",
-            venue: {
-              name: "smartbar",
-              neighborhood: "Wrigleyville",
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-15T16:00:00.000Z"));
+    try {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          city: { slug: "chicago" },
+          events: [
+            {
+              id: "event_family_matters_posthuman",
+              title: "Family Matters feat. Posthuman",
+              startsAt: "2026-05-22T02:00:00.000Z",
+              venue: {
+                name: "smartbar",
+                neighborhood: "Wrigleyville",
+              },
+              artists: [{ name: "Posthuman" }],
+              styles: ["techno", "house"],
+              source: {
+                title: "Resident Advisor listing",
+                url: "https://ra.co/events/2412925",
+                lastVerifiedAt: "2026-05-15",
+              },
             },
-            artists: [{ name: "Posthuman" }],
-            styles: ["techno", "house"],
-            source: {
-              title: "Resident Advisor listing",
-              url: "https://ra.co/events/2412925",
-              lastVerifiedAt: "2026-05-15",
-            },
-          },
-        ],
-      }),
-    });
+          ],
+        }),
+      });
 
-    renderEvents();
+      renderEvents();
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/catalog/events?city=chicago");
-    const latestEvents = screen.getByRole("region", {
-      name: /latest events/i,
-    });
-    const eventHeading = await within(latestEvents).findByRole("heading", {
-      name: /family matters feat\. posthuman/i,
-    });
-    const eventRow = eventHeading.closest("li");
-    expect(eventRow).not.toBeNull();
-    expect(within(eventRow!).getByText(/smartbar/i)).toBeInTheDocument();
-    expect(within(eventRow!).getByText(/wrigleyville/i)).toBeInTheDocument();
-    expect(within(eventRow!).getAllByText(/posthuman/i)).toHaveLength(2);
-    expect(within(eventRow!).getByText(/techno \/ house/i)).toBeInTheDocument();
-    expect(within(eventRow!).getByText(/^verified may 15$/i)).toBeInTheDocument();
-    const source = within(eventRow!).getByRole("link", { name: /^resident advisor$/i });
-    expect(source).toHaveAttribute("href", "https://ra.co/events/2412925");
-    expect(source).toHaveAccessibleName("Resident Advisor");
+      expect(fetchMock).toHaveBeenCalledWith("/api/catalog/events?city=chicago");
+      const latestEvents = screen.getByRole("region", {
+        name: /latest events/i,
+      });
+      const eventHeading = await within(latestEvents).findByRole("heading", {
+        name: /family matters feat\. posthuman/i,
+      });
+      const eventRow = eventHeading.closest("li");
+      expect(eventRow).not.toBeNull();
+      expect(within(eventRow!).getByText(/smartbar/i)).toBeInTheDocument();
+      expect(within(eventRow!).getByText(/wrigleyville/i)).toBeInTheDocument();
+      expect(within(eventRow!).getAllByText(/posthuman/i)).toHaveLength(2);
+      expect(within(eventRow!).getByText(/techno \/ house/i)).toBeInTheDocument();
+      expect(within(eventRow!).getByText(/^verified may 15$/i)).toBeInTheDocument();
+      const source = within(eventRow!).getByRole("link", { name: /^resident advisor$/i });
+      expect(source).toHaveAttribute("href", "https://ra.co/events/2412925");
+      expect(source).toHaveAccessibleName("Resident Advisor");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("opens a linked style filter from the url", async () => {
