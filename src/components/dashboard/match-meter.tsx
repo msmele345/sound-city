@@ -8,7 +8,7 @@ export function MatchMeter({ score }: { score: number }) {
         <span className="text-rule-strong">{"░".repeat(10 - filled)}</span>
       </span>
       <span className="font-semibold text-signal tabular-nums">
-        {score.toFixed(2)}
+        {pct}% match
       </span>
       <span className="sr-only">Match {pct} percent</span>
     </span>

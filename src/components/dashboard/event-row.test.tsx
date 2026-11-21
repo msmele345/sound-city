@@ -43,6 +43,13 @@ function expectSourceTitleLink() {
 }
 
 describe("event row", () => {
+  it("shows the match score as a percentage and keeps the spoken text", () => {
+    renderRow("recommendation");
+    expect(screen.getByText("80% match")).toBeInTheDocument();
+    expect(screen.getByText("Match 80 percent")).toBeInTheDocument();
+    expect(screen.queryByText("0.80")).not.toBeInTheDocument();
+  });
+
   it("links a recommendation title to the source page in a new tab", () => {
     renderRow("recommendation");
     expectSourceTitleLink();
