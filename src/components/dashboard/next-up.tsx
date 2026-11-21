@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 
 import { compareStartsAt } from "@/lib/starts-at";
-import { useMemo } from "react";
 
 import { formatEventDate, formatEventTime } from "./format";
 import { SectionMark } from "./section-mark";
