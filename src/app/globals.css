@@ -12,7 +12,7 @@
   --color-panel: oklch(0.188 0.007 250);
   --color-ink: oklch(0.955 0.004 250);
   --color-ink-dim: oklch(0.68 0.006 250);
-  --color-ink-faint: oklch(0.52 0.007 250);
+  --color-ink-faint: oklch(0.6 0.007 250);
   --color-signal: oklch(0.79 0.165 64);
   --color-signal-deep: oklch(0.72 0.17 60);
   --color-rule: oklch(1 0 0 / 0.13);
