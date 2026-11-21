@@ -6,9 +6,10 @@ import { compareStartsAt } from "@/lib/starts-at";
 
 import { useEventActions } from "./event-actions";
 import { EventRow } from "./event-row";
+import { groupFeedRows } from "./feed-rows";
 import { formatEventDate } from "./format";
 import { StyleFilterControl, styleFilterOptions } from "./style-filter-control";
-import type { CatalogEvent, EventFeedState } from "./types";
+import type { EventFeedState } from "./types";
 
 const chicago = "America/Chicago";
 
@@ -32,17 +33,6 @@ function dayLabel(startsAt: string, now: Date) {
   if (day === today) return "Tonight";
   if (day === shiftDayKey(today, 1)) return "Tomorrow";
   return formatEventDate(startsAt);
-}
-
-function groupByDay(events: CatalogEvent[], now: Date) {
-  const groups: { label: string; events: CatalogEvent[] }[] = [];
-  for (const event of events) {
-    const label = dayLabel(event.startsAt, now);
-    const current = groups.at(-1);
-    if (current?.label === label) current.events.push(event);
-    else groups.push({ label, events: [event] });
-  }
-  return groups;
 }
 
 export function EventDiscoveryFeed({
@@ -106,18 +96,19 @@ export function EventDiscoveryFeed({
         </p>
       ) : (
         <div className="mt-2">
-          {groupByDay(visibleEvents, new Date()).map((group) => (
+          {groupFeedRows(visibleEvents, (event) => dayLabel(event.startsAt, new Date())).map(
+            (group) => (
             <section key={group.label} className="mt-6 first:mt-2">
               <h3 className="border-b border-rule pb-2 font-display text-2xl uppercase leading-none text-ink">
                 {group.label}
               </h3>
               <ol>
-                {group.events.map((event) => (
+                {group.rows.map(({ item: event, index }) => (
                   <EventRow
                     key={event.id}
                     event={event}
                     variant="feed"
-                    index={visibleEvents.indexOf(event)}
+                    index={index}
                     saved={eventActions.actions.savedEventIds.includes(event.id)}
                     dismissed={eventActions.actions.dismissedEventIds.includes(event.id)}
                     attended={eventActions.actions.attendedEventIds.includes(event.id)}
