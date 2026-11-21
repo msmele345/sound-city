@@ -100,7 +100,9 @@ export function SavedView() {
                 This save has no stored details and is not in the current catalog.
               </p>
               <div className="mt-4">
-                <Button onClick={() => eventActions.removeSaved(id)}>Remove</Button>
+                <Button variant="quiet" onClick={() => eventActions.removeSaved(id)}>
+                  Remove
+                </Button>
               </div>
             </li>
           ))}

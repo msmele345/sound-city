@@ -134,8 +134,12 @@ describe("Saved route", () => {
       await within(saved).findByRole("heading", { name: /event details unavailable/i }),
     ).toBeInTheDocument();
     expect(within(saved).queryByText(/nothing saved yet/i)).not.toBeInTheDocument();
+    const remove = within(saved).getByRole("button", { name: /^remove$/i });
+    expect(remove.className).toContain("font-mono");
+    expect(remove.className).toContain("uppercase");
+    expect(remove.className).toContain("border");
 
-    await user.click(within(saved).getByRole("button", { name: /^remove$/i }));
+    await user.click(remove);
 
     expect(savedLink).toHaveTextContent("00");
     expect(
