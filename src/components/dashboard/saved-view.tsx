@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { isUpcomingPublicStart } from "@/lib/public-events";
+import { compareStartsAt } from "@/lib/starts-at";
 import type { EventSnapshot } from "@/lib/recommendations";
 
 import { Button } from "./button";
@@ -48,10 +49,10 @@ export function SavedView() {
   const now = new Date();
   const upcoming = snapshots
     .filter((snapshot) => isUpcomingPublicStart(snapshot.startsAt, now, chicago))
-    .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt));
+    .toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt));
   const past = snapshots
     .filter((snapshot) => !isUpcomingPublicStart(snapshot.startsAt, now, chicago))
-    .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt));
+    .toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt));
   const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.id));
   const idsWithoutSnapshots = eventActions.actions.savedEventIds.filter(
     (id) => !snapshotIds.has(id),
@@ -66,7 +67,7 @@ export function SavedView() {
               eventActions.actions.dismissedEventIds.includes(event.id) &&
               isUpcomingPublicStart(event.startsAt, now, chicago),
           )
-          .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt))
+          .toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt))
       : [];
 
   return (

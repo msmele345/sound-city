@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 
+import { compareStartsAt } from "@/lib/starts-at";
+
 import { Button } from "./button";
 import { EventRow } from "./event-row";
 import { formatSignalCategory } from "./format";
@@ -16,7 +18,7 @@ function VenueUpcoming({
 }) {
   const [open, setOpen] = useState(false);
   const sorted = useMemo(
-    () => events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
+    () => events.toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt)),
     [events],
   );
   const next = sorted[0];

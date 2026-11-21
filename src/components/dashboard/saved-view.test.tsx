@@ -174,6 +174,54 @@ describe("Saved route", () => {
     }
   });
 
+  it("orders saved events by start time when the strings would not", async () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_later", "event_earlier"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+          savedSnapshots: [
+            {
+              id: "event_later",
+              title: "Later By Clock",
+              startsAt: "2026-11-21T23:00:00-06:00",
+              venueName: "Spybar",
+              neighborhood: "River North",
+              sourceUrl: "https://example.com/later",
+            },
+            {
+              id: "event_earlier",
+              title: "Earlier By Clock",
+              startsAt: "2026-11-22T04:00:00.000Z",
+              venueName: "smartbar",
+              neighborhood: "Wrigleyville",
+              sourceUrl: "https://example.com/earlier",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    const earlier = await within(saved).findByRole("heading", { name: /earlier by clock/i });
+    const later = within(saved).getByRole("heading", { name: /later by clock/i });
+    expect(
+      earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("lists saved events from snapshots after they leave the catalog and groups past events", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(

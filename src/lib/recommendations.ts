@@ -1,3 +1,4 @@
+import { compareStartsAt } from "./starts-at";
 import type { CanonicalTechnoSubGenre } from "./style-normalization";
 
 export type TasteStyle =
@@ -256,6 +257,6 @@ export function rankRecommendedEvents(
       (a, b) =>
         b.score - a.score ||
         sourceTrustTieBreaker(b.event) - sourceTrustTieBreaker(a.event) ||
-        a.event.startsAt.localeCompare(b.event.startsAt),
+        compareStartsAt(a.event.startsAt, b.event.startsAt),
     );
 }

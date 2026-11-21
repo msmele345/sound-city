@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { compareStartsAt } from "@/lib/starts-at";
 import { useMemo } from "react";
 
 import { formatEventDate, formatEventTime } from "./format";
@@ -10,7 +12,7 @@ import type { EventFeedState } from "./types";
 export function NextUp({ feed }: { feed: EventFeedState }) {
   const events = useMemo(
     () =>
-      feed.events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)).slice(0, 5),
+      feed.events.toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt)).slice(0, 5),
     [feed.events],
   );
 

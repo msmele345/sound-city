@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 
+import { compareStartsAt } from "@/lib/starts-at";
+
 import { useEventActions } from "./event-actions";
 import { EventRow } from "./event-row";
 import { formatEventDate } from "./format";
@@ -55,7 +57,7 @@ export function EventDiscoveryFeed({
   const eventActions = useEventActions();
   const events = useMemo(
     () =>
-      feed.events.toSorted((a, b) => a.startsAt.localeCompare(b.startsAt)),
+      feed.events.toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt)),
     [feed.events],
   );
   const styles = useMemo(() => styleFilterOptions(events), [events]);
