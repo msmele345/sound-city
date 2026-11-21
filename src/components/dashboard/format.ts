@@ -37,3 +37,37 @@ export function formatVerifiedDate(lastVerifiedAt: string) {
 export function formatSignalCategory(category: CatalogVenueSignal["category"]) {
   return category.replace("-", " ");
 }
+
+const siteNameByHost: Record<string, string> = {
+  "ra.co": "Resident Advisor",
+  "metrochicago.com": "Metro",
+  "spybarchicago.com": "Spybar",
+  "podlasiechicago.com": "Podlasie",
+};
+
+export function formatSourceDisplayName(title: string) {
+  const stripped = title.replace(/^review source:\s*/i, "").trim();
+  const url = httpUrl(stripped);
+  if (url) {
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const site = siteNameByHost[host] ?? siteNameByHost[host.replace(/^[^.]+\./, "")];
+    return site ?? host;
+  }
+
+  if (/resident advisor/i.test(stripped)) return "Resident Advisor";
+
+  const withoutKind = stripped
+    .replace(/\s+(listing|venue page|about page|artist page|calendar|page)$/i, "")
+    .trim();
+  const chicagoName = withoutKind.match(/^(\S+)\s+chicago\b/i);
+  return chicagoName?.[1] ?? withoutKind;
+}
+
+function httpUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url : null;
+  } catch {
+    return null;
+  }
+}
