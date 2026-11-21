@@ -56,9 +56,11 @@ export function formatSourceDisplayName(title: string) {
 
   if (/resident advisor/i.test(stripped)) return "Resident Advisor";
 
-  const withoutKind = stripped
+  const shortened = stripped
     .replace(/\s+(listing|venue page|about page|artist page|calendar|page)$/i, "")
     .trim();
+  const withoutKind =
+    shortened && shortened.split(/\s+/).length > 1 ? shortened : stripped;
   const chicagoName = withoutKind.match(/^(\S+)\s+chicago\b/i);
   return chicagoName?.[1] ?? withoutKind;
 }

@@ -44,6 +44,11 @@ describe("dashboard formatters", () => {
     }
   });
 
+  it("keeps a meaningful name when a calendar suffix would leave only one word", () => {
+    expect(formatSourceDisplayName("Venue calendar")).toBe("Venue calendar");
+    expect(formatSourceDisplayName("Fixture Warehouse calendar")).toBe("Fixture Warehouse");
+  });
+
   it("strips a review-source prefix and names a raw url by its site", () => {
     expect(formatSourceDisplayName("Review source: https://ra.co/events/2403087")).toBe(
       "Resident Advisor",

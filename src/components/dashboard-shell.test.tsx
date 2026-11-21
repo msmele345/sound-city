@@ -759,7 +759,7 @@ describe("public home", () => {
     expect(eventRow).not.toBeNull();
     expect(within(eventRow!).getByText(/^verified may 15$/i)).toBeInTheDocument();
     expect(
-      within(eventRow!).getByRole("link", { name: /^venue$/i }),
+      within(eventRow!).getByRole("link", { name: /^venue calendar$/i }),
     ).toHaveAttribute("href", "https://example.com/calendar");
     expect(within(eventRow!).queryByText(/confidence/i)).not.toBeInTheDocument();
     expect(within(eventRow!).queryByText(/parser/i)).not.toBeInTheDocument();
