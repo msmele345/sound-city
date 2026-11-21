@@ -156,62 +156,54 @@ export function EventRow({
   if (variant === "feed") {
     return (
       <li
-        className={`grid gap-4 border-b border-rule py-5 sm:grid-cols-[5.5rem_1fr] sm:gap-6${
+        className={`grid grid-cols-1 items-start gap-3 border-b border-rule py-5 sm:grid-cols-[5.5rem_minmax(0,1.5fr)_minmax(7rem,0.8fr)_auto] sm:items-center sm:gap-x-6${
           dismissed ? " opacity-50" : ""
         }`}
       >
-        <div className="font-mono uppercase text-ink-faint">
-          <p className="text-meta tracking-[0.18em]">
-            {formatEventDate(event.startsAt)}
-          </p>
-          <p className="mt-1 text-meta tracking-[0.08em] text-ink">
-            {formatEventTime(event.startsAt)}
-          </p>
-        </div>
-        <div>
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <EventTitle
-              event={event}
-              heading="h3"
-              className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink"
-            />
-            <span className="font-mono text-label uppercase tracking-[0.14em] text-ink-faint">
-              {String(index + 1).padStart(2, "0")}
-            </span>
-          </div>
+        <p className="font-mono text-meta uppercase tracking-[0.08em] text-ink">
+          {formatEventTime(event.startsAt)}
+        </p>
+        <div className="min-w-0">
+          <EventTitle
+            event={event}
+            heading="h3"
+            className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink"
+          />
           <p className="mt-2 font-mono text-meta uppercase tracking-[0.12em] text-ink-dim">
             {event.venue.name}
             <span className="text-ink-faint"> / </span>
             {event.venue.neighborhood}
           </p>
-          <p className="mt-3 text-body text-ink-dim">
-            {event.artists.map((artist) => artist.name).join(", ")}
-          </p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-meta uppercase tracking-[0.14em]">
-            <span className="text-ink-faint">{event.styles.join(" / ")}</span>
-          </div>
+          {event.artists.length > 0 ? (
+            <p className="mt-2 text-body text-ink-dim">
+              {event.artists.map((artist) => artist.name).join(", ")}
+            </p>
+          ) : null}
           <SourceTrustLine source={event.source} />
-          <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
-              {saved ? "Saved" : "Save"}
+        </div>
+        <p className="font-mono text-meta uppercase tracking-[0.14em] text-ink-faint">
+          {event.styles.join(" / ")}
+        </p>
+        <div className="flex max-w-full flex-col items-start gap-2 sm:items-end">
+          <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
+            {saved ? "Saved" : "Save"}
+          </Button>
+          {dismissed ? (
+            <Button variant="quiet" onClick={onRestore}>
+              Restore
             </Button>
-            {dismissed ? (
-              <Button variant="quiet" onClick={onRestore}>
-                Restore
-              </Button>
-            ) : (
-              <Button variant="quiet" onClick={onDismiss}>
-                Dismiss
-              </Button>
-            )}
-            <Button
-              variant={attended ? "pressed" : "quiet"}
-              aria-pressed={attended}
-              onClick={onAttend}
-            >
-              Attended
+          ) : (
+            <Button variant="quiet" onClick={onDismiss}>
+              Dismiss
             </Button>
-          </div>
+          )}
+          <Button
+            variant={attended ? "pressed" : "quiet"}
+            aria-pressed={attended}
+            onClick={onAttend}
+          >
+            Attended
+          </Button>
         </div>
       </li>
     );
