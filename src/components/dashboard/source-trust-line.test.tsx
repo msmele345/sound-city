@@ -9,6 +9,14 @@ const source = {
 };
 
 describe("source trust line", () => {
+  it("shows the verified year when it is not the current year", () => {
+    render(
+      <SourceTrustLine source={{ ...source, lastVerifiedAt: "2024-05-15" }} />,
+    );
+
+    expect(screen.getByText(/^verified may 15, 2024$/i)).toBeInTheDocument();
+  });
+
   it("does not render an unnamed link for a blank title", () => {
     const { rerender } = render(
       <SourceTrustLine

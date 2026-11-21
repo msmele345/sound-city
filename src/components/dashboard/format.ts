@@ -34,6 +34,13 @@ export function formatVerifiedDate(lastVerifiedAt: string) {
   }).format(date);
 }
 
+export function formatVerifiedTrustDate(lastVerifiedAt: string, now = new Date()) {
+  const formatted = formatVerifiedDate(lastVerifiedAt);
+  const year = Number(formatted.match(/, (\d{4})$/)?.[1]);
+  if (year === now.getFullYear()) return formatted.replace(/, \d{4}$/, "");
+  return formatted;
+}
+
 export function formatSignalCategory(category: CatalogVenueSignal["category"]) {
   return category.replace("-", " ");
 }

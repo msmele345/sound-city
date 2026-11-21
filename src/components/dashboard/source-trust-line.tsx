@@ -1,10 +1,10 @@
 import { isHttpUrl } from "@/lib/http-url";
 
-import { formatSourceDisplayName, formatVerifiedDate } from "./format";
+import { formatSourceDisplayName, formatVerifiedTrustDate } from "./format";
 import type { CatalogSource } from "./types";
 
 export function SourceTrustLine({ source }: { source: CatalogSource }) {
-  const verifiedOn = formatVerifiedDate(source.lastVerifiedAt).replace(/, \d{4}$/, "");
+  const verifiedOn = formatVerifiedTrustDate(source.lastVerifiedAt);
   const sourceName = formatSourceDisplayName(source.title, source.url);
 
   return (

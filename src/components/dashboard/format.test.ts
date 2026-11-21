@@ -6,6 +6,7 @@ import {
   formatSignalCategory,
   formatSourceDisplayName,
   formatVerifiedDate,
+  formatVerifiedTrustDate,
 } from "./format";
 
 describe("dashboard formatters", () => {
@@ -21,6 +22,12 @@ describe("dashboard formatters", () => {
 
   it("formats a date-only verified timestamp as that calendar day", () => {
     expect(formatVerifiedDate("2026-05-15")).toBe("May 15, 2026");
+  });
+
+  it("drops the verified year only when it is the current year", () => {
+    const now = new Date(2026, 10, 21);
+    expect(formatVerifiedTrustDate("2026-05-15", now)).toBe("May 15");
+    expect(formatVerifiedTrustDate("2024-05-15", now)).toBe("May 15, 2024");
   });
 
   it("shows a short site name for the source titles in the catalog", () => {
