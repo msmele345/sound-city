@@ -66,9 +66,10 @@ describe("Events route", () => {
     expect(within(eventRow!).getByText(/wrigleyville/i)).toBeInTheDocument();
     expect(within(eventRow!).getAllByText(/posthuman/i)).toHaveLength(2);
     expect(within(eventRow!).getByText(/techno \/ house/i)).toBeInTheDocument();
-    expect(
-      within(eventRow!).getByRole("link", { name: /resident advisor listing/i }),
-    ).toHaveAttribute("href", "https://ra.co/events/2412925");
+    expect(within(eventRow!).getByText(/^verified may 15$/i)).toBeInTheDocument();
+    const source = within(eventRow!).getByRole("link", { name: /^resident advisor$/i });
+    expect(source).toHaveAttribute("href", "https://ra.co/events/2412925");
+    expect(source).toHaveAccessibleName("Resident Advisor");
   });
 
   it("opens a linked style filter from the url", async () => {
