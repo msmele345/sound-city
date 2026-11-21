@@ -216,7 +216,7 @@ function NavLinks({ activeStyle }: { activeStyle: string }) {
               </span>{" "}
               {item.label}
               {item.href === "/saved" ? (
-                <span aria-live="polite"> {savedCount}</span>
+                <span> {savedCount}</span>
               ) : null}
             </Link>
           );

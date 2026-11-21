@@ -483,6 +483,9 @@ describe("Events route", () => {
     await user.click(within(row!).getByRole("button", { name: /^save$/i }));
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent("Saved Lemtom at Spybar");
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+    expect(nav.querySelector("[aria-live]")).toBeNull();
+    expect(screen.getAllByRole("status")).toHaveLength(1);
 
     await user.click(within(row!).getByRole("button", { name: /^saved$/i }));
     expect(status).toHaveTextContent("Removed Lemtom at Spybar");
