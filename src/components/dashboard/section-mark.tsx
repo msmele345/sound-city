@@ -17,7 +17,7 @@ export function SectionMark({
       >
         {title}
       </h2>
-      <span className="max-w-full shrink-0 font-mono text-[0.7rem] uppercase tracking-[0.18em] text-ink-faint">
+      <span className="max-w-full shrink-0 font-mono text-label uppercase tracking-[0.18em] text-ink-faint">
         {index}
       </span>
     </div>

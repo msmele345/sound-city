@@ -757,9 +757,9 @@ describe("public home", () => {
     });
     const eventRow = eventHeading.closest("li");
     expect(eventRow).not.toBeNull();
-    expect(within(eventRow!).getByText(/verified may 15, 2026/i)).toBeInTheDocument();
+    expect(within(eventRow!).getByText(/^verified may 15$/i)).toBeInTheDocument();
     expect(
-      within(eventRow!).getByRole("link", { name: /venue calendar/i }),
+      within(eventRow!).getByRole("link", { name: /^venue$/i }),
     ).toHaveAttribute("href", "https://example.com/calendar");
     expect(within(eventRow!).queryByText(/confidence/i)).not.toBeInTheDocument();
     expect(within(eventRow!).queryByText(/parser/i)).not.toBeInTheDocument();
@@ -887,7 +887,7 @@ describe("public home", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(showcase).getByRole("link", { name: /family matters listing/i }),
+      within(showcase).getByRole("link", { name: /^family matters$/i }),
     ).toHaveAttribute("href", "https://example.com/event");
     expect(
       screen.queryByRole("region", { name: /venue signals/i }),

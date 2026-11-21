@@ -26,7 +26,7 @@ export function TasteProfilePanel({
   return (
     <div className="mt-5 min-w-0 max-w-[calc(100vw-2.5rem)] sm:max-w-none">
       <div className="flex items-start justify-between gap-4 border-y border-rule py-3">
-        <p className="min-w-0 font-mono text-xs uppercase leading-relaxed tracking-[0.12em] text-ink">
+        <p className="min-w-0 font-mono text-meta uppercase leading-relaxed tracking-[0.12em] text-ink">
           <span className="sr-only">Taste profile. </span>
           <span>{tasteSummary(profile)}</span>
         </p>

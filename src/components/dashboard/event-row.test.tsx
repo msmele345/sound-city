@@ -43,6 +43,30 @@ function expectSourceTitleLink() {
 }
 
 describe("event row", () => {
+  it("shows the match score as a percentage and keeps the spoken text", () => {
+    renderRow("recommendation");
+    expect(screen.getByText("80% match")).toBeInTheDocument();
+    expect(screen.getByText("Match 80 percent")).toBeInTheDocument();
+    expect(screen.queryByText("0.80")).not.toBeInTheDocument();
+  });
+
+  it("does not link a title when the source url is not http or https", () => {
+    render(
+      <ol>
+        <EventRow
+          event={{
+            ...event,
+            source: { ...event.source, url: "javascript:alert(1)" },
+          }}
+          variant="feed"
+        />
+      </ol>,
+    );
+
+    expect(screen.queryByRole("link", { name: /^lemtom$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^lemtom$/i })).toBeInTheDocument();
+  });
+
   it("links a recommendation title to the source page in a new tab", () => {
     renderRow("recommendation");
     expectSourceTitleLink();

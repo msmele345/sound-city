@@ -6,7 +6,7 @@ export default function EventsPage() {
   return (
     <Suspense
       fallback={
-        <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+        <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
           Loading Chicago event feed
         </p>
       }
