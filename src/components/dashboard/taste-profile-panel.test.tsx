@@ -9,6 +9,7 @@ import {
 } from "@/lib/recommendations";
 
 import { RecommendedEvents } from "./recommended-events";
+import { tasteSummary } from "./taste-profile-controls";
 import type { CatalogEvent } from "./types";
 import { usePersonalization } from "./use-personalization";
 
@@ -39,7 +40,10 @@ function renderQueue(profile: TasteProfile = defaultTasteProfile) {
         profile={current}
         actions={defaultRecommendationActions}
         onProfileChange={setCurrent}
-        onActionsChange={() => undefined}
+        onReset={() => setCurrent(defaultTasteProfile)}
+        onToggleSaved={() => undefined}
+        onDismiss={() => undefined}
+        onAttend={() => undefined}
       />
     );
   }
@@ -48,14 +52,25 @@ function renderQueue(profile: TasteProfile = defaultTasteProfile) {
 }
 
 function StoredQueue() {
-  const { profile, actions, setProfile, setActions } = usePersonalization();
+  const {
+    profile,
+    actions,
+    setProfile,
+    resetProfile,
+    toggleSaved,
+    dismiss,
+    toggleAttended,
+  } = usePersonalization();
   return (
     <RecommendedEvents
       feed={{ status: "ready", events: [event] }}
       profile={profile}
       actions={actions}
       onProfileChange={setProfile}
-      onActionsChange={setActions}
+      onReset={resetProfile}
+      onToggleSaved={toggleSaved}
+      onDismiss={(event) => dismiss(event.id)}
+      onAttend={toggleAttended}
     />
   );
 }
@@ -65,6 +80,71 @@ beforeEach(() => {
 });
 
 describe("taste profile panel", () => {
+  it("skips empty parts of the taste summary", () => {
+    expect(
+      tasteSummary({ ...defaultTasteProfile, styles: [] }),
+    ).toBe("Raw · Small room · Late · Discovery 4");
+  });
+
+  it("checks a default style when saved styles are empty", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "sound-city.local-profile.v1",
+      JSON.stringify({ profile: { styles: [] } }),
+    );
+    render(<StoredQueue />);
+
+    expect(
+      screen.getByText("house, techno · Raw · Small room · Late · Discovery 4"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(screen.getByRole("checkbox", { name: /^house$/i })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /^techno$/i })).toBeChecked();
+  });
+
+  it("checks a default style when every saved style is invalid", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "sound-city.local-profile.v1",
+      JSON.stringify({ profile: { styles: ["not-a-style"] } }),
+    );
+    render(<StoredQueue />);
+
+    expect(
+      screen.getByText("house, techno · Raw · Small room · Late · Discovery 4"),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(screen.getByRole("checkbox", { name: /^house$/i })).toBeChecked();
+  });
+
+  it("selects the default option when a saved vibe, venue size, or start time is unknown", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      "sound-city.local-profile.v1",
+      JSON.stringify({
+        profile: { vibe: "nope", venueSize: "ballroom", startTime: "noon" },
+      }),
+    );
+    render(<StoredQueue />);
+
+    expect(
+      screen.getByText("house, techno · Raw · Small room · Late · Discovery 4"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/nope/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/ballroom/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^noon$/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^tune$/i }));
+
+    expect(screen.getByRole("radio", { name: /^raw$/i })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /small room/i })).toBeChecked();
+    expect(screen.getByRole("radio", { name: /^late$/i })).toBeChecked();
+  });
+
   it("summarizes styles, vibe, venue size, start time, and discovery level above the recommendations", async () => {
     const user = userEvent.setup();
     renderQueue();

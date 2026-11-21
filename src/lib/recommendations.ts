@@ -20,10 +20,21 @@ export type TasteProfile = {
   discoveryLevel: number;
 };
 
+export type EventSnapshot = {
+  id: string;
+  title: string;
+  startsAt: string;
+  venueName: string;
+  neighborhood: string;
+  sourceUrl: string;
+};
+
 export type RecommendationActions = {
   savedEventIds: string[];
   dismissedEventIds: string[];
   attendedEventIds: string[];
+  savedSnapshots?: EventSnapshot[];
+  attendedSnapshots?: EventSnapshot[];
 };
 
 export type RecommendationEvent = {

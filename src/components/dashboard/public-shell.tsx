@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, type ReactNode } from "react";
 
+import { Button } from "./button";
 import { CatalogProvider, useCatalogData } from "./catalog-context";
-import { PersonalizationProvider } from "./personalization-context";
+import {
+  PersonalizationProvider,
+  usePersonalizationData,
+} from "./personalization-context";
 import { StyleFilterProvider, useStyleFilter } from "./style-filter-context";
 
 const nav = [
@@ -13,6 +17,7 @@ const nav = [
   { label: "Events", href: "/events" },
   { label: "Artists", href: "/artists" },
   { label: "Venues", href: "/venues" },
+  { label: "Saved", href: "/saved" },
 ];
 
 function catalogCounts(
@@ -128,6 +133,36 @@ function CompactMasthead() {
   );
 }
 
+function ActionStatus() {
+  const pathname = usePathname();
+  const { notice, clearNotice } = usePersonalizationData();
+  const seenPath = useRef(pathname);
+
+  useEffect(() => {
+    if (seenPath.current === pathname) return;
+    seenPath.current = pathname;
+    clearNotice();
+  }, [clearNotice, pathname]);
+
+  return (
+    <div
+      role="status"
+      className="font-mono text-xs uppercase tracking-[0.14em] text-ink"
+    >
+      {notice ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule py-3">
+          <p>{notice.message}</p>
+          {notice.undo ? (
+            <Button variant="quiet" onClick={notice.undo}>
+              Undo
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function isCurrentPath(pathname: string, href: string) {
   const path = href.split("?")[0] ?? href;
   if (!path || path.startsWith("#")) {
@@ -152,6 +187,8 @@ function hrefWithStyle(href: string, activeStyle: string) {
 
 function NavLinks({ activeStyle }: { activeStyle: string }) {
   const pathname = usePathname();
+  const { actions } = usePersonalizationData();
+  const savedCount = String(actions.savedEventIds.length).padStart(2, "0");
 
   return (
     <nav
@@ -178,6 +215,9 @@ function NavLinks({ activeStyle }: { activeStyle: string }) {
                 {String(i + 1).padStart(2, "0")}
               </span>{" "}
               {item.label}
+              {item.href === "/saved" ? (
+                <span aria-live="polite"> {savedCount}</span>
+              ) : null}
             </Link>
           );
         })}
@@ -205,6 +245,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
               <StyleAwareNav />
             </StyleFilterProvider>
           </Suspense>
+
+          <ActionStatus />
 
           <main className="mt-10 min-w-0">
             <Suspense

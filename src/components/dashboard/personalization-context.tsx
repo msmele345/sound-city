@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 
+import { useCatalogData } from "./catalog-context";
 import { usePersonalization } from "./use-personalization";
 
 type PersonalizationValue = ReturnType<typeof usePersonalization>;
@@ -9,7 +10,10 @@ type PersonalizationValue = ReturnType<typeof usePersonalization>;
 const PersonalizationContext = createContext<PersonalizationValue | null>(null);
 
 export function PersonalizationProvider({ children }: { children: ReactNode }) {
-  const personalization = usePersonalization();
+  const { feed } = useCatalogData();
+  const personalization = usePersonalization(
+    feed.status === "ready" ? feed.events : undefined,
+  );
   return (
     <PersonalizationContext.Provider value={personalization}>
       {children}

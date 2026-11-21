@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  defaultTasteProfile,
   type StartTimePreference,
   type TasteProfile,
   type TasteStyle,
@@ -53,15 +52,20 @@ export function tasteSummary(profile: TasteProfile) {
     optionLabel(venueSizeOptions, profile.venueSize),
     optionLabel(startTimeOptions, profile.startTime),
     `Discovery ${profile.discoveryLevel}`,
-  ].join(" · ");
+  ]
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .join(" · ");
 }
 
 export function TasteProfileControls({
   profile,
   onProfileChange,
+  onReset,
 }: {
   profile: TasteProfile;
   onProfileChange(profile: TasteProfile): void;
+  onReset(): void;
 }) {
   function toggleStyle(style: TasteStyle) {
     const styles = profile.styles.includes(style)
@@ -158,9 +162,7 @@ export function TasteProfileControls({
       </div>
 
       <div className="mt-4">
-        <Button onClick={() => onProfileChange(defaultTasteProfile)}>
-          Reset to defaults
-        </Button>
+        <Button onClick={onReset}>Reset to defaults</Button>
       </div>
     </div>
   );
