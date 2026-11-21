@@ -9,6 +9,29 @@ const source = {
 };
 
 describe("source trust line", () => {
+  it("does not render an unnamed link for a blank title", () => {
+    const { rerender } = render(
+      <SourceTrustLine
+        source={{ ...source, title: "   ", url: "https://www.example.com/events/1" }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "example.com" })).toHaveAttribute(
+      "href",
+      "https://www.example.com/events/1",
+    );
+    expect(screen.queryByRole("link", { name: /^$/ })).not.toBeInTheDocument();
+
+    rerender(
+      <SourceTrustLine
+        source={{ ...source, title: "   ", url: "javascript:alert(1)" }}
+      />,
+    );
+
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(screen.getByText(/^verified may 15$/i)).toBeInTheDocument();
+  });
+
   it("renders a non-http source name as text", () => {
     render(
       <SourceTrustLine

@@ -45,14 +45,11 @@ const siteNameByHost: Record<string, string> = {
   "podlasiechicago.com": "Podlasie",
 };
 
-export function formatSourceDisplayName(title: string) {
+export function formatSourceDisplayName(title: string, sourceUrl = "") {
   const stripped = title.replace(/^review source:\s*/i, "").trim();
   const url = httpUrl(stripped);
-  if (url) {
-    const host = url.hostname.toLowerCase().replace(/^www\./, "");
-    const site = siteNameByHost[host] ?? siteNameByHost[host.replace(/^[^.]+\./, "")];
-    return site ?? host;
-  }
+  if (url) return siteName(url);
+  if (!stripped) return siteName(httpUrl(sourceUrl));
 
   if (/resident advisor/i.test(stripped)) return "Resident Advisor";
 
@@ -65,6 +62,12 @@ export function formatSourceDisplayName(title: string) {
   const named = withoutCity || withoutKind;
   const chicagoName = named.match(/^(\S+)\s+chicago\b/i);
   return chicagoName?.[1] ?? named;
+}
+
+function siteName(url: URL | null) {
+  if (!url) return "";
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  return siteNameByHost[host] ?? siteNameByHost[host.replace(/^[^.]+\./, "")] ?? host;
 }
 
 function httpUrl(value: string) {

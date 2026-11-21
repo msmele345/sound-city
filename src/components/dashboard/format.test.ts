@@ -44,6 +44,14 @@ describe("dashboard formatters", () => {
     }
   });
 
+  it("names a blank title from its site, or nothing when the url is unusable", () => {
+    expect(formatSourceDisplayName("   ", "https://www.example.com/events/1")).toBe(
+      "example.com",
+    );
+    expect(formatSourceDisplayName("  ", "javascript:alert(1)")).toBe("");
+    expect(formatSourceDisplayName("")).toBe("");
+  });
+
   it("drops a trailing city the way other source names lose Chicago", () => {
     expect(formatSourceDisplayName("Smart Bar Chicago")).toBe("Smart Bar");
     expect(formatSourceDisplayName("Spybar Chicago about page")).toBe("Spybar");
