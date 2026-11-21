@@ -61,8 +61,10 @@ export function formatSourceDisplayName(title: string) {
     .trim();
   const withoutKind =
     shortened && shortened.split(/\s+/).length > 1 ? shortened : stripped;
-  const chicagoName = withoutKind.match(/^(\S+)\s+chicago\b/i);
-  return chicagoName?.[1] ?? withoutKind;
+  const withoutCity = withoutKind.replace(/\s+chicago$/i, "").trim();
+  const named = withoutCity || withoutKind;
+  const chicagoName = named.match(/^(\S+)\s+chicago\b/i);
+  return chicagoName?.[1] ?? named;
 }
 
 function httpUrl(value: string) {

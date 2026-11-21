@@ -44,6 +44,11 @@ describe("dashboard formatters", () => {
     }
   });
 
+  it("drops a trailing city the way other source names lose Chicago", () => {
+    expect(formatSourceDisplayName("Smart Bar Chicago")).toBe("Smart Bar");
+    expect(formatSourceDisplayName("Spybar Chicago about page")).toBe("Spybar");
+  });
+
   it("keeps a meaningful name when a calendar suffix would leave only one word", () => {
     expect(formatSourceDisplayName("Venue calendar")).toBe("Venue calendar");
     expect(formatSourceDisplayName("Fixture Warehouse calendar")).toBe("Fixture Warehouse");
