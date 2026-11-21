@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { isUpcomingPublicStart } from "@/server/catalog/public-events";
+import { isUpcomingPublicStart } from "@/lib/public-events";
 import type { EventSnapshot } from "@/lib/recommendations";
 
 import { Button } from "./button";
