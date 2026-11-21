@@ -1,5 +1,6 @@
 export function compareStartsAt(a: string, b: string) {
-  return instant(a) - instant(b);
+  const delta = instant(a) - instant(b);
+  return Number.isNaN(delta) ? 0 : delta;
 }
 
 function instant(value: string) {
