@@ -53,9 +53,11 @@ export function SavedView() {
     .filter((snapshot) => !isUpcomingPublicStart(snapshot.startsAt, now, chicago))
     .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt));
   const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.id));
-  const unavailableIds = eventActions.actions.savedEventIds.filter(
+  const idsWithoutSnapshots = eventActions.actions.savedEventIds.filter(
     (id) => !snapshotIds.has(id),
   );
+  const feedReady = feed.status !== "loading";
+  const unavailableIds = feedReady ? idsWithoutSnapshots : [];
   const dismissed =
     feed.status === "ready"
       ? feed.events
@@ -70,7 +72,10 @@ export function SavedView() {
   return (
     <section id="saved" aria-labelledby="saved-heading" className="min-w-0 scroll-mt-6">
       <SectionMark id="saved-heading" title="Saved" index="Kept / 05" />
-      {upcoming.length === 0 && past.length === 0 && unavailableIds.length === 0 ? (
+      {upcoming.length === 0 &&
+      past.length === 0 &&
+      unavailableIds.length === 0 &&
+      idsWithoutSnapshots.length === 0 ? (
         <EmptyList>Nothing saved yet.</EmptyList>
       ) : null}
       {upcoming.length > 0 ? (

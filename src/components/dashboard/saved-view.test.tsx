@@ -73,6 +73,35 @@ describe("Saved route", () => {
     expect(savedLink).toHaveTextContent("01");
   });
 
+  it("does not call an id-only save unavailable before the feed has loaded", async () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_may_2026"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+        },
+      }),
+    );
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+    const savedLink = within(nav).getByRole("link", { name: /saved/i });
+    expect(await within(savedLink).findByText("01")).toBeInTheDocument();
+    const saved = screen.getByRole("region", { name: /^saved$/i });
+    expect(
+      within(saved).queryByRole("heading", { name: /event details unavailable/i }),
+    ).not.toBeInTheDocument();
+    expect(within(saved).queryByText(/nothing saved yet/i)).not.toBeInTheDocument();
+  });
+
   it("shows an id-only save that is not in the feed and removes it", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
