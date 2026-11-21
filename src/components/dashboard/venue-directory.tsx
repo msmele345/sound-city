@@ -143,7 +143,7 @@ export function VenueDirectory({
                     <dt className="uppercase tracking-[0.16em] text-ink-faint">
                       {formatSignalCategory(signal.category)}
                     </dt>
-                    <dd className="text-body uppercase tracking-[0.05em] text-ink-dim">
+                    <dd className="font-sans text-body normal-case tracking-normal text-ink-dim">
                       {signal.value}
                     </dd>
                   </div>
@@ -157,7 +157,7 @@ export function VenueDirectory({
               href={venue.source.url}
               target="_blank"
               rel="noreferrer"
-              className="mt-4 inline-flex font-mono text-meta uppercase tracking-[0.14em] text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
+              className="mt-4 inline-flex font-sans text-body text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
             >
               {venue.source.title}
             </a>
