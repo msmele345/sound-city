@@ -47,6 +47,17 @@ const vibeValues = ["raw", "deep", "melodic", "high-energy"] as const;
 const venueSizeValues = ["small-room", "midsize-club", "warehouse"] as const;
 const startTimeValues = ["early", "late", "after-hours"] as const;
 
+const discoveryMin = 1;
+const discoveryMax = 5;
+
+function readDiscoveryLevel(value: unknown) {
+  const level = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(level) || level < discoveryMin || level > discoveryMax) {
+    return defaultTasteProfile.discoveryLevel;
+  }
+  return Math.round(level);
+}
+
 function knownChoice<T extends string>(
   value: unknown,
   allowed: readonly T[],
@@ -101,7 +112,7 @@ function readLocalPersonalization(): LocalPersonalization {
           startTimeValues,
           defaultTasteProfile.startTime,
         ),
-        discoveryLevel: Number(parsed.profile?.discoveryLevel ?? 4),
+        discoveryLevel: readDiscoveryLevel(parsed.profile?.discoveryLevel),
       },
       actions: readActions(parsed.actions),
     };

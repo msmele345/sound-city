@@ -146,6 +146,54 @@ describe("usePersonalization", () => {
     );
   });
 
+  it("falls back to the default discovery level when the saved value is junk or out of range", () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ profile: { discoveryLevel: "nope" } }),
+    );
+    expect(renderHook(() => usePersonalization()).result.current.profile.discoveryLevel).toBe(
+      4,
+    );
+
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ profile: { discoveryLevel: 0 } }),
+    );
+    expect(renderHook(() => usePersonalization()).result.current.profile.discoveryLevel).toBe(
+      4,
+    );
+
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ profile: { discoveryLevel: 9 } }),
+    );
+    expect(renderHook(() => usePersonalization()).result.current.profile.discoveryLevel).toBe(
+      4,
+    );
+  });
+
+  it("keeps a saved discovery level that is on the slider", () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ profile: { discoveryLevel: 2 } }),
+    );
+
+    expect(renderHook(() => usePersonalization()).result.current.profile.discoveryLevel).toBe(
+      2,
+    );
+  });
+
+  it("rounds an in-range discovery level to the nearest slider step", () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({ profile: { discoveryLevel: 2.6 } }),
+    );
+
+    expect(renderHook(() => usePersonalization()).result.current.profile.discoveryLevel).toBe(
+      3,
+    );
+  });
+
   it("falls back to the default vibe, venue size, and start time when a saved value is unknown", () => {
     window.localStorage.setItem(
       storageKey,
