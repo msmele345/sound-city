@@ -75,18 +75,18 @@ export function EventRow({
               heading="h3"
               className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink sm:text-3xl"
             />
-            <p className="font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+            <p className="font-mono text-meta uppercase tracking-[0.12em] text-ink-dim">
               {formatEventDate(event.startsAt)}
               <span className="text-ink-faint"> &middot; </span>
               {formatEventTime(event.startsAt)}
             </p>
           </div>
-          <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-ink-dim">
+          <p className="mt-2 font-mono text-meta uppercase tracking-[0.12em] text-ink-dim">
             {event.venue.name}
             <span className="text-ink-faint"> / </span>
             {event.venue.neighborhood}
           </p>
-          <p className="mt-3 max-w-xl text-[0.95rem] leading-relaxed text-ink-dim">
+          <p className="mt-3 max-w-xl text-body text-ink-dim">
             {reason}
           </p>
           <SourceTrustLine source={event.source} />
@@ -119,7 +119,7 @@ export function EventRow({
           heading="h3"
           className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink"
         />
-        <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-ink-dim">
+        <p className="mt-2 font-mono text-meta uppercase tracking-[0.12em] text-ink-dim">
           {formatEventDate(event.startsAt)}
           <span className="text-ink-faint"> / </span>
           {formatEventTime(event.startsAt)}
@@ -161,10 +161,10 @@ export function EventRow({
         }`}
       >
         <div className="font-mono uppercase text-ink-faint">
-          <p className="text-xs tracking-[0.18em]">
+          <p className="text-meta tracking-[0.18em]">
             {formatEventDate(event.startsAt)}
           </p>
-          <p className="mt-1 text-sm tracking-[0.08em] text-ink">
+          <p className="mt-1 text-meta tracking-[0.08em] text-ink">
             {formatEventTime(event.startsAt)}
           </p>
         </div>
@@ -175,19 +175,19 @@ export function EventRow({
               heading="h3"
               className="min-w-0 break-words font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink"
             />
-            <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
+            <span className="font-mono text-label uppercase tracking-[0.14em] text-ink-faint">
               {String(index + 1).padStart(2, "0")}
             </span>
           </div>
-          <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-ink-dim">
+          <p className="mt-2 font-mono text-meta uppercase tracking-[0.12em] text-ink-dim">
             {event.venue.name}
             <span className="text-ink-faint"> / </span>
             {event.venue.neighborhood}
           </p>
-          <p className="mt-3 text-sm leading-relaxed text-ink-dim">
+          <p className="mt-3 text-body text-ink-dim">
             {event.artists.map((artist) => artist.name).join(", ")}
           </p>
-          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.14em]">
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-meta uppercase tracking-[0.14em]">
             <span className="text-ink-faint">{event.styles.join(" / ")}</span>
           </div>
           <SourceTrustLine source={event.source} />
@@ -226,7 +226,7 @@ export function EventRow({
         heading={Heading}
         className="font-display text-xl uppercase leading-none text-ink"
       />
-      <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
+      <p className="mt-2 font-mono text-meta uppercase tracking-[0.13em] text-ink-faint">
         {formatEventDate(event.startsAt)}
         <span className="text-ink-faint"> / </span>
         {formatEventTime(event.startsAt)}

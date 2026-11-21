@@ -3,7 +3,7 @@ import type { CatalogSource } from "./types";
 
 export function SourceTrustLine({ source }: { source: CatalogSource }) {
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-[0.7rem] uppercase tracking-[0.14em]">
+    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-meta uppercase tracking-[0.14em]">
       <span className="text-ink-faint">
         Verified {formatVerifiedDate(source.lastVerifiedAt)}
       </span>

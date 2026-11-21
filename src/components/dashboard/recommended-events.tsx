@@ -46,15 +46,15 @@ export function RecommendedEvents({
       />
 
       {feed.status === "loading" ? (
-        <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+        <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
           Loading recommendation queue
         </p>
       ) : feed.status === "error" ? (
-        <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        <p className="border-b border-rule py-5 text-body text-ink-dim">
           Recommendation queue is unavailable until the event feed returns.
         </p>
       ) : recommendations.length === 0 ? (
-        <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        <p className="border-b border-rule py-5 text-body text-ink-dim">
           No recommendations remain in the local queue.
         </p>
       ) : (

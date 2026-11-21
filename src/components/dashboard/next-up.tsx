@@ -22,15 +22,15 @@ export function NextUp({ feed }: { feed: EventFeedState }) {
     >
       <SectionMark id="next-up-heading" title="Next up" index="Feed / 03" />
       {feed.status === "loading" ? (
-        <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+        <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
           Loading next events
         </p>
       ) : feed.status === "error" ? (
-        <p role="alert" className="border-b border-rule py-5 text-sm text-ink-dim">
+        <p role="alert" className="border-b border-rule py-5 text-body text-ink-dim">
           Event feed is unavailable. Source-verified listings will return here.
         </p>
       ) : events.length === 0 ? (
-        <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        <p className="border-b border-rule py-5 text-body text-ink-dim">
           No upcoming Chicago events are verified yet.
         </p>
       ) : (
@@ -40,7 +40,7 @@ export function NextUp({ feed }: { feed: EventFeedState }) {
               <h3 className="font-display text-2xl uppercase leading-none text-ink">
                 {event.title}
               </h3>
-              <p className="mt-2 font-mono text-xs uppercase tracking-[0.12em] text-ink-dim">
+              <p className="mt-2 font-mono text-meta uppercase tracking-[0.12em] text-ink-dim">
                 {formatEventDate(event.startsAt)}
                 <span className="text-ink-faint"> / </span>
                 {formatEventTime(event.startsAt)}
@@ -55,7 +55,7 @@ export function NextUp({ feed }: { feed: EventFeedState }) {
       )}
       <Link
         href="/events"
-        className="mt-4 inline-flex font-mono text-xs uppercase tracking-[0.16em] text-signal transition-colors duration-150 hover:text-ink"
+        className="mt-4 inline-flex font-mono text-label uppercase tracking-[0.16em] text-signal transition-colors duration-150 hover:text-ink"
       >
         All events
       </Link>

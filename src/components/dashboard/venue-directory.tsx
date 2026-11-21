@@ -24,20 +24,20 @@ function VenueUpcoming({
 
   return (
     <div className="mt-4 border-t border-rule pt-4">
-      <h4 className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">
+      <h4 className="font-mono text-label uppercase tracking-[0.18em] text-ink-faint">
         Upcoming events
       </h4>
       {feedStatus === "loading" ? (
-        <p className="mt-3 text-sm text-ink-dim">
+        <p className="mt-3 text-body text-ink-dim">
           Waiting on verified event feed.
         </p>
       ) : !next ? (
-        <p className="mt-3 text-sm text-ink-dim">
+        <p className="mt-3 text-body text-ink-dim">
           No upcoming events are attached to this venue yet.
         </p>
       ) : (
         <>
-          <p className="mt-3 font-mono text-xs uppercase tracking-[0.14em] text-ink-dim">
+          <p className="mt-3 font-mono text-meta uppercase tracking-[0.14em] text-ink-dim">
             {sorted.length} upcoming
           </p>
           <ol className="mt-2">
@@ -76,7 +76,7 @@ export function VenueDirectory({
 }) {
   if (directory.status === "loading") {
     return (
-      <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
         Loading venue directory
       </p>
     );
@@ -84,7 +84,7 @@ export function VenueDirectory({
 
   if (directory.status === "error") {
     return (
-      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+      <p className="border-b border-rule py-5 text-body text-ink-dim">
         Venue signals are unavailable. Curated room context will return here.
       </p>
     );
@@ -92,7 +92,7 @@ export function VenueDirectory({
 
   if (directory.venues.length === 0) {
     return (
-      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+      <p className="border-b border-rule py-5 text-body text-ink-dim">
         No Chicago venues are verified yet.
       </p>
     );
@@ -116,11 +116,11 @@ export function VenueDirectory({
               <h3 className="font-display text-3xl uppercase leading-none text-ink">
                 {venue.name}
               </h3>
-              <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
+              <span className="font-mono text-label uppercase tracking-[0.14em] text-ink-faint">
                 {String(i + 1).padStart(2, "0")}
               </span>
             </div>
-            <p className="mt-2 font-mono text-[0.68rem] uppercase tracking-[0.13em] text-ink-faint">
+            <p className="mt-2 font-mono text-meta uppercase tracking-[0.13em] text-ink-faint">
               {venue.neighborhood}
               {venue.capacity ? (
                 <>
@@ -129,7 +129,7 @@ export function VenueDirectory({
                 </>
               ) : null}
             </p>
-            <p className="mt-3 text-sm leading-relaxed text-ink-dim">
+            <p className="mt-3 text-body text-ink-dim">
               {venue.address}
             </p>
 
@@ -138,12 +138,12 @@ export function VenueDirectory({
                 {venue.signals.map((signal) => (
                   <div
                     key={signal.id}
-                    className="grid gap-2 border-t border-rule py-3 font-mono text-xs sm:grid-cols-[5rem_1fr]"
+                    className="grid gap-2 border-t border-rule py-3 font-mono text-meta sm:grid-cols-[5rem_1fr]"
                   >
                     <dt className="uppercase tracking-[0.16em] text-ink-faint">
                       {formatSignalCategory(signal.category)}
                     </dt>
-                    <dd className="uppercase tracking-[0.05em] text-ink-dim">
+                    <dd className="text-body uppercase tracking-[0.05em] text-ink-dim">
                       {signal.value}
                     </dd>
                   </div>
@@ -157,7 +157,7 @@ export function VenueDirectory({
               href={venue.source.url}
               target="_blank"
               rel="noreferrer"
-              className="mt-4 inline-flex font-mono text-[0.68rem] uppercase tracking-[0.14em] text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
+              className="mt-4 inline-flex font-mono text-meta uppercase tracking-[0.14em] text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
             >
               {venue.source.title}
             </a>

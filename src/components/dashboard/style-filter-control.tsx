@@ -24,7 +24,7 @@ export function StyleFilterControl({
     <div
       role="group"
       aria-label="Filter by style"
-      className="mt-4 flex flex-col items-start border-y border-rule font-mono text-[0.7rem] uppercase tracking-[0.16em] sm:flex-row sm:flex-wrap"
+      className="mt-4 flex flex-col items-start border-y border-rule font-mono text-label uppercase tracking-[0.16em] sm:flex-row sm:flex-wrap"
     >
       {["all", ...styles].map((style) => (
         <button

@@ -33,7 +33,7 @@ export function EventDiscoveryFeed({
 
   if (feed.status === "loading") {
     return (
-      <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
         Loading Chicago event feed
       </p>
     );
@@ -41,7 +41,7 @@ export function EventDiscoveryFeed({
 
   if (feed.status === "error") {
     return (
-      <p role="alert" className="border-b border-rule py-5 text-sm text-ink-dim">
+      <p role="alert" className="border-b border-rule py-5 text-body text-ink-dim">
         Event feed is unavailable. Source-verified listings will return here.
       </p>
     );
@@ -49,7 +49,7 @@ export function EventDiscoveryFeed({
 
   if (events.length === 0) {
     return (
-      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+      <p className="border-b border-rule py-5 text-body text-ink-dim">
         No upcoming Chicago events are verified yet.
       </p>
     );
@@ -63,7 +63,7 @@ export function EventDiscoveryFeed({
         onStyleChange={onStyleChange}
       />
       {visibleEvents.length === 0 ? (
-        <p className="border-b border-rule py-5 text-sm text-ink-dim">
+        <p className="border-b border-rule py-5 text-body text-ink-dim">
           No verified events match that style.
         </p>
       ) : (

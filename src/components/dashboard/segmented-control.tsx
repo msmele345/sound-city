@@ -17,7 +17,7 @@ export function SegmentedControl<Value extends string>({
     <div className="min-w-0">
       <div
         id={labelId}
-        className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint"
+        className="font-mono text-label uppercase tracking-[0.18em] text-ink-faint"
       >
         {label}
       </div>
@@ -31,7 +31,7 @@ export function SegmentedControl<Value extends string>({
           return (
             <label
               key={option.value}
-              className={`relative flex min-w-0 flex-1 cursor-pointer items-center border-rule px-3 py-2 font-mono text-[0.7rem] uppercase tracking-[0.14em] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal ${
+              className={`relative flex min-w-0 flex-1 cursor-pointer items-center border-rule px-3 py-2 font-mono text-label uppercase tracking-[0.14em] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal ${
                 index > 0 ? "border-t sm:border-t-0 sm:border-l" : ""
               } ${selected ? "bg-panel text-signal" : "text-ink-dim hover:bg-panel"}`}
             >

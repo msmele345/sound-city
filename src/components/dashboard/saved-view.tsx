@@ -91,7 +91,7 @@ export function SavedView() {
               <h3 className="font-display text-2xl uppercase leading-none text-ink">
                 Event details unavailable
               </h3>
-              <p className="mt-2 text-sm text-ink-dim">
+              <p className="mt-2 text-body text-ink-dim">
                 This save has no stored details and is not in the current catalog.
               </p>
               <div className="mt-4">
@@ -162,7 +162,7 @@ export function SavedView() {
 
 function EmptyList({ children }: { children: string }) {
   return (
-    <p className="border-b border-rule py-5 text-sm text-ink-dim">
+    <p className="border-b border-rule py-5 text-body text-ink-dim">
       {children}{" "}
       <Link
         href="/"

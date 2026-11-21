@@ -80,7 +80,7 @@ export function TasteProfileControls({
   return (
     <div className="min-w-0">
       <fieldset>
-        <legend className="font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint">
+        <legend className="font-mono text-label uppercase tracking-[0.2em] text-ink-faint">
           Styles
         </legend>
         <div className="mt-3 flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:flex-wrap">
@@ -131,11 +131,11 @@ export function TasteProfileControls({
         <div className="flex items-baseline justify-between gap-3">
           <label
             htmlFor="discovery-level"
-            className="font-mono text-[0.65rem] uppercase tracking-[0.18em] text-ink-faint"
+            className="font-mono text-label uppercase tracking-[0.18em] text-ink-faint"
           >
             Discovery level
           </label>
-          <span className="font-mono text-sm tabular-nums text-ink">
+          <span className="font-mono text-meta tabular-nums text-ink">
             {profile.discoveryLevel}
           </span>
         </div>
@@ -155,7 +155,7 @@ export function TasteProfileControls({
           }
           className="mt-2 w-full min-w-0 accent-signal"
         />
-        <div className="mt-1 flex justify-between gap-3 font-mono text-[0.65rem] uppercase tracking-[0.14em] text-ink-dim">
+        <div className="mt-1 flex justify-between gap-3 font-mono text-label uppercase tracking-[0.14em] text-ink-dim">
           <span>Mainstream</span>
           <span>Underground</span>
         </div>
