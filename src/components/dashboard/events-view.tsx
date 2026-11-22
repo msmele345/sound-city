@@ -7,10 +7,10 @@ import { useStyleFilter } from "./style-filter-context";
 
 export function EventsView() {
   const { activeStyle, setActiveStyle } = useStyleFilter();
-  const { feed } = useCatalogData();
+  const { feed, retryFeed } = useCatalogData();
 
   return (
-    <section id="events" aria-labelledby="latest-heading" className="min-w-0 scroll-mt-6">
+    <section id="events" aria-labelledby="latest-heading" className="min-w-0 scroll-mt-24">
       <SectionMark
         id="latest-heading"
         title="Latest Events"
@@ -20,6 +20,7 @@ export function EventsView() {
         feed={feed}
         activeStyle={activeStyle}
         onStyleChange={setActiveStyle}
+        onRetry={retryFeed}
       />
     </section>
   );

@@ -44,6 +44,94 @@ beforeEach(() => {
 });
 
 describe("Artists route", () => {
+  it("announces artist loading with skeleton rows", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+
+    render(
+      <PublicShell>
+        <ArtistsPage />
+      </PublicShell>,
+    );
+
+    for (const name of [/loading weekly artist showcase/i, /loading artist style matches/i]) {
+      const loading = screen.getByRole("status", { name });
+      expect(loading).toHaveAttribute("aria-busy", "true");
+      expect(
+        within(loading).getAllByRole("listitem", { hidden: true }).length,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("retries a failed artist showcase and directory", async () => {
+    const user = userEvent.setup();
+    let showcaseCalls = 0;
+    let artistCalls = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/catalog/showcase?city=chicago") {
+        showcaseCalls += 1;
+        if (showcaseCalls === 1) {
+          return Promise.resolve({ ok: false, json: async () => ({}) });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ artist: posthuman }),
+        });
+      }
+      if (url === "/api/catalog/artists?city=chicago") {
+        artistCalls += 1;
+        if (artistCalls === 1) {
+          return Promise.resolve({ ok: false, json: async () => ({}) });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            artists: [
+              {
+                ...posthuman,
+                id: "artist_local",
+                name: "Local Selector",
+                slug: "local-selector",
+                showcase: false,
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ events: [], venues: [] }),
+      });
+    });
+
+    render(
+      <PublicShell>
+        <ArtistsPage />
+      </PublicShell>,
+    );
+
+    const showcase = screen.getByRole("region", { name: /artist showcase/i });
+    expect(
+      await within(showcase).findByText(/artist showcase is unavailable/i),
+    ).toBeInTheDocument();
+    expect(
+      within(showcase).getByText(/artist style matches are unavailable/i),
+    ).toBeInTheDocument();
+
+    const [retryShowcase, retryDirectory] = within(showcase).getAllByRole("button", {
+      name: /^retry$/i,
+    });
+    await user.click(retryShowcase);
+    expect(
+      await within(showcase).findByRole("heading", { name: /^posthuman$/i }),
+    ).toBeInTheDocument();
+    await user.click(retryDirectory);
+    expect(
+      await within(showcase).findByRole("heading", { name: /local selector/i }),
+    ).toBeInTheDocument();
+    expect(showcaseCalls).toBe(2);
+    expect(artistCalls).toBe(2);
+  });
+
   it("renders the weekly feature and the artist directory", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/showcase?city=chicago") {

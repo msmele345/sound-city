@@ -1,6 +1,11 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+
 import { isHttpUrl } from "@/lib/http-url";
 
 import { Button } from "./button";
+import { feedbackMs, prefersReducedMotion } from "./motion";
 import { formatEventDate, formatEventTime } from "./format";
 import { MatchMeter } from "./match-meter";
 import { SourceTrustLine } from "./source-trust-line";
@@ -48,7 +53,45 @@ type EventRowProps = {
   onAttend?: () => void;
   /** Nested upcoming rows. Venue lists omit the venue name; artist lists include it. */
   compact?: "venue" | "artist";
+  /** Visual-only exit. Hidden from assistive tech while the row leaves. */
+  exiting?: boolean;
 };
+
+function SaveButton({
+  saved,
+  onSave,
+  children,
+}: {
+  saved: boolean;
+  onSave?: () => void;
+  children: string;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const timer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    };
+  }, []);
+
+  return (
+    <Button
+      variant="quiet"
+      aria-pressed={saved}
+      confirming={confirming}
+      onClick={() => {
+        onSave?.();
+        if (prefersReducedMotion()) return;
+        setConfirming(true);
+        if (timer.current !== null) window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(() => setConfirming(false), feedbackMs);
+      }}
+    >
+      {children}
+    </Button>
+  );
+}
 
 export function EventRow({
   event,
@@ -64,11 +107,14 @@ export function EventRow({
   onRestore,
   onAttend,
   compact = "venue",
+  exiting = false,
 }: EventRowProps) {
   if (variant === "recommendation") {
     return (
       <li
-        className="rise group grid grid-cols-1 gap-y-3 border-b border-rule py-6 transition-colors duration-150 hover:bg-panel/60 sm:grid-cols-[auto_1fr] sm:gap-x-8"
+        aria-hidden={exiting || undefined}
+        inert={exiting || undefined}
+        className={`${exiting ? "row-leave" : "rise"} group grid grid-cols-1 gap-y-3 border-b border-rule py-6 transition-colors duration-150 hover:bg-panel/60 sm:grid-cols-[auto_1fr] sm:gap-x-8`}
         style={{ animationDelay: `${120 + index * 70}ms` }}
       >
         <span className="font-display text-4xl leading-none text-ink-faint transition-colors duration-150 group-hover:text-signal sm:text-5xl">
@@ -98,13 +144,9 @@ export function EventRow({
           <SourceTrustLine source={event.source} />
           <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
             {score !== undefined ? <MatchMeter score={score} /> : null}
-            <Button
-              variant="quiet"
-              aria-pressed={saved}
-              onClick={onSave}
-            >
+            <SaveButton saved={saved} onSave={onSave}>
               {saved ? "Saved" : "Save"}
-            </Button>
+            </SaveButton>
             <Button variant="quiet" onClick={onDismiss}>
               Dismiss
             </Button>
@@ -136,9 +178,9 @@ export function EventRow({
         </p>
         <div className="mt-4 flex max-w-full flex-col items-start gap-x-4 gap-y-2 sm:flex-row sm:flex-wrap sm:items-center">
           {onSave ? (
-            <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
+            <SaveButton saved={saved} onSave={onSave}>
               {saved ? "Saved" : "Save"}
-            </Button>
+            </SaveButton>
           ) : null}
           {onRestore ? (
             <Button variant="quiet" onClick={onRestore}>
@@ -162,8 +204,8 @@ export function EventRow({
   if (variant === "feed") {
     return (
       <li
-        className={`grid grid-cols-1 items-start gap-3 border-b border-rule py-5 sm:grid-cols-[5.5rem_minmax(0,1.5fr)_minmax(7rem,0.8fr)_auto] sm:items-center sm:gap-x-6${
-          dismissed ? " opacity-50" : ""
+        className={`grid grid-cols-1 items-start gap-3 border-b border-rule py-5 sm:grid-cols-[5.5rem_minmax(0,1.6fr)_minmax(7rem,0.7fr)_9.5rem] sm:gap-x-6${
+          dismissed ? " row-dismissed" : ""
         }`}
       >
         <p className="font-mono text-meta uppercase tracking-[0.08em] text-ink">
@@ -190,10 +232,10 @@ export function EventRow({
         <p className="font-mono text-meta uppercase tracking-[0.14em] text-ink-faint">
           {event.styles.join(" / ")}
         </p>
-        <div className="flex max-w-full flex-col items-start gap-2 sm:items-end">
-          <Button variant="quiet" aria-pressed={saved} onClick={onSave}>
+        <div className="flex max-w-full flex-col items-start gap-2 sm:w-full sm:items-stretch">
+          <SaveButton saved={saved} onSave={onSave}>
             {saved ? "Saved" : "Save"}
-          </Button>
+          </SaveButton>
           {dismissed ? (
             <Button variant="quiet" onClick={onRestore}>
               Restore

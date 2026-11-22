@@ -134,6 +134,151 @@ describe("public home", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("says nothing is on tonight and links to the next date with events", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-21T18:00:00.000Z"));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        events: [
+          {
+            id: "event_tomorrow",
+            title: "Next Night",
+            startsAt: "2026-05-23T03:00:00.000Z",
+            venue: { name: "Podlasie Club", neighborhood: "Avondale" },
+            artists: [{ name: "Local House Selector" }],
+            styles: ["house"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/next",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    try {
+      renderHome();
+      const forYou = screen.getByRole("region", { name: /for you/i });
+      expect(await within(forYou).findByText(/nothing on tonight/i)).toBeInTheDocument();
+      expect(within(forYou).getByRole("link", { name: /tomorrow/i })).toHaveAttribute(
+        "href",
+        "/events#day-2026-05-22",
+      );
+      expect(
+        within(forYou).getByRole("heading", { name: /^next night$/i }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries a failed recommendation feed", async () => {
+    const user = userEvent.setup();
+    let eventCalls = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/catalog/events?city=chicago") {
+        eventCalls += 1;
+        if (eventCalls === 1) {
+          return Promise.resolve({ ok: false, json: async () => ({}) });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            events: [
+              {
+                id: "event_back",
+                title: "Back Online",
+                startsAt: "2026-05-24T03:00:00.000Z",
+                venue: { name: "Spybar", neighborhood: "River North" },
+                artists: [],
+                styles: ["house"],
+                source: {
+                  title: "Listing",
+                  url: "https://example.com/back",
+                  lastVerifiedAt: "2026-05-15",
+                },
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ artists: [], venues: [], artist: null }),
+      });
+    });
+
+    renderHome();
+    const forYou = screen.getByRole("region", { name: /for you/i });
+    expect(await within(forYou).findByRole("alert")).toHaveTextContent(
+      /recommendation queue is unavailable/i,
+    );
+    await user.click(within(forYou).getByRole("button", { name: /^retry$/i }));
+    expect(
+      await within(forYou).findByRole("heading", { name: /back online/i }),
+    ).toBeInTheDocument();
+    expect(eventCalls).toBe(2);
+  });
+
+  it("offers a skip link to the main content", () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    renderHome();
+
+    expect(screen.getByRole("link", { name: /skip to content/i })).toHaveAttribute(
+      "href",
+      "#content",
+    );
+    expect(screen.getByRole("main")).toHaveAttribute("id", "content");
+  });
+
+  it("moves focus to the view heading after a route change", () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+    navigationStub.pathname = "/";
+    const { rerender } = render(
+      <PublicShell>
+        <HomeView />
+      </PublicShell>,
+    );
+
+    expect(screen.getByRole("heading", { name: /^for you$/i })).not.toHaveFocus();
+
+    navigationStub.pathname = "/events";
+    rerender(
+      <PublicShell>
+        <EventsView />
+      </PublicShell>,
+    );
+
+    expect(screen.getByRole("heading", { name: /latest events/i })).toHaveFocus();
+  });
+
+  it("announces home list loading with skeleton rows", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+
+    renderHome();
+
+    for (const name of [
+      /loading recommendation queue/i,
+      /loading next events/i,
+      /loading weekly artist showcase/i,
+    ]) {
+      const loading = screen.getByRole("status", { name });
+      expect(loading).toHaveAttribute("aria-busy", "true");
+      expect(
+        within(loading).getAllByRole("listitem", { hidden: true }).length,
+      ).toBeGreaterThan(0);
+    }
+  });
+
   it("hides masthead counts while the catalog is loading", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 

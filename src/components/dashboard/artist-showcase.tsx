@@ -1,29 +1,31 @@
 import { EventRow } from "./event-row";
+import { LoadError } from "./load-error";
+import { LoadingRows } from "./loading-rows";
 import type { EventFeedState, ShowcaseState } from "./types";
 
 export function ArtistShowcase({
   showcase,
   feed,
   activeStyle,
+  onRetry,
 }: {
   showcase: ShowcaseState;
   feed: EventFeedState;
   activeStyle: string;
+  onRetry(): void;
 }) {
   if (showcase.status === "loading") {
     return (
-      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-        Loading weekly artist showcase
-      </p>
+      <LoadingRows label="Loading weekly artist showcase" variant="showcase" />
     );
   }
 
   if (showcase.status === "error") {
     return (
-      <p className="border-b border-rule py-5 text-body text-ink-dim">
-        Artist showcase is unavailable. Curated listening links will return
-        here.
-      </p>
+      <LoadError
+        message="Artist showcase is unavailable. Curated listening links will return here."
+        onRetry={onRetry}
+      />
     );
   }
 
@@ -88,7 +90,7 @@ export function ArtistShowcase({
                 href={link.url}
                 target="_blank"
                 rel="noreferrer"
-                className="border border-rule px-3 py-2 font-mono text-label uppercase tracking-[0.14em] text-signal transition-colors duration-150 hover:bg-panel hover:text-ink"
+                className="inline-flex min-h-9 items-center border border-rule px-3 py-2 font-mono text-label uppercase tracking-[0.14em] text-signal pointer-coarse:min-h-11 hover:bg-panel hover:text-ink"
               >
                 {link.label}
               </a>
@@ -102,9 +104,7 @@ export function ArtistShowcase({
           Upcoming shows
         </h4>
         {feed.status === "loading" ? (
-          <p className="mt-3 text-body text-ink-dim">
-            Waiting on verified event feed.
-          </p>
+          <LoadingRows label="Waiting on verified event feed" variant="compact" />
         ) : upcomingEvents.length === 0 ? (
           <p className="mt-3 text-body text-ink-dim">
             No upcoming Chicago dates are attached to this artist yet.

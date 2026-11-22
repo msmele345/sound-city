@@ -31,7 +31,7 @@ export function SegmentedControl<Value extends string>({
           return (
             <label
               key={option.value}
-              className={`relative min-h-9 min-w-9 pointer-coarse:min-h-11 pointer-coarse:min-w-11 flex min-w-0 flex-1 cursor-pointer items-center border-rule px-3 py-2 font-mono text-label uppercase tracking-[0.14em] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal ${
+              className={`pressable relative min-h-9 min-w-9 pointer-coarse:min-h-11 pointer-coarse:min-w-11 flex min-w-0 flex-1 cursor-pointer items-center border-rule px-3 py-2 font-mono text-label uppercase tracking-[0.14em] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal ${
                 index > 0 ? "border-t sm:border-t-0 sm:border-l" : ""
               } ${selected ? "bg-panel text-signal" : "text-ink-dim hover:bg-panel"}`}
             >
@@ -41,7 +41,7 @@ export function SegmentedControl<Value extends string>({
                 value={option.value}
                 checked={selected}
                 onChange={() => onChange(option.value)}
-                className="absolute inset-0 cursor-pointer opacity-0"
+                className="absolute inset-0 cursor-pointer opacity-0 focus-visible:outline-none"
               />
               {option.label}
             </label>

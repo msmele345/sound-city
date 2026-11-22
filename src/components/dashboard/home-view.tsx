@@ -11,7 +11,7 @@ import { useStyleFilter } from "./style-filter-context";
 
 export function HomeView() {
   const { activeStyle } = useStyleFilter();
-  const { feed, showcase } = useCatalogData();
+  const { feed, showcase, retryFeed, retryShowcase } = useCatalogData();
   const { profile, setProfile, resetProfile } = usePersonalizationData();
   const eventActions = useEventActions();
 
@@ -20,7 +20,7 @@ export function HomeView() {
       <section
         id="recommendations"
         aria-labelledby="recommended-heading"
-        className="min-w-0 scroll-mt-6"
+        className="min-w-0 scroll-mt-24"
       >
         <SectionMark
           id="recommended-heading"
@@ -36,11 +36,12 @@ export function HomeView() {
           onToggleSaved={eventActions.save}
           onDismiss={eventActions.dismiss}
           onAttend={eventActions.attend}
+          onRetry={retryFeed}
         />
       </section>
 
       <aside className="flex min-w-0 flex-col gap-12 lg:border-l-2 lg:border-rule-strong lg:pl-12">
-        <section id="artists" aria-labelledby="showcase-heading" className="min-w-0 scroll-mt-6">
+        <section id="artists" aria-labelledby="showcase-heading" className="min-w-0 scroll-mt-24">
           <SectionMark
             id="showcase-heading"
             title="Artist Showcase"
@@ -50,10 +51,11 @@ export function HomeView() {
             showcase={showcase}
             feed={feed}
             activeStyle={activeStyle}
+            onRetry={retryShowcase}
           />
         </section>
 
-        <NextUp feed={feed} />
+        <NextUp feed={feed} onRetry={retryFeed} />
       </aside>
     </div>
   );

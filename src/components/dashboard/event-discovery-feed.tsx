@@ -4,45 +4,26 @@ import { useMemo } from "react";
 
 import { compareStartsAt } from "@/lib/starts-at";
 
+import { chicagoDayKey, dayHeading, nextDateAfterTonight } from "./chicago-day";
 import { useEventActions } from "./event-actions";
 import { EventRow } from "./event-row";
 import { groupFeedRows } from "./feed-rows";
-import { formatEventDate } from "./format";
+import { LoadError } from "./load-error";
+import { LoadingRows } from "./loading-rows";
+import { NothingTonight } from "./nothing-tonight";
 import { StyleFilterControl, styleFilterOptions } from "./style-filter-control";
 import type { EventFeedState } from "./types";
-
-const chicago = "America/Chicago";
-
-function chicagoDayKey(instant: Date) {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: chicago,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(instant);
-}
-
-function shiftDayKey(dayKey: string, days: number) {
-  const [year, month, day] = dayKey.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
-}
-
-function dayLabel(startsAt: string, now: Date) {
-  const day = chicagoDayKey(new Date(startsAt));
-  const today = chicagoDayKey(now);
-  if (day === today) return "Tonight";
-  if (day === shiftDayKey(today, 1)) return "Tomorrow";
-  return formatEventDate(startsAt);
-}
 
 export function EventDiscoveryFeed({
   feed,
   activeStyle,
   onStyleChange,
+  onRetry,
 }: {
   feed: EventFeedState;
   activeStyle: string;
   onStyleChange(style: string): void;
+  onRetry(): void;
 }) {
   const eventActions = useEventActions();
   const events = useMemo(
@@ -58,20 +39,30 @@ export function EventDiscoveryFeed({
         : events.filter((event) => event.styles.includes(activeStyle)),
     [activeStyle, events],
   );
+  const schedule = useMemo(() => {
+    const now = new Date();
+    const today = chicagoDayKey(now);
+    return {
+      tonight: nextDateAfterTonight(visibleEvents, now),
+      groups: groupFeedRows(visibleEvents, (event) =>
+        chicagoDayKey(new Date(event.startsAt)),
+      ).map((group) => ({
+        ...group,
+        heading: dayHeading(group.label, today, group.rows[0].item.startsAt),
+      })),
+    };
+  }, [visibleEvents]);
 
   if (feed.status === "loading") {
-    return (
-      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-        Loading Chicago event feed
-      </p>
-    );
+    return <LoadingRows label="Loading Chicago event feed" variant="feed" />;
   }
 
   if (feed.status === "error") {
     return (
-      <p role="alert" className="border-b border-rule py-5 text-body text-ink-dim">
-        Event feed is unavailable. Source-verified listings will return here.
-      </p>
+      <LoadError
+        message="Event feed is unavailable. Source-verified listings will return here."
+        onRetry={onRetry}
+      />
     );
   }
 
@@ -96,11 +87,20 @@ export function EventDiscoveryFeed({
         </p>
       ) : (
         <div className="mt-2">
-          {groupFeedRows(visibleEvents, (event) => dayLabel(event.startsAt, new Date())).map(
-            (group) => (
-            <section key={group.label} className="mt-6 first:mt-2">
-              <h3 className="border-b border-rule pb-2 font-display text-2xl uppercase leading-none text-ink">
-                {group.label}
+          {schedule.tonight ? (
+            <NothingTonight
+              dayKey={schedule.tonight.dayKey}
+              label={schedule.tonight.label}
+            />
+          ) : null}
+          {schedule.groups.map((group) => (
+            <section key={group.label} className="mt-8 first:mt-4">
+              <h3
+                id={`day-${group.label}`}
+                tabIndex={-1}
+                className="scroll-mt-24 border-b border-rule pb-2 font-display text-2xl uppercase leading-none text-ink outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal"
+              >
+                {group.heading}
               </h3>
               <ol>
                 {group.rows.map(({ item: event, index }) => (

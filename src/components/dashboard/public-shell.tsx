@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, type ReactNode } from "react";
 
 import { Button } from "./button";
 import { CatalogProvider, useCatalogData } from "./catalog-context";
+import { LoadingRows } from "./loading-rows";
 import {
   PersonalizationProvider,
   usePersonalizationData,
@@ -163,6 +164,22 @@ function ActionStatus() {
   );
 }
 
+function viewHeadingId(pathname: string) {
+  if (pathname === "/events" || pathname.startsWith("/events/")) {
+    return "latest-heading";
+  }
+  if (pathname === "/artists" || pathname.startsWith("/artists/")) {
+    return "artists-showcase-heading";
+  }
+  if (pathname === "/venues" || pathname.startsWith("/venues/")) {
+    return "venue-heading";
+  }
+  if (pathname === "/saved" || pathname.startsWith("/saved/")) {
+    return "saved-heading";
+  }
+  return "recommended-heading";
+}
+
 function isCurrentPath(pathname: string, href: string) {
   const path = href.split("?")[0] ?? href;
   if (!path || path.startsWith("#")) {
@@ -207,16 +224,16 @@ function NavLinks({ activeStyle }: { activeStyle: string }) {
               key={item.label}
               href={href}
               aria-current={current ? "page" : undefined}
-              className={`min-w-0 border-r border-rule px-3 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal sm:px-4 ${
-                current ? "bg-panel text-signal" : "text-ink-dim"
-              }`}
+              className={`relative flex min-h-9 min-w-0 items-center gap-x-1.5 border-r border-rule px-3 py-3 pointer-coarse:min-h-11 transition-colors duration-150 hover:bg-panel hover:text-signal focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-signal sm:px-4 ${
+                item.href === "/saved" ? "col-span-2 sm:col-auto" : ""
+              } ${current ? "bg-panel text-signal" : "text-ink-dim"}`}
             >
               <span className="text-ink-faint">
                 {String(i + 1).padStart(2, "0")}
-              </span>{" "}
-              {item.label}
+              </span>
+              <span>{item.label}</span>
               {item.href === "/saved" ? (
-                <span> {savedCount}</span>
+                <span>{savedCount}</span>
               ) : null}
             </Link>
           );
@@ -233,11 +250,26 @@ function StyleAwareNav() {
 
 export function PublicShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const seenPath = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (seenPath.current === null) {
+      seenPath.current = pathname;
+      return;
+    }
+    if (seenPath.current === pathname) return;
+    seenPath.current = pathname;
+    const heading = document.getElementById(viewHeadingId(pathname));
+    if (heading instanceof HTMLElement) heading.focus();
+  }, [pathname]);
 
   return (
     <CatalogProvider>
       <PersonalizationProvider>
         <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
+          <a href="#content" className="sr-only">
+            Skip to content
+          </a>
           {pathname === "/" ? <LargeMasthead /> : <CompactMasthead />}
 
           <Suspense fallback={<NavLinks activeStyle="all" />}>
@@ -248,21 +280,20 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
           <ActionStatus />
 
-          <main className="mt-10 min-w-0">
+          <main id="content" tabIndex={-1} className="mt-10 min-w-0 scroll-mt-24 outline-none">
             <Suspense
-              fallback={
-                <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-                  Loading view
-                </p>
-              }
+              fallback={<LoadingRows label="Loading view" variant="feed" />}
             >
               <StyleFilterProvider>{children}</StyleFilterProvider>
             </Suspense>
           </main>
 
-          <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t-2 border-rule-strong pt-4 font-mono text-label uppercase tracking-[0.2em] text-ink-faint">
+          <footer className="mt-12 flex flex-col items-start gap-3 border-t-2 border-rule-strong pt-4 font-mono text-label uppercase tracking-[0.2em] text-ink-faint sm:flex-row sm:items-center sm:justify-between">
             <span>Source-verified &middot; Chicago underground</span>
-            <a href="/admin" className="transition-colors duration-150 hover:text-ink">
+            <a
+              href="/admin"
+              className="inline-flex min-h-9 items-center transition-colors duration-150 pointer-coarse:min-h-11 hover:text-ink"
+            >
               Admin
             </a>
             <span>End of manifest</span>

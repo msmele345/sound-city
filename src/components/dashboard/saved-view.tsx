@@ -71,7 +71,7 @@ export function SavedView() {
       : [];
 
   return (
-    <section id="saved" aria-labelledby="saved-heading" className="min-w-0 scroll-mt-6">
+    <section id="saved" aria-labelledby="saved-heading" className="min-w-0 scroll-mt-24">
       <SectionMark id="saved-heading" title="Saved" index="Kept / 05" />
       {upcoming.length === 0 &&
       past.length === 0 &&
@@ -177,7 +177,7 @@ function EmptyList({ children }: { children: string }) {
       {children}{" "}
       <Link
         href="/"
-        className="text-signal underline decoration-rule-strong underline-offset-4 transition-colors duration-150 hover:text-ink"
+        className="inline-flex min-h-9 items-center text-signal underline decoration-rule-strong underline-offset-4 pointer-coarse:min-h-11 hover:text-ink"
       >
         For You
       </Link>

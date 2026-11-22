@@ -6,10 +6,18 @@ import { useMemo } from "react";
 import { compareStartsAt } from "@/lib/starts-at";
 
 import { formatEventDate, formatEventTime } from "./format";
+import { LoadError } from "./load-error";
+import { LoadingRows } from "./loading-rows";
 import { SectionMark } from "./section-mark";
 import type { EventFeedState } from "./types";
 
-export function NextUp({ feed }: { feed: EventFeedState }) {
+export function NextUp({
+  feed,
+  onRetry,
+}: {
+  feed: EventFeedState;
+  onRetry(): void;
+}) {
   const events = useMemo(
     () =>
       feed.events.toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt)).slice(0, 5),
@@ -20,17 +28,16 @@ export function NextUp({ feed }: { feed: EventFeedState }) {
     <section
       id="next-up"
       aria-labelledby="next-up-heading"
-      className="min-w-0 scroll-mt-6"
+      className="min-w-0 scroll-mt-24"
     >
       <SectionMark id="next-up-heading" title="Next up" index="Feed / 03" />
       {feed.status === "loading" ? (
-        <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-          Loading next events
-        </p>
+        <LoadingRows label="Loading next events" variant="next" />
       ) : feed.status === "error" ? (
-        <p role="alert" className="border-b border-rule py-5 text-body text-ink-dim">
-          Event feed is unavailable. Source-verified listings will return here.
-        </p>
+        <LoadError
+          message="Event feed is unavailable. Source-verified listings will return here."
+          onRetry={onRetry}
+        />
       ) : events.length === 0 ? (
         <p className="border-b border-rule py-5 text-body text-ink-dim">
           No upcoming Chicago events are verified yet.
@@ -57,7 +64,7 @@ export function NextUp({ feed }: { feed: EventFeedState }) {
       )}
       <Link
         href="/events"
-        className="mt-4 inline-flex font-mono text-label uppercase tracking-[0.16em] text-signal transition-colors duration-150 hover:text-ink"
+        className="mt-4 inline-flex min-h-9 items-center font-mono text-label uppercase tracking-[0.16em] text-signal pointer-coarse:min-h-11 hover:text-ink"
       >
         All events
       </Link>

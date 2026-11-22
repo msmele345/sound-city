@@ -16,6 +16,24 @@ beforeEach(() => {
 });
 
 describe("Venues route", () => {
+  it("announces venue loading with skeleton rows", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+
+    render(
+      <PublicShell>
+        <VenuesPage />
+      </PublicShell>,
+    );
+
+    const loading = screen.getByRole("status", {
+      name: /loading venue directory/i,
+    });
+    expect(loading).toHaveAttribute("aria-busy", "true");
+    expect(
+      within(loading).getAllByRole("listitem", { hidden: true }).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("renders the venue directory", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/events?city=chicago") {
@@ -209,5 +227,60 @@ describe("Venues route", () => {
     expect(
       within(venues).getByRole("heading", { name: /later night/i }),
     ).toBeInTheDocument();
+  });
+
+  it("retries a failed venue directory", async () => {
+    const user = userEvent.setup();
+    let venueCalls = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/catalog/venues?city=chicago") {
+        venueCalls += 1;
+        if (venueCalls === 1) {
+          return Promise.resolve({ ok: false, json: async () => ({}) });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            venues: [
+              {
+                id: "venue_smartbar",
+                citySlug: "chicago",
+                name: "smartbar",
+                slug: "smartbar",
+                neighborhood: "Wrigleyville",
+                address: "3730 N Clark St",
+                capacity: 400,
+                source: {
+                  title: "Venue source",
+                  url: "https://example.com/smartbar",
+                  lastVerifiedAt: "2026-05-15",
+                },
+                signals: [],
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ events: [], artists: [], artist: null }),
+      });
+    });
+
+    render(
+      <PublicShell>
+        <VenuesPage />
+      </PublicShell>,
+    );
+
+    const venues = screen.getByRole("region", { name: /venue signals/i });
+    expect(
+      await within(venues).findByText(/venue signals are unavailable/i),
+    ).toBeInTheDocument();
+    await user.click(within(venues).getByRole("button", { name: /^retry$/i }));
+    expect(
+      await within(venues).findByRole("heading", { name: /smartbar/i }),
+    ).toBeInTheDocument();
+    expect(venueCalls).toBe(2);
   });
 });

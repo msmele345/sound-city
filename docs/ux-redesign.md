@@ -1,10 +1,10 @@
 # UX Redesign — Industrial Warehouse System
 
 > **For future agents:** This redesign was **not part of the original MVP plan**
-> (`plans/sound-city-mvp.md`). It was introduced after a design critique. Read
-> this before touching `src/components/dashboard-shell.tsx`,
-> `src/app/globals.css`, or `src/app/layout.tsx` so you don't unknowingly revert
-> the design language back to where it started.
+> (`plans/sound-city-mvp.md`). It was introduced after a design critique and
+> then evolved across the public views ([issue #31](https://github.com/msmele345/sound-city/issues/31)).
+> Read this before touching `src/components/dashboard/`, `src/app/globals.css`,
+> or `src/app/layout.tsx` so you don't unknowingly revert the design language.
 
 ## Why this happened
 
@@ -27,8 +27,8 @@ A redesign direction was chosen deliberately (not guessed):
 
 Tokens live in `src/app/globals.css` under `@theme`. Use the token utilities
 (`bg-bg`, `text-ink`, `border-rule`, `text-signal`, `font-display`,
-`font-mono`, etc.) — **do not** hardcode hex values or reach for arbitrary
-Tailwind colors.
+`font-mono`, `text-label`, `text-meta`, `text-body`) — **do not** hardcode hex
+values or reach for arbitrary Tailwind colors.
 
 - **Palette:** near-monochrome, cold-tinted concrete neutrals (hue ~250),
   defined in OKLCH. Exactly **one** signal color: sodium-vapor hazard amber
@@ -38,20 +38,38 @@ Tailwind colors.
 - **Type:** `Anton` (condensed industrial signage — display/headings only),
   `Archivo` (engineered grotesque — body/UI), `IBM Plex Mono` (data: times,
   match scores, labels). The monospace is **intentional** (spec-sheet concept),
-  not a lazy default — keep it for data, not prose. Fonts are loaded via
-  `next/font/google` in `src/app/layout.tsx`.
+  not a lazy default — keep it for labels and data, not prose. Fonts are loaded
+  via `next/font/google` in `src/app/layout.tsx`. A **12px type floor** applies:
+  `--text-label` is 12px, `--text-meta` is 13px, and `--text-body` is 16px.
+  Uppercase mono is for labels and data only (dates, times, scores, counts).
+  Venue signal values, recommendation reasons, bios, and source names use
+  sentence-case sans.
 - **Layout:** **No cards.** Hierarchy comes from structural rules
   (`border-rule` / `border-rule-strong`), scale contrast, and value — not
   containers or shadows. Square corners, no drop shadows, no glassmorphism, no
-  glow.
-- **Motion:** one orchestrated page-load `rise` (transform/opacity only,
-  ease-out-expo, staggered). `prefers-reduced-motion` is honored. Don't add
-  scattered micro-animations or animate layout properties.
-- **Accessibility:** the `<main>` landmark, ARIA-labelled sections, and the
-  five section heading names (`Sound City`, `Recommended Tonight`,
-  `Latest Events`, `Artist Showcase`, `Venue Signals`) are contract — the test
-  in `dashboard-shell.test.tsx` depends on them. The match meter has `sr-only`
-  text so meaning survives without color. Keep these.
+  glow. Desktop layout is decided first; phones get one column.
+- **Routes:** five public views under one shell (`PublicShell`): **For You**
+  (`/`), **Events** (`/events`), **Artists** (`/artists`), **Venues**
+  (`/venues`), and **Saved** (`/saved`). The home side column also has **Next
+  up** and the weekly **Artist Showcase**. Section headings may be renamed;
+  the names above are the current contract, covered by
+  `dashboard-shell.test.tsx`. Admin is a footer link, not a nav item.
+- **Shared primitives:** `Button` (quiet and pressed), `Chip`, `SegmentedControl`,
+  `SectionMark`, and `EventRow` (recommendation, feed, compact, and saved).
+  Loading lists use `LoadingRows` (skeleton geometry plus a screen-reader
+  status). Failures use `LoadError` with Retry. Taste controls sit behind the
+  Tune disclosure. Style options stay checkboxes; vibe, venue size, and start
+  time are radio groups.
+- **Motion:** the page-load `rise` stays (transform/opacity only, ease-out-expo,
+  staggered). Small interaction feedback is also allowed: a press on buttons,
+  a confirm on Save, and a row exit on Dismiss. Those use transform and opacity
+  only, stay under 200ms, and are disabled under `prefers-reduced-motion`.
+  Don't add scattered micro-animations or animate layout properties.
+- **Accessibility:** `<main id="content">` is the skip-link target. Route
+  changes move focus to that view's heading. The match meter keeps `sr-only`
+  text so the score survives without color. Faint text stays at least 4.5:1
+  on both background tokens. Buttons, chips, and segmented options keep a 36px
+  pointer target and a 44px touch target.
 
 ### Hard "do not reintroduce" list
 
@@ -60,26 +78,21 @@ nested cards · the hero-metric stat-grid template · generic drop shadows ·
 glassmorphism · gradient text · decorative rainbow gradients · eyebrow kickers
 that merely restate the heading.
 
-## Optional next steps (continuous UX improvement)
+## What changed after the first redesign
 
-These are **not required** and not yet started. Ordered roughly by leverage:
+The optional follow-ups from the first pass are done. The list below is the
+record of those rules, not a backlog:
 
-1. **Close the actionability gap (product, highest value):** the dashboard is
-   read-only. Event rows aren't links and there's no primary action
-   (save / going / listen / view sources). A discovery tool you can't act on is
-   a dead end. This needs design + product, not just styling.
-2. **Fix navigation:** nav anchors point at `#dashboard`, `#events`, etc.
-   which don't exist as targets. Wire to real routes/sections.
-3. **`/impeccable:clarify`** — tighten remaining microcopy into the terse
-   "manifest" voice the redesign established.
-4. **Real states** — design empty / loading / error states for the event
-   lists (currently static arrays). The critical one is "no events tonight,"
-   the defining empty state for a discovery app.
-5. **`/impeccable:polish`** — run *after* 1–4, once layout is stable, for the
-   final spacing/alignment/detail pass.
-6. **`/impeccable:audit`** — verify WCAG contrast on real data and across
-   breakpoints once content is dynamic.
+- Navigation is real routes, with the current page marked and a sticky bar.
+  The large wordmark is home only.
+- Every event row can be saved, dismissed, or marked attended. Dismiss can be
+  undone. Saved events have their own view.
+- Loading lists are skeleton rows that match the loaded geometry, and a
+  screen-reader status still announces loading. An empty night says "Nothing
+  on tonight" and links to the next date that has events. A failed fetch has
+  Retry.
+- Match scores read as percentages. Sources use a short site name. Reasons are
+  plain sentences. The feed is grouped by day, with Tonight and Tomorrow labels.
 
-When extending the UI (new components, pages), match this system rather than
-defaulting to generic patterns. If a change would touch the design language,
-re-read this file and the critique rationale first.
+When extending the UI, match this system. If a change would touch the design
+language, re-read this file and the critique rationale first.

@@ -11,7 +11,8 @@ import { useStyleFilter } from "./style-filter-context";
 
 export function ArtistsView() {
   const { activeStyle, setActiveStyle } = useStyleFilter();
-  const { feed, showcase, artistDirectory } = useCatalogData();
+  const { feed, showcase, artistDirectory, retryShowcase, retryArtists } =
+    useCatalogData();
   const styles = useMemo(
     () => styleFilterOptions(feed.events),
     [feed.events],
@@ -21,7 +22,7 @@ export function ArtistsView() {
     <section
       id="artists"
       aria-labelledby="artists-showcase-heading"
-      className="min-w-0 scroll-mt-6"
+      className="min-w-0 scroll-mt-24"
     >
       <SectionMark
         id="artists-showcase-heading"
@@ -39,6 +40,7 @@ export function ArtistsView() {
         showcase={showcase}
         feed={feed}
         activeStyle={activeStyle}
+        onRetry={retryShowcase}
       />
       <ArtistStyleMatches
         directory={artistDirectory}
@@ -46,6 +48,7 @@ export function ArtistsView() {
         excludeArtistId={
           showcase.status === "ready" ? showcase.artist?.id : undefined
         }
+        onRetry={retryArtists}
       />
     </section>
   );

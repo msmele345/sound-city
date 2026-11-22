@@ -5,20 +5,20 @@ import { SectionMark } from "./section-mark";
 import { VenueDirectory } from "./venue-directory";
 
 export function VenuesView() {
-  const { feed, venueDirectory } = useCatalogData();
+  const { feed, venueDirectory, retryVenues } = useCatalogData();
 
   return (
     <section
       id="venues"
       aria-labelledby="venue-heading"
-      className="min-w-0 scroll-mt-6"
+      className="min-w-0 scroll-mt-24"
     >
       <SectionMark
         id="venue-heading"
         title="Venue Signals"
         index="Room context / 05"
       />
-      <VenueDirectory directory={venueDirectory} feed={feed} />
+      <VenueDirectory directory={venueDirectory} feed={feed} onRetry={retryVenues} />
     </section>
   );
 }
