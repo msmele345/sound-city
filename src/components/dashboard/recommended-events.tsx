@@ -8,8 +8,10 @@ import {
   type TasteProfile,
 } from "@/lib/recommendations";
 
+import { nextDateAfterTonight } from "./chicago-day";
 import { EventRow } from "./event-row";
 import { LoadingRows } from "./loading-rows";
+import { NothingTonight } from "./nothing-tonight";
 import { TasteProfilePanel } from "./taste-profile-panel";
 import type { EventFeedState } from "./types";
 import type { PersonalizationEvent } from "./use-personalization";
@@ -37,6 +39,11 @@ export function RecommendedEvents({
     () => rankRecommendedEvents(feed.events, { profile, actions }).slice(0, 5),
     [actions, feed.events, profile],
   );
+  const tonight = useMemo(
+    () =>
+      feed.status === "ready" ? nextDateAfterTonight(feed.events, new Date()) : null,
+    [feed.events, feed.status],
+  );
 
   return (
     <>
@@ -45,6 +52,10 @@ export function RecommendedEvents({
         onProfileChange={onProfileChange}
         onReset={onReset}
       />
+
+      {tonight ? (
+        <NothingTonight dayKey={tonight.dayKey} label={tonight.label} />
+      ) : null}
 
       {feed.status === "loading" ? (
         <LoadingRows label="Loading recommendation queue" variant="recommendation" />

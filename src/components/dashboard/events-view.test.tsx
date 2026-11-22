@@ -107,6 +107,7 @@ describe("Events route", () => {
       expect(tomorrow.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(next.compareDocumentPosition(laterDay) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       expect(laterDay.compareDocumentPosition(weekend) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(feed).queryByText(/nothing on tonight/i)).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -585,6 +586,48 @@ describe("Events route", () => {
     expect(screen.queryByRole("button", { name: /^undo$/i })).not.toBeInTheDocument();
   });
 
+  it("says nothing is on tonight and links to the next date with events", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-21T18:00:00.000Z"));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        city: { slug: "chicago" },
+        events: [
+          {
+            id: "event_weekend",
+            title: "Weekend",
+            startsAt: "2026-05-24T03:00:00.000Z",
+            venue: { name: "Spybar", neighborhood: "River North" },
+            artists: [],
+            styles: ["house"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/weekend",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    try {
+      renderEvents();
+      const feed = screen.getByRole("region", { name: /latest events/i });
+      expect(await within(feed).findByText(/nothing on tonight/i)).toBeInTheDocument();
+      expect(within(feed).getByRole("link", { name: /sat, may 23/i })).toHaveAttribute(
+        "href",
+        "/events#day-2026-05-23",
+      );
+      expect(
+        within(feed).getByRole("heading", { name: /^sat, may 23$/i }),
+      ).toHaveAttribute("id", "day-2026-05-23");
+      expect(within(feed).getByRole("heading", { name: /^weekend$/i })).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows loading, empty, and error states for the event feed", async () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 
@@ -613,6 +656,7 @@ describe("Events route", () => {
     expect(
       await screen.findByText(/no upcoming chicago events are verified yet/i),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/nothing on tonight/i)).not.toBeInTheDocument();
     emptyView.unmount();
 
     fetchMock.mockResolvedValueOnce({

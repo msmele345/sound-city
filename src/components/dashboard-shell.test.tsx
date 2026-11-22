@@ -134,6 +134,46 @@ describe("public home", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("says nothing is on tonight and links to the next date with events", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-05-21T18:00:00.000Z"));
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        events: [
+          {
+            id: "event_tomorrow",
+            title: "Next Night",
+            startsAt: "2026-05-23T03:00:00.000Z",
+            venue: { name: "Podlasie Club", neighborhood: "Avondale" },
+            artists: [{ name: "Local House Selector" }],
+            styles: ["house"],
+            source: {
+              title: "Listing",
+              url: "https://example.com/next",
+              lastVerifiedAt: "2026-05-15",
+            },
+          },
+        ],
+      }),
+    });
+
+    try {
+      renderHome();
+      const forYou = screen.getByRole("region", { name: /for you/i });
+      expect(await within(forYou).findByText(/nothing on tonight/i)).toBeInTheDocument();
+      expect(within(forYou).getByRole("link", { name: /tomorrow/i })).toHaveAttribute(
+        "href",
+        "/events#day-2026-05-22",
+      );
+      expect(
+        within(forYou).getByRole("heading", { name: /^next night$/i }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("announces home list loading with skeleton rows", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 
