@@ -10,6 +10,7 @@ import {
 
 import { nextDateAfterTonight } from "./chicago-day";
 import { EventRow } from "./event-row";
+import { LoadError } from "./load-error";
 import { LoadingRows } from "./loading-rows";
 import { NothingTonight } from "./nothing-tonight";
 import { TasteProfilePanel } from "./taste-profile-panel";
@@ -25,6 +26,7 @@ export function RecommendedEvents({
   onToggleSaved,
   onDismiss,
   onAttend,
+  onRetry,
 }: {
   feed: EventFeedState;
   profile: TasteProfile;
@@ -34,6 +36,7 @@ export function RecommendedEvents({
   onToggleSaved(event: PersonalizationEvent): void;
   onDismiss(event: PersonalizationEvent): void;
   onAttend(event: PersonalizationEvent): void;
+  onRetry(): void;
 }) {
   const recommendations = useMemo(
     () => rankRecommendedEvents(feed.events, { profile, actions }).slice(0, 5),
@@ -60,9 +63,10 @@ export function RecommendedEvents({
       {feed.status === "loading" ? (
         <LoadingRows label="Loading recommendation queue" variant="recommendation" />
       ) : feed.status === "error" ? (
-        <p className="border-b border-rule py-5 text-body text-ink-dim">
-          Recommendation queue is unavailable until the event feed returns.
-        </p>
+        <LoadError
+          message="Recommendation queue is unavailable until the event feed returns."
+          onRetry={onRetry}
+        />
       ) : recommendations.length === 0 ? (
         <p className="border-b border-rule py-5 text-body text-ink-dim">
           No recommendations remain in the local queue.

@@ -6,11 +6,18 @@ import { useMemo } from "react";
 import { compareStartsAt } from "@/lib/starts-at";
 
 import { formatEventDate, formatEventTime } from "./format";
+import { LoadError } from "./load-error";
 import { LoadingRows } from "./loading-rows";
 import { SectionMark } from "./section-mark";
 import type { EventFeedState } from "./types";
 
-export function NextUp({ feed }: { feed: EventFeedState }) {
+export function NextUp({
+  feed,
+  onRetry,
+}: {
+  feed: EventFeedState;
+  onRetry(): void;
+}) {
   const events = useMemo(
     () =>
       feed.events.toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt)).slice(0, 5),
@@ -27,9 +34,10 @@ export function NextUp({ feed }: { feed: EventFeedState }) {
       {feed.status === "loading" ? (
         <LoadingRows label="Loading next events" variant="next" />
       ) : feed.status === "error" ? (
-        <p role="alert" className="border-b border-rule py-5 text-body text-ink-dim">
-          Event feed is unavailable. Source-verified listings will return here.
-        </p>
+        <LoadError
+          message="Event feed is unavailable. Source-verified listings will return here."
+          onRetry={onRetry}
+        />
       ) : events.length === 0 ? (
         <p className="border-b border-rule py-5 text-body text-ink-dim">
           No upcoming Chicago events are verified yet.

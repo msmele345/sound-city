@@ -669,4 +669,55 @@ describe("Events route", () => {
       /event feed is unavailable/i,
     );
   });
+
+  it("retries a failed event feed", async () => {
+    const user = userEvent.setup();
+    let eventCalls = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/catalog/events?city=chicago") {
+        eventCalls += 1;
+        if (eventCalls === 1) {
+          return Promise.resolve({
+            ok: false,
+            json: async () => ({ error: "City not found" }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            events: [
+              {
+                id: "event_back",
+                title: "Back Online",
+                startsAt: "2026-05-24T03:00:00.000Z",
+                venue: { name: "Spybar", neighborhood: "River North" },
+                artists: [],
+                styles: ["house"],
+                source: {
+                  title: "Listing",
+                  url: "https://example.com/back",
+                  lastVerifiedAt: "2026-05-15",
+                },
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ artists: [], venues: [], artist: null }),
+      });
+    });
+
+    renderEvents();
+    const feed = screen.getByRole("region", { name: /latest events/i });
+    expect(await within(feed).findByRole("alert")).toHaveTextContent(
+      /event feed is unavailable/i,
+    );
+    await user.click(within(feed).getByRole("button", { name: /^retry$/i }));
+    expect(
+      await within(feed).findByRole("heading", { name: /back online/i }),
+    ).toBeInTheDocument();
+    expect(eventCalls).toBe(2);
+  });
 });

@@ -44,6 +44,7 @@ function renderQueue(profile: TasteProfile = defaultTasteProfile) {
         onToggleSaved={() => undefined}
         onDismiss={() => undefined}
         onAttend={() => undefined}
+        onRetry={() => undefined}
       />
     );
   }
@@ -71,6 +72,7 @@ function StoredQueue() {
       onToggleSaved={toggleSaved}
       onDismiss={(event) => dismiss(event.id)}
       onAttend={toggleAttended}
+      onRetry={() => undefined}
     />
   );
 }

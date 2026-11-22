@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import type {
   ArtistDirectoryState,
@@ -29,6 +29,27 @@ export function useCatalog() {
     status: "loading",
     venues: [],
   });
+  const [feedAttempt, setFeedAttempt] = useState(0);
+  const [showcaseAttempt, setShowcaseAttempt] = useState(0);
+  const [artistAttempt, setArtistAttempt] = useState(0);
+  const [venueAttempt, setVenueAttempt] = useState(0);
+
+  const retryFeed = useCallback(() => {
+    setFeed({ status: "loading", events: [] });
+    setFeedAttempt((attempt) => attempt + 1);
+  }, []);
+  const retryShowcase = useCallback(() => {
+    setShowcase({ status: "loading", artist: null });
+    setShowcaseAttempt((attempt) => attempt + 1);
+  }, []);
+  const retryArtists = useCallback(() => {
+    setArtistDirectory({ status: "loading", artists: [] });
+    setArtistAttempt((attempt) => attempt + 1);
+  }, []);
+  const retryVenues = useCallback(() => {
+    setVenueDirectory({ status: "loading", venues: [] });
+    setVenueAttempt((attempt) => attempt + 1);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -50,6 +71,16 @@ export function useCatalog() {
       }
     }
 
+    void loadEvents();
+
+    return () => {
+      active = false;
+    };
+  }, [feedAttempt]);
+
+  useEffect(() => {
+    let active = true;
+
     async function loadShowcase() {
       try {
         const response = await fetch("/api/catalog/showcase?city=chicago");
@@ -68,6 +99,16 @@ export function useCatalog() {
         }
       }
     }
+
+    void loadShowcase();
+
+    return () => {
+      active = false;
+    };
+  }, [showcaseAttempt]);
+
+  useEffect(() => {
+    let active = true;
 
     async function loadArtists() {
       try {
@@ -91,6 +132,16 @@ export function useCatalog() {
       }
     }
 
+    void loadArtists();
+
+    return () => {
+      active = false;
+    };
+  }, [artistAttempt]);
+
+  useEffect(() => {
+    let active = true;
+
     async function loadVenues() {
       try {
         const response = await fetch("/api/catalog/venues?city=chicago");
@@ -111,15 +162,21 @@ export function useCatalog() {
       }
     }
 
-    void loadEvents();
-    void loadShowcase();
-    void loadArtists();
     void loadVenues();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [venueAttempt]);
 
-  return { feed, showcase, artistDirectory, venueDirectory };
+  return {
+    feed,
+    showcase,
+    artistDirectory,
+    venueDirectory,
+    retryFeed,
+    retryShowcase,
+    retryArtists,
+    retryVenues,
+  };
 }

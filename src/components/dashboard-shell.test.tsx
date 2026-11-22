@@ -174,6 +174,54 @@ describe("public home", () => {
     }
   });
 
+  it("retries a failed recommendation feed", async () => {
+    const user = userEvent.setup();
+    let eventCalls = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/api/catalog/events?city=chicago") {
+        eventCalls += 1;
+        if (eventCalls === 1) {
+          return Promise.resolve({ ok: false, json: async () => ({}) });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            events: [
+              {
+                id: "event_back",
+                title: "Back Online",
+                startsAt: "2026-05-24T03:00:00.000Z",
+                venue: { name: "Spybar", neighborhood: "River North" },
+                artists: [],
+                styles: ["house"],
+                source: {
+                  title: "Listing",
+                  url: "https://example.com/back",
+                  lastVerifiedAt: "2026-05-15",
+                },
+              },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ artists: [], venues: [], artist: null }),
+      });
+    });
+
+    renderHome();
+    const forYou = screen.getByRole("region", { name: /for you/i });
+    expect(await within(forYou).findByRole("alert")).toHaveTextContent(
+      /recommendation queue is unavailable/i,
+    );
+    await user.click(within(forYou).getByRole("button", { name: /^retry$/i }));
+    expect(
+      await within(forYou).findByRole("heading", { name: /back online/i }),
+    ).toBeInTheDocument();
+    expect(eventCalls).toBe(2);
+  });
+
   it("announces home list loading with skeleton rows", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 

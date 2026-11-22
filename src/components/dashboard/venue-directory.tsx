@@ -7,6 +7,7 @@ import { compareStartsAt } from "@/lib/starts-at";
 import { Button } from "./button";
 import { EventRow } from "./event-row";
 import { formatSignalCategory } from "./format";
+import { LoadError } from "./load-error";
 import { LoadingRows } from "./loading-rows";
 import type { CatalogEvent, EventFeedState, VenueDirectoryState } from "./types";
 
@@ -71,9 +72,11 @@ function VenueUpcoming({
 export function VenueDirectory({
   directory,
   feed,
+  onRetry,
 }: {
   directory: VenueDirectoryState;
   feed: EventFeedState;
+  onRetry(): void;
 }) {
   if (directory.status === "loading") {
     return <LoadingRows label="Loading venue directory" variant="venue" />;
@@ -81,9 +84,10 @@ export function VenueDirectory({
 
   if (directory.status === "error") {
     return (
-      <p className="border-b border-rule py-5 text-body text-ink-dim">
-        Venue signals are unavailable. Curated room context will return here.
-      </p>
+      <LoadError
+        message="Venue signals are unavailable. Curated room context will return here."
+        onRetry={onRetry}
+      />
     );
   }
 

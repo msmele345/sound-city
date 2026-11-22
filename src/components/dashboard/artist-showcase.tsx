@@ -1,4 +1,5 @@
 import { EventRow } from "./event-row";
+import { LoadError } from "./load-error";
 import { LoadingRows } from "./loading-rows";
 import type { EventFeedState, ShowcaseState } from "./types";
 
@@ -6,10 +7,12 @@ export function ArtistShowcase({
   showcase,
   feed,
   activeStyle,
+  onRetry,
 }: {
   showcase: ShowcaseState;
   feed: EventFeedState;
   activeStyle: string;
+  onRetry(): void;
 }) {
   if (showcase.status === "loading") {
     return (
@@ -19,10 +22,10 @@ export function ArtistShowcase({
 
   if (showcase.status === "error") {
     return (
-      <p className="border-b border-rule py-5 text-body text-ink-dim">
-        Artist showcase is unavailable. Curated listening links will return
-        here.
-      </p>
+      <LoadError
+        message="Artist showcase is unavailable. Curated listening links will return here."
+        onRetry={onRetry}
+      />
     );
   }
 

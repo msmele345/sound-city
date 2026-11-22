@@ -1,3 +1,4 @@
+import { LoadError } from "./load-error";
 import { LoadingRows } from "./loading-rows";
 import { SourceTrustLine } from "./source-trust-line";
 import type { ArtistDirectoryState } from "./types";
@@ -6,10 +7,12 @@ export function ArtistStyleMatches({
   directory,
   activeStyle,
   excludeArtistId,
+  onRetry,
 }: {
   directory: ArtistDirectoryState;
   activeStyle: string;
   excludeArtistId?: string;
+  onRetry(): void;
 }) {
   if (directory.status === "loading") {
     return (
@@ -19,9 +22,10 @@ export function ArtistStyleMatches({
 
   if (directory.status === "error") {
     return (
-      <p className="border-b border-rule py-5 text-body text-ink-dim">
-        Artist style matches are unavailable.
-      </p>
+      <LoadError
+        message="Artist style matches are unavailable."
+        onRetry={onRetry}
+      />
     );
   }
 

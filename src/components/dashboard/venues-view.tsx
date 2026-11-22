@@ -5,7 +5,7 @@ import { SectionMark } from "./section-mark";
 import { VenueDirectory } from "./venue-directory";
 
 export function VenuesView() {
-  const { feed, venueDirectory } = useCatalogData();
+  const { feed, venueDirectory, retryVenues } = useCatalogData();
 
   return (
     <section
@@ -18,7 +18,7 @@ export function VenuesView() {
         title="Venue Signals"
         index="Room context / 05"
       />
-      <VenueDirectory directory={venueDirectory} feed={feed} />
+      <VenueDirectory directory={venueDirectory} feed={feed} onRetry={retryVenues} />
     </section>
   );
 }

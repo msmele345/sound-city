@@ -8,6 +8,7 @@ import { chicagoDayKey, dayHeading, nextDateAfterTonight } from "./chicago-day";
 import { useEventActions } from "./event-actions";
 import { EventRow } from "./event-row";
 import { groupFeedRows } from "./feed-rows";
+import { LoadError } from "./load-error";
 import { LoadingRows } from "./loading-rows";
 import { NothingTonight } from "./nothing-tonight";
 import { StyleFilterControl, styleFilterOptions } from "./style-filter-control";
@@ -17,10 +18,12 @@ export function EventDiscoveryFeed({
   feed,
   activeStyle,
   onStyleChange,
+  onRetry,
 }: {
   feed: EventFeedState;
   activeStyle: string;
   onStyleChange(style: string): void;
+  onRetry(): void;
 }) {
   const eventActions = useEventActions();
   const events = useMemo(
@@ -56,9 +59,10 @@ export function EventDiscoveryFeed({
 
   if (feed.status === "error") {
     return (
-      <p role="alert" className="border-b border-rule py-5 text-body text-ink-dim">
-        Event feed is unavailable. Source-verified listings will return here.
-      </p>
+      <LoadError
+        message="Event feed is unavailable. Source-verified listings will return here."
+        onRetry={onRetry}
+      />
     );
   }
 

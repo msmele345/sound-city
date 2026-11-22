@@ -11,7 +11,7 @@ import { useStyleFilter } from "./style-filter-context";
 
 export function HomeView() {
   const { activeStyle } = useStyleFilter();
-  const { feed, showcase } = useCatalogData();
+  const { feed, showcase, retryFeed, retryShowcase } = useCatalogData();
   const { profile, setProfile, resetProfile } = usePersonalizationData();
   const eventActions = useEventActions();
 
@@ -36,6 +36,7 @@ export function HomeView() {
           onToggleSaved={eventActions.save}
           onDismiss={eventActions.dismiss}
           onAttend={eventActions.attend}
+          onRetry={retryFeed}
         />
       </section>
 
@@ -50,10 +51,11 @@ export function HomeView() {
             showcase={showcase}
             feed={feed}
             activeStyle={activeStyle}
+            onRetry={retryShowcase}
           />
         </section>
 
-        <NextUp feed={feed} />
+        <NextUp feed={feed} onRetry={retryFeed} />
       </aside>
     </div>
   );
