@@ -10,7 +10,7 @@ export function EventsView() {
   const { feed, retryFeed } = useCatalogData();
 
   return (
-    <section id="events" aria-labelledby="latest-heading" className="min-w-0 scroll-mt-6">
+    <section id="events" aria-labelledby="latest-heading" className="min-w-0 scroll-mt-24">
       <SectionMark
         id="latest-heading"
         title="Latest Events"

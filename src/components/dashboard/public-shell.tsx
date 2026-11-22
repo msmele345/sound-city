@@ -224,16 +224,16 @@ function NavLinks({ activeStyle }: { activeStyle: string }) {
               key={item.label}
               href={href}
               aria-current={current ? "page" : undefined}
-              className={`min-w-0 border-r border-rule px-3 py-3 transition-colors duration-150 hover:bg-panel hover:text-signal sm:px-4 ${
-                current ? "bg-panel text-signal" : "text-ink-dim"
-              }`}
+              className={`relative flex min-h-9 min-w-0 items-center gap-x-1.5 border-r border-rule px-3 py-3 pointer-coarse:min-h-11 transition-colors duration-150 hover:bg-panel hover:text-signal focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-signal sm:px-4 ${
+                item.href === "/saved" ? "col-span-2 sm:col-auto" : ""
+              } ${current ? "bg-panel text-signal" : "text-ink-dim"}`}
             >
               <span className="text-ink-faint">
                 {String(i + 1).padStart(2, "0")}
-              </span>{" "}
-              {item.label}
+              </span>
+              <span>{item.label}</span>
               {item.href === "/saved" ? (
-                <span> {savedCount}</span>
+                <span>{savedCount}</span>
               ) : null}
             </Link>
           );
@@ -267,7 +267,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
     <CatalogProvider>
       <PersonalizationProvider>
         <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
-          <a href="#content" className="skip-link">
+          <a href="#content" className="sr-only">
             Skip to content
           </a>
           {pathname === "/" ? <LargeMasthead /> : <CompactMasthead />}
@@ -280,7 +280,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
           <ActionStatus />
 
-          <main id="content" tabIndex={-1} className="mt-10 min-w-0 scroll-mt-6 outline-none">
+          <main id="content" tabIndex={-1} className="mt-10 min-w-0 scroll-mt-24 outline-none">
             <Suspense
               fallback={<LoadingRows label="Loading view" variant="feed" />}
             >
@@ -288,9 +288,12 @@ export function PublicShell({ children }: { children: ReactNode }) {
             </Suspense>
           </main>
 
-          <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t-2 border-rule-strong pt-4 font-mono text-label uppercase tracking-[0.2em] text-ink-faint">
+          <footer className="mt-12 flex flex-col items-start gap-3 border-t-2 border-rule-strong pt-4 font-mono text-label uppercase tracking-[0.2em] text-ink-faint sm:flex-row sm:items-center sm:justify-between">
             <span>Source-verified &middot; Chicago underground</span>
-            <a href="/admin" className="transition-colors duration-150 hover:text-ink">
+            <a
+              href="/admin"
+              className="inline-flex min-h-9 items-center transition-colors duration-150 pointer-coarse:min-h-11 hover:text-ink"
+            >
               Admin
             </a>
             <span>End of manifest</span>

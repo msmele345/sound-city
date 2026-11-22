@@ -204,7 +204,7 @@ export function EventRow({
   if (variant === "feed") {
     return (
       <li
-        className={`grid grid-cols-1 items-start gap-3 border-b border-rule py-5 sm:grid-cols-[5.5rem_minmax(0,1.5fr)_minmax(7rem,0.8fr)_auto] sm:items-center sm:gap-x-6${
+        className={`grid grid-cols-1 items-start gap-3 border-b border-rule py-5 sm:grid-cols-[5.5rem_minmax(0,1.6fr)_minmax(7rem,0.7fr)_9.5rem] sm:gap-x-6${
           dismissed ? " row-dismissed" : ""
         }`}
       >
@@ -232,7 +232,7 @@ export function EventRow({
         <p className="font-mono text-meta uppercase tracking-[0.14em] text-ink-faint">
           {event.styles.join(" / ")}
         </p>
-        <div className="flex max-w-full flex-col items-start gap-2 sm:items-end">
+        <div className="flex max-w-full flex-col items-start gap-2 sm:w-full sm:items-stretch">
           <SaveButton saved={saved} onSave={onSave}>
             {saved ? "Saved" : "Save"}
           </SaveButton>

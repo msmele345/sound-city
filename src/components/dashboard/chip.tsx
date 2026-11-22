@@ -19,7 +19,7 @@ export function Chip({
       <input
         {...props}
         type="checkbox"
-        className="absolute inset-0 cursor-pointer opacity-0"
+        className="absolute inset-0 cursor-pointer opacity-0 focus-visible:outline-none"
       />
       {children}
     </label>

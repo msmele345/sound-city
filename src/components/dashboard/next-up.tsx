@@ -28,7 +28,7 @@ export function NextUp({
     <section
       id="next-up"
       aria-labelledby="next-up-heading"
-      className="min-w-0 scroll-mt-6"
+      className="min-w-0 scroll-mt-24"
     >
       <SectionMark id="next-up-heading" title="Next up" index="Feed / 03" />
       {feed.status === "loading" ? (
@@ -64,7 +64,7 @@ export function NextUp({
       )}
       <Link
         href="/events"
-        className="mt-4 inline-flex font-mono text-label uppercase tracking-[0.16em] text-signal transition-colors duration-150 hover:text-ink"
+        className="mt-4 inline-flex min-h-9 items-center font-mono text-label uppercase tracking-[0.16em] text-signal pointer-coarse:min-h-11 hover:text-ink"
       >
         All events
       </Link>

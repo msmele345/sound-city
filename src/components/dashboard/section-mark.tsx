@@ -10,7 +10,7 @@ export function SectionMark({
   index: string;
 }) {
   return (
-    <div className="flex w-full min-w-0 flex-col items-start gap-2 border-b-2 border-rule-strong pb-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+    <div className="flex w-full min-w-0 scroll-mt-24 flex-col items-start gap-2 border-b-2 border-rule-strong pb-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
       <h2
         id={id}
         tabIndex={-1}

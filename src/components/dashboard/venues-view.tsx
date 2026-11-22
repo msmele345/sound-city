@@ -11,7 +11,7 @@ export function VenuesView() {
     <section
       id="venues"
       aria-labelledby="venue-heading"
-      className="min-w-0 scroll-mt-6"
+      className="min-w-0 scroll-mt-24"
     >
       <SectionMark
         id="venue-heading"

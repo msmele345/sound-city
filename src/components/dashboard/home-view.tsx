@@ -20,7 +20,7 @@ export function HomeView() {
       <section
         id="recommendations"
         aria-labelledby="recommended-heading"
-        className="min-w-0 scroll-mt-6"
+        className="min-w-0 scroll-mt-24"
       >
         <SectionMark
           id="recommended-heading"
@@ -41,7 +41,7 @@ export function HomeView() {
       </section>
 
       <aside className="flex min-w-0 flex-col gap-12 lg:border-l-2 lg:border-rule-strong lg:pl-12">
-        <section id="artists" aria-labelledby="showcase-heading" className="min-w-0 scroll-mt-6">
+        <section id="artists" aria-labelledby="showcase-heading" className="min-w-0 scroll-mt-24">
           <SectionMark
             id="showcase-heading"
             title="Artist Showcase"

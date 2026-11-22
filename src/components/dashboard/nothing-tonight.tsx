@@ -12,7 +12,7 @@ export function NothingTonight({
       Nothing on tonight.{" "}
       <Link
         href={`/events#day-${dayKey}`}
-        className="text-signal underline decoration-rule-strong underline-offset-4"
+        className="inline-flex min-h-9 items-center text-signal underline decoration-rule-strong underline-offset-4 pointer-coarse:min-h-11"
       >
         Next is {label}
       </Link>

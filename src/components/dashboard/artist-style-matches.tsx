@@ -62,7 +62,7 @@ export function ArtistStyleMatches({
                       href={link.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="border border-rule px-3 py-2 font-mono text-label uppercase tracking-[0.14em] text-signal transition-colors duration-150 hover:bg-panel hover:text-ink"
+                      className="inline-flex min-h-9 items-center border border-rule px-3 py-2 font-mono text-label uppercase tracking-[0.14em] text-signal pointer-coarse:min-h-11 hover:bg-panel hover:text-ink"
                     >
                       {link.label}
                     </a>

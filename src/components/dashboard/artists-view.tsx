@@ -22,7 +22,7 @@ export function ArtistsView() {
     <section
       id="artists"
       aria-labelledby="artists-showcase-heading"
-      className="min-w-0 scroll-mt-6"
+      className="min-w-0 scroll-mt-24"
     >
       <SectionMark
         id="artists-showcase-heading"

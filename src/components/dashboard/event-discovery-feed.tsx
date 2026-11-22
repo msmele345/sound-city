@@ -94,10 +94,11 @@ export function EventDiscoveryFeed({
             />
           ) : null}
           {schedule.groups.map((group) => (
-            <section key={group.label} className="mt-6 first:mt-2">
+            <section key={group.label} className="mt-8 first:mt-4">
               <h3
                 id={`day-${group.label}`}
-                className="border-b border-rule pb-2 font-display text-2xl uppercase leading-none text-ink"
+                tabIndex={-1}
+                className="scroll-mt-24 border-b border-rule pb-2 font-display text-2xl uppercase leading-none text-ink outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal"
               >
                 {group.heading}
               </h3>
