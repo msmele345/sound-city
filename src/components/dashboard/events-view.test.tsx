@@ -590,7 +590,18 @@ describe("Events route", () => {
 
     const { unmount } = renderEvents();
 
-    expect(screen.getByText(/loading chicago event feed/i)).toBeInTheDocument();
+    const loading = screen.getByRole("status", {
+      name: /loading chicago event feed/i,
+    });
+    expect(loading).toHaveAttribute("aria-busy", "true");
+    expect(
+      within(loading).getAllByRole("listitem", { hidden: true }).length,
+    ).toBeGreaterThan(0);
+    expect(
+      within(loading).getAllByRole("listitem", { hidden: true }).every(
+        (row) => (row.textContent ?? "").trim() === "",
+      ),
+    ).toBe(true);
     unmount();
 
     fetchMock.mockResolvedValueOnce({

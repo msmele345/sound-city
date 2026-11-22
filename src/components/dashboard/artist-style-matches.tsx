@@ -1,3 +1,4 @@
+import { LoadingRows } from "./loading-rows";
 import { SourceTrustLine } from "./source-trust-line";
 import type { ArtistDirectoryState } from "./types";
 
@@ -12,9 +13,7 @@ export function ArtistStyleMatches({
 }) {
   if (directory.status === "loading") {
     return (
-      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-        Loading artist style matches
-      </p>
+      <LoadingRows label="Loading artist style matches" variant="artist" />
     );
   }
 

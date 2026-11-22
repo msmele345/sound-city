@@ -9,6 +9,7 @@ import {
 } from "@/lib/recommendations";
 
 import { EventRow } from "./event-row";
+import { LoadingRows } from "./loading-rows";
 import { TasteProfilePanel } from "./taste-profile-panel";
 import type { EventFeedState } from "./types";
 import type { PersonalizationEvent } from "./use-personalization";
@@ -46,9 +47,7 @@ export function RecommendedEvents({
       />
 
       {feed.status === "loading" ? (
-        <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-          Loading recommendation queue
-        </p>
+        <LoadingRows label="Loading recommendation queue" variant="recommendation" />
       ) : feed.status === "error" ? (
         <p className="border-b border-rule py-5 text-body text-ink-dim">
           Recommendation queue is unavailable until the event feed returns.

@@ -7,6 +7,7 @@ import { compareStartsAt } from "@/lib/starts-at";
 import { useEventActions } from "./event-actions";
 import { EventRow } from "./event-row";
 import { groupFeedRows } from "./feed-rows";
+import { LoadingRows } from "./loading-rows";
 import { formatEventDate } from "./format";
 import { StyleFilterControl, styleFilterOptions } from "./style-filter-control";
 import type { EventFeedState } from "./types";
@@ -60,11 +61,7 @@ export function EventDiscoveryFeed({
   );
 
   if (feed.status === "loading") {
-    return (
-      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-        Loading Chicago event feed
-      </p>
-    );
+    return <LoadingRows label="Loading Chicago event feed" variant="feed" />;
   }
 
   if (feed.status === "error") {

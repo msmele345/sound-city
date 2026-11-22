@@ -6,6 +6,7 @@ import { useMemo } from "react";
 import { compareStartsAt } from "@/lib/starts-at";
 
 import { formatEventDate, formatEventTime } from "./format";
+import { LoadingRows } from "./loading-rows";
 import { SectionMark } from "./section-mark";
 import type { EventFeedState } from "./types";
 
@@ -24,9 +25,7 @@ export function NextUp({ feed }: { feed: EventFeedState }) {
     >
       <SectionMark id="next-up-heading" title="Next up" index="Feed / 03" />
       {feed.status === "loading" ? (
-        <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-          Loading next events
-        </p>
+        <LoadingRows label="Loading next events" variant="next" />
       ) : feed.status === "error" ? (
         <p role="alert" className="border-b border-rule py-5 text-body text-ink-dim">
           Event feed is unavailable. Source-verified listings will return here.

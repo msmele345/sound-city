@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, type ReactNode } from "react";
 
 import { Button } from "./button";
 import { CatalogProvider, useCatalogData } from "./catalog-context";
+import { LoadingRows } from "./loading-rows";
 import {
   PersonalizationProvider,
   usePersonalizationData,
@@ -250,11 +251,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
           <main className="mt-10 min-w-0">
             <Suspense
-              fallback={
-                <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-                  Loading view
-                </p>
-              }
+              fallback={<LoadingRows label="Loading view" variant="feed" />}
             >
               <StyleFilterProvider>{children}</StyleFilterProvider>
             </Suspense>

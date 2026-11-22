@@ -16,6 +16,24 @@ beforeEach(() => {
 });
 
 describe("Venues route", () => {
+  it("announces venue loading with skeleton rows", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+
+    render(
+      <PublicShell>
+        <VenuesPage />
+      </PublicShell>,
+    );
+
+    const loading = screen.getByRole("status", {
+      name: /loading venue directory/i,
+    });
+    expect(loading).toHaveAttribute("aria-busy", "true");
+    expect(
+      within(loading).getAllByRole("listitem", { hidden: true }).length,
+    ).toBeGreaterThan(0);
+  });
+
   it("renders the venue directory", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/events?city=chicago") {

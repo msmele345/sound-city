@@ -134,6 +134,24 @@ describe("public home", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("announces home list loading with skeleton rows", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+
+    renderHome();
+
+    for (const name of [
+      /loading recommendation queue/i,
+      /loading next events/i,
+      /loading weekly artist showcase/i,
+    ]) {
+      const loading = screen.getByRole("status", { name });
+      expect(loading).toHaveAttribute("aria-busy", "true");
+      expect(
+        within(loading).getAllByRole("listitem", { hidden: true }).length,
+      ).toBeGreaterThan(0);
+    }
+  });
+
   it("hides masthead counts while the catalog is loading", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 

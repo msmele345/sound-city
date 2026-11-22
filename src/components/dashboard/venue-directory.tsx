@@ -7,6 +7,7 @@ import { compareStartsAt } from "@/lib/starts-at";
 import { Button } from "./button";
 import { EventRow } from "./event-row";
 import { formatSignalCategory } from "./format";
+import { LoadingRows } from "./loading-rows";
 import type { CatalogEvent, EventFeedState, VenueDirectoryState } from "./types";
 
 function VenueUpcoming({
@@ -30,9 +31,7 @@ function VenueUpcoming({
         Upcoming events
       </h4>
       {feedStatus === "loading" ? (
-        <p className="mt-3 text-body text-ink-dim">
-          Waiting on verified event feed.
-        </p>
+        <LoadingRows label="Waiting on verified event feed" variant="compact" count={1} />
       ) : !next ? (
         <p className="mt-3 text-body text-ink-dim">
           No upcoming events are attached to this venue yet.
@@ -77,11 +76,7 @@ export function VenueDirectory({
   feed: EventFeedState;
 }) {
   if (directory.status === "loading") {
-    return (
-      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-        Loading venue directory
-      </p>
-    );
+    return <LoadingRows label="Loading venue directory" variant="venue" />;
   }
 
   if (directory.status === "error") {

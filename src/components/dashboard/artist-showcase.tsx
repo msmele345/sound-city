@@ -1,4 +1,5 @@
 import { EventRow } from "./event-row";
+import { LoadingRows } from "./loading-rows";
 import type { EventFeedState, ShowcaseState } from "./types";
 
 export function ArtistShowcase({
@@ -12,9 +13,7 @@ export function ArtistShowcase({
 }) {
   if (showcase.status === "loading") {
     return (
-      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
-        Loading weekly artist showcase
-      </p>
+      <LoadingRows label="Loading weekly artist showcase" variant="showcase" />
     );
   }
 
@@ -102,9 +101,7 @@ export function ArtistShowcase({
           Upcoming shows
         </h4>
         {feed.status === "loading" ? (
-          <p className="mt-3 text-body text-ink-dim">
-            Waiting on verified event feed.
-          </p>
+          <LoadingRows label="Waiting on verified event feed" variant="compact" />
         ) : upcomingEvents.length === 0 ? (
           <p className="mt-3 text-body text-ink-dim">
             No upcoming Chicago dates are attached to this artist yet.

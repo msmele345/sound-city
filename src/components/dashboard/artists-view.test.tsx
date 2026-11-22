@@ -44,6 +44,24 @@ beforeEach(() => {
 });
 
 describe("Artists route", () => {
+  it("announces artist loading with skeleton rows", () => {
+    fetchMock.mockReturnValue(new Promise(() => undefined));
+
+    render(
+      <PublicShell>
+        <ArtistsPage />
+      </PublicShell>,
+    );
+
+    for (const name of [/loading weekly artist showcase/i, /loading artist style matches/i]) {
+      const loading = screen.getByRole("status", { name });
+      expect(loading).toHaveAttribute("aria-busy", "true");
+      expect(
+        within(loading).getAllByRole("listitem", { hidden: true }).length,
+      ).toBeGreaterThan(0);
+    }
+  });
+
   it("renders the weekly feature and the artist directory", async () => {
     fetchMock.mockImplementation((url: string) => {
       if (url === "/api/catalog/showcase?city=chicago") {
