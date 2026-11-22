@@ -12,7 +12,7 @@
   --color-panel: oklch(0.188 0.007 250);
   --color-ink: oklch(0.955 0.004 250);
   --color-ink-dim: oklch(0.68 0.006 250);
-  --color-ink-faint: oklch(0.52 0.007 250);
+  --color-ink-faint: oklch(0.6 0.007 250);
   --color-signal: oklch(0.79 0.165 64);
   --color-signal-deep: oklch(0.72 0.17 60);
   --color-rule: oklch(1 0 0 / 0.13);
@@ -21,6 +21,14 @@
   --font-display: var(--font-anton), "Arial Narrow", sans-serif;
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  /* 12px floor. Labels sit on it, metadata one step up, body at 16px. */
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.2;
+  --text-meta: 0.8125rem;
+  --text-meta--line-height: 1.35;
+  --text-body: 1rem;
+  --text-body--line-height: 1.625;
 
   --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }

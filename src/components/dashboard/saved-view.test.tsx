@@ -73,6 +73,35 @@ describe("Saved route", () => {
     expect(savedLink).toHaveTextContent("01");
   });
 
+  it("does not call an id-only save unavailable before the feed has loaded", async () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_may_2026"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+        },
+      }),
+    );
+    fetchMock.mockImplementation(() => new Promise(() => {}));
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+    const savedLink = within(nav).getByRole("link", { name: /saved/i });
+    expect(await within(savedLink).findByText("01")).toBeInTheDocument();
+    const saved = screen.getByRole("region", { name: /^saved$/i });
+    expect(
+      within(saved).queryByRole("heading", { name: /event details unavailable/i }),
+    ).not.toBeInTheDocument();
+    expect(within(saved).queryByText(/nothing saved yet/i)).not.toBeInTheDocument();
+  });
+
   it("shows an id-only save that is not in the feed and removes it", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem(
@@ -105,8 +134,12 @@ describe("Saved route", () => {
       await within(saved).findByRole("heading", { name: /event details unavailable/i }),
     ).toBeInTheDocument();
     expect(within(saved).queryByText(/nothing saved yet/i)).not.toBeInTheDocument();
+    const remove = within(saved).getByRole("button", { name: /^remove$/i });
+    expect(remove.className).toContain("font-mono");
+    expect(remove.className).toContain("uppercase");
+    expect(remove.className).toContain("border");
 
-    await user.click(within(saved).getByRole("button", { name: /^remove$/i }));
+    await user.click(remove);
 
     expect(savedLink).toHaveTextContent("00");
     expect(
@@ -139,6 +172,263 @@ describe("Saved route", () => {
     for (const link of links) {
       expect(link).toHaveAttribute("href", "/");
     }
+  });
+
+  it("splits saved events around the six-hour grace period", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-15T12:00:00.000Z"));
+    const snapshot = {
+      venueName: "Spybar",
+      neighborhood: "River North",
+      sourceUrl: "https://example.com/grace",
+    };
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_inside", "event_cutoff", "event_outside"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+          savedSnapshots: [
+            {
+              ...snapshot,
+              id: "event_outside",
+              title: "Outside Grace",
+              startsAt: "2026-06-15T05:00:00.000Z",
+            },
+            {
+              ...snapshot,
+              id: "event_cutoff",
+              title: "At Cutoff",
+              startsAt: "2026-06-15T06:00:00.000Z",
+            },
+            {
+              ...snapshot,
+              id: "event_inside",
+              title: "Inside Grace",
+              startsAt: "2026-06-15T07:00:00.000Z",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    try {
+      render(
+        <PublicShell>
+          <SavedPage />
+        </PublicShell>,
+      );
+
+      const saved = await screen.findByRole("region", { name: /^saved$/i });
+      const inside = await within(saved).findByRole("heading", { name: /inside grace/i });
+      const past = within(saved).getByRole("heading", { name: /^past$/i });
+      const outside = within(saved).getByRole("heading", { name: /outside grace/i });
+      const cutoff = within(saved).getByRole("heading", { name: /at cutoff/i });
+
+      expect(
+        inside.compareDocumentPosition(past) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        past.compareDocumentPosition(outside) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        outside.compareDocumentPosition(cutoff) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows a saved event that is also attended as pressed", async () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_past", "event_future"],
+          dismissedEventIds: [],
+          attendedEventIds: ["event_past"],
+          savedSnapshots: [
+            {
+              id: "event_past",
+              title: "Old Night",
+              startsAt: "2020-01-01T03:00:00.000Z",
+              venueName: "Spybar",
+              neighborhood: "River West",
+              sourceUrl: "https://example.com/old",
+            },
+            {
+              id: "event_future",
+              title: "Lemtom",
+              startsAt: "2030-05-24T03:00:00.000Z",
+              venueName: "smartbar",
+              neighborhood: "Wrigleyville",
+              sourceUrl: "https://example.com/lemtom",
+            },
+          ],
+          attendedSnapshots: [
+            {
+              id: "event_past",
+              title: "Old Night",
+              startsAt: "2020-01-01T03:00:00.000Z",
+              venueName: "Spybar",
+              neighborhood: "River West",
+              sourceUrl: "https://example.com/old",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    const pastHeading = await within(saved).findByRole("heading", { name: /^past$/i });
+    const pastList = pastHeading.nextElementSibling;
+    expect(pastList).not.toBeNull();
+    expect(
+      within(pastList as HTMLElement).getByRole("button", { name: /^attended$/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const upcoming = within(saved).getByRole("heading", { name: /^lemtom$/i }).closest("li");
+    expect(upcoming).not.toBeNull();
+    expect(
+      within(upcoming!).queryByRole("button", { name: /^attended$/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks a past saved event attended and announces it once", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_future", "event_past"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+          savedSnapshots: [
+            {
+              id: "event_past",
+              title: "Old Night",
+              startsAt: "2020-01-01T03:00:00.000Z",
+              venueName: "Spybar",
+              neighborhood: "River West",
+              sourceUrl: "https://example.com/old",
+            },
+            {
+              id: "event_future",
+              title: "Lemtom",
+              startsAt: "2030-05-24T03:00:00.000Z",
+              venueName: "smartbar",
+              neighborhood: "Wrigleyville",
+              sourceUrl: "https://example.com/lemtom",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    const upcoming = (
+      await within(saved).findByRole("heading", { name: /^lemtom$/i })
+    ).closest("li");
+    const pastEvent = within(saved).getByRole("heading", { name: /old night/i });
+    const pastRow = pastEvent.closest("li");
+    expect(upcoming).not.toBeNull();
+    expect(pastRow).not.toBeNull();
+    expect(
+      within(upcoming!).queryByRole("button", { name: /^attended$/i }),
+    ).not.toBeInTheDocument();
+    expect(within(pastRow!).getByRole("button", { name: /^saved$/i })).toBeInTheDocument();
+
+    await user.click(within(pastRow!).getByRole("button", { name: /^attended$/i }));
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("Attended Old Night at Spybar");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    const nav = screen.getByRole("navigation", { name: /primary navigation/i });
+    expect(nav.querySelector("[aria-live]")).toBeNull();
+
+    const attendedHeading = within(saved).getByRole("heading", { name: /^attended$/i });
+    const attendedEvent = within(saved).getByRole("heading", { name: /old night/i });
+    expect(
+      attendedHeading.compareDocumentPosition(attendedEvent) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      within(attendedEvent.closest("li")!).getByRole("button", { name: /^attended$/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(within(saved).queryByRole("heading", { name: /^past$/i })).not.toBeInTheDocument();
+    expect(within(saved).getByRole("heading", { name: /^lemtom$/i })).toBeInTheDocument();
+  });
+
+  it("orders saved events by start time when the strings would not", async () => {
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_later", "event_earlier"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+          savedSnapshots: [
+            {
+              id: "event_later",
+              title: "Later By Clock",
+              startsAt: "2026-11-21T23:00:00-06:00",
+              venueName: "Spybar",
+              neighborhood: "River North",
+              sourceUrl: "https://example.com/later",
+            },
+            {
+              id: "event_earlier",
+              title: "Earlier By Clock",
+              startsAt: "2026-11-22T04:00:00.000Z",
+              venueName: "smartbar",
+              neighborhood: "Wrigleyville",
+              sourceUrl: "https://example.com/earlier",
+            },
+          ],
+        },
+      }),
+    );
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    render(
+      <PublicShell>
+        <SavedPage />
+      </PublicShell>,
+    );
+
+    const saved = await screen.findByRole("region", { name: /^saved$/i });
+    const earlier = await within(saved).findByRole("heading", { name: /earlier by clock/i });
+    const later = within(saved).getByRole("heading", { name: /later by clock/i });
+    expect(
+      earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("lists saved events from snapshots after they leave the catalog and groups past events", async () => {

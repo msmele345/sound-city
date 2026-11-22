@@ -107,7 +107,7 @@ describe("Venues route", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(venues).getByRole("link", { name: /family matters listing/i }),
+      within(venues).getByRole("link", { name: /^family matters$/i }),
     ).toHaveAttribute("href", "https://example.com/event");
   });
 

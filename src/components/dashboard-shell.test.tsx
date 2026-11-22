@@ -720,49 +720,55 @@ describe("public home", () => {
   });
 
   it("shows public source freshness and source links on recommended events", async () => {
-    fetchMock.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        city: { slug: "chicago" },
-        events: [
-          {
-            id: "event_recommended",
-            title: "Recommended Source Test",
-            startsAt: "2026-05-23T03:00:00.000Z",
-            venue: {
-              name: "Podlasie Club",
-              neighborhood: "Avondale",
-              capacity: 220,
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-15T16:00:00.000Z"));
+    try {
+      fetchMock.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          city: { slug: "chicago" },
+          events: [
+            {
+              id: "event_recommended",
+              title: "Recommended Source Test",
+              startsAt: "2026-05-23T03:00:00.000Z",
+              venue: {
+                name: "Podlasie Club",
+                neighborhood: "Avondale",
+                capacity: 220,
+              },
+              artists: [{ name: "Local Selector" }],
+              styles: ["house"],
+              source: {
+                title: "Venue calendar",
+                url: "https://example.com/calendar",
+                lastVerifiedAt: "2026-05-15",
+                confidence: 94,
+              },
             },
-            artists: [{ name: "Local Selector" }],
-            styles: ["house"],
-            source: {
-              title: "Venue calendar",
-              url: "https://example.com/calendar",
-              lastVerifiedAt: "2026-05-15",
-              confidence: 94,
-            },
-          },
-        ],
-      }),
-    });
+          ],
+        }),
+      });
 
-    renderHome();
+      renderHome();
 
-    const recommended = screen.getByRole("region", {
-      name: /for you/i,
-    });
-    const eventHeading = await within(recommended).findByRole("heading", {
-      name: /recommended source test/i,
-    });
-    const eventRow = eventHeading.closest("li");
-    expect(eventRow).not.toBeNull();
-    expect(within(eventRow!).getByText(/verified may 15, 2026/i)).toBeInTheDocument();
-    expect(
-      within(eventRow!).getByRole("link", { name: /venue calendar/i }),
-    ).toHaveAttribute("href", "https://example.com/calendar");
-    expect(within(eventRow!).queryByText(/confidence/i)).not.toBeInTheDocument();
-    expect(within(eventRow!).queryByText(/parser/i)).not.toBeInTheDocument();
+      const recommended = screen.getByRole("region", {
+        name: /for you/i,
+      });
+      const eventHeading = await within(recommended).findByRole("heading", {
+        name: /recommended source test/i,
+      });
+      const eventRow = eventHeading.closest("li");
+      expect(eventRow).not.toBeNull();
+      expect(within(eventRow!).getByText(/^verified may 15$/i)).toBeInTheDocument();
+      expect(
+        within(eventRow!).getByRole("link", { name: /^venue calendar$/i }),
+      ).toHaveAttribute("href", "https://example.com/calendar");
+      expect(within(eventRow!).queryByText(/confidence/i)).not.toBeInTheDocument();
+      expect(within(eventRow!).queryByText(/parser/i)).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("loads the weekly artist feature on the home page", async () => {
@@ -887,7 +893,7 @@ describe("public home", () => {
       }),
     ).toBeInTheDocument();
     expect(
-      within(showcase).getByRole("link", { name: /family matters listing/i }),
+      within(showcase).getByRole("link", { name: /^family matters$/i }),
     ).toHaveAttribute("href", "https://example.com/event");
     expect(
       screen.queryByRole("region", { name: /venue signals/i }),

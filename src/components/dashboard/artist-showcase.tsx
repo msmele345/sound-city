@@ -12,7 +12,7 @@ export function ArtistShowcase({
 }) {
   if (showcase.status === "loading") {
     return (
-      <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+      <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
         Loading weekly artist showcase
       </p>
     );
@@ -20,7 +20,7 @@ export function ArtistShowcase({
 
   if (showcase.status === "error") {
     return (
-      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+      <p className="border-b border-rule py-5 text-body text-ink-dim">
         Artist showcase is unavailable. Curated listening links will return
         here.
       </p>
@@ -29,7 +29,7 @@ export function ArtistShowcase({
 
   if (!showcase.artist) {
     return (
-      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+      <p className="border-b border-rule py-5 text-body text-ink-dim">
         No weekly artist showcase is selected yet.
       </p>
     );
@@ -40,7 +40,7 @@ export function ArtistShowcase({
     !showcase.artist.styles.includes(activeStyle)
   ) {
     return (
-      <p className="border-b border-rule py-5 text-sm text-ink-dim">
+      <p className="border-b border-rule py-5 text-body text-ink-dim">
         No featured artist matches {activeStyle}.
       </p>
     );
@@ -68,16 +68,16 @@ export function ArtistShowcase({
         }}
       />
       <div className="border-b border-rule py-5">
-        <p className="font-mono text-[0.65rem] uppercase tracking-[0.22em] text-signal">
+        <p className="font-mono text-label uppercase tracking-[0.22em] text-signal">
           Weekly feature
         </p>
         <h3 className="mt-3 font-display text-5xl uppercase leading-[0.85] text-ink">
           {artist.name}
         </h3>
-        <p className="mt-4 font-mono text-xs uppercase tracking-[0.14em] text-ink-faint">
+        <p className="mt-4 font-mono text-meta uppercase tracking-[0.14em] text-ink-faint">
           {artist.styles.join(" / ")}
         </p>
-        <p className="mt-5 text-sm leading-relaxed text-ink-dim">
+        <p className="mt-5 text-body text-ink-dim">
           {artist.bio}
         </p>
         {artist.links.length > 0 ? (
@@ -88,7 +88,7 @@ export function ArtistShowcase({
                 href={link.url}
                 target="_blank"
                 rel="noreferrer"
-                className="border border-rule px-3 py-2 font-mono text-[0.68rem] uppercase tracking-[0.14em] text-signal transition-colors duration-150 hover:bg-panel hover:text-ink"
+                className="border border-rule px-3 py-2 font-mono text-label uppercase tracking-[0.14em] text-signal transition-colors duration-150 hover:bg-panel hover:text-ink"
               >
                 {link.label}
               </a>
@@ -98,15 +98,15 @@ export function ArtistShowcase({
       </div>
 
       <div className="border-b border-rule py-5">
-        <h4 className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-ink-faint">
+        <h4 className="font-mono text-label uppercase tracking-[0.18em] text-ink-faint">
           Upcoming shows
         </h4>
         {feed.status === "loading" ? (
-          <p className="mt-3 text-sm text-ink-dim">
+          <p className="mt-3 text-body text-ink-dim">
             Waiting on verified event feed.
           </p>
         ) : upcomingEvents.length === 0 ? (
-          <p className="mt-3 text-sm text-ink-dim">
+          <p className="mt-3 text-body text-ink-dim">
             No upcoming Chicago dates are attached to this artist yet.
           </p>
         ) : (

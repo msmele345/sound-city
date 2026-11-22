@@ -56,7 +56,7 @@ function ManifestReadout({
   return (
     <div className={align === "end" ? "shrink-0 lg:text-right" : "shrink-0"}>
       {compact ? null : (
-        <p className="font-mono text-[0.7rem] uppercase tracking-[0.22em] text-ink-faint">
+        <p className="font-mono text-label uppercase tracking-[0.22em] text-ink-faint">
           CHI&middot;HT / VOL.01
         </p>
       )}
@@ -75,7 +75,7 @@ function ManifestReadout({
               {item.value}
             </dd>
             <dt
-              className={`font-mono text-[0.62rem] uppercase tracking-[0.16em] text-ink-faint ${
+              className={`font-mono text-label uppercase tracking-[0.16em] text-ink-faint ${
                 compact ? "mt-1" : ""
               }`}
             >
@@ -93,7 +93,7 @@ function LargeMasthead() {
     <header id="dashboard" className="rise scroll-mt-6 border-b-2 border-rule-strong pb-7">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.34em] text-signal">
+          <p className="font-mono text-label uppercase tracking-[0.34em] text-signal">
             Chicago / House + Techno
           </p>
           <h1 className="mt-3 font-display text-[clamp(3.5rem,13vw,8.5rem)] uppercase leading-[0.82] tracking-[0.005em] text-ink">
@@ -123,7 +123,7 @@ function CompactMasthead() {
           <h1 className="font-display text-4xl uppercase leading-none tracking-[0.005em] text-ink sm:text-5xl">
             Sound City
           </h1>
-          <p className="font-mono text-[0.65rem] uppercase tracking-[0.22em] text-signal">
+          <p className="font-mono text-label uppercase tracking-[0.22em] text-signal">
             Chicago / House + Techno
           </p>
         </div>
@@ -147,7 +147,7 @@ function ActionStatus() {
   return (
     <div
       role="status"
-      className="font-mono text-xs uppercase tracking-[0.14em] text-ink"
+      className="font-mono text-label uppercase tracking-[0.14em] text-ink"
     >
       {notice ? (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-rule py-3">
@@ -196,7 +196,7 @@ function NavLinks({ activeStyle }: { activeStyle: string }) {
       className="sticky top-0 z-30 mt-6 border-b border-rule bg-bg"
     >
       <div
-        className="rise grid grid-cols-2 font-mono text-xs uppercase tracking-[0.2em] sm:flex sm:flex-wrap sm:items-stretch"
+        className="rise grid grid-cols-2 font-mono text-label uppercase tracking-[0.2em] sm:flex sm:flex-wrap sm:items-stretch"
         style={{ animationDelay: "70ms" }}
       >
         {nav.map((item, i) => {
@@ -216,7 +216,7 @@ function NavLinks({ activeStyle }: { activeStyle: string }) {
               </span>{" "}
               {item.label}
               {item.href === "/saved" ? (
-                <span aria-live="polite"> {savedCount}</span>
+                <span> {savedCount}</span>
               ) : null}
             </Link>
           );
@@ -251,7 +251,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           <main className="mt-10 min-w-0">
             <Suspense
               fallback={
-                <p className="border-b border-rule py-5 font-mono text-sm uppercase tracking-[0.12em] text-ink-dim">
+                <p className="border-b border-rule py-5 font-mono text-label uppercase tracking-[0.12em] text-ink-dim">
                   Loading view
                 </p>
               }
@@ -260,7 +260,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
             </Suspense>
           </main>
 
-          <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t-2 border-rule-strong pt-4 font-mono text-[0.65rem] uppercase tracking-[0.2em] text-ink-faint">
+          <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t-2 border-rule-strong pt-4 font-mono text-label uppercase tracking-[0.2em] text-ink-faint">
             <span>Source-verified &middot; Chicago underground</span>
             <a href="/admin" className="transition-colors duration-150 hover:text-ink">
               Admin

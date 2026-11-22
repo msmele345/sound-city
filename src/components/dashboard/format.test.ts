@@ -1,8 +1,12 @@
+import { launchCatalogData } from "@/server/catalog/launch-data";
+
 import {
   formatEventDate,
   formatEventTime,
   formatSignalCategory,
+  formatSourceDisplayName,
   formatVerifiedDate,
+  formatVerifiedTrustDate,
 } from "./format";
 
 describe("dashboard formatters", () => {
@@ -18,6 +22,61 @@ describe("dashboard formatters", () => {
 
   it("formats a date-only verified timestamp as that calendar day", () => {
     expect(formatVerifiedDate("2026-05-15")).toBe("May 15, 2026");
+  });
+
+  it("drops the verified year only when it is the current year", () => {
+    const now = new Date(2026, 10, 21);
+    expect(formatVerifiedTrustDate("2026-05-15", now)).toBe("May 15");
+    expect(formatVerifiedTrustDate("2024-05-15", now)).toBe("May 15, 2024");
+  });
+
+  it("shows a short site name for the source titles in the catalog", () => {
+    const expected = new Map([
+      ["Metro Chicago smartbar venue page", "Metro"],
+      ["Spybar Chicago about page", "Spybar"],
+      ["Podlasie Club about page", "Podlasie Club"],
+      ["Family Matters feat. Posthuman Resident Advisor listing", "Resident Advisor"],
+      ["Lemtom at Spybar Resident Advisor listing", "Resident Advisor"],
+      ["Jeremy Olander Open-to-Close Resident Advisor listing", "Resident Advisor"],
+    ]);
+    const titles = new Set([
+      ...launchCatalogData.venues.map((venue) => venue.source.title),
+      ...launchCatalogData.artists.map((artist) => artist.source.title),
+      ...launchCatalogData.events.map((event) => event.source.title),
+    ]);
+
+    expect([...titles].sort()).toEqual([...expected.keys()].sort());
+    for (const title of titles) {
+      expect(formatSourceDisplayName(title)).toBe(expected.get(title));
+    }
+  });
+
+  it("names a blank title from its site, or nothing when the url is unusable", () => {
+    expect(formatSourceDisplayName("   ", "https://www.example.com/events/1")).toBe(
+      "example.com",
+    );
+    expect(formatSourceDisplayName("  ", "javascript:alert(1)")).toBe("");
+    expect(formatSourceDisplayName("")).toBe("");
+  });
+
+  it("drops a trailing city the way other source names lose Chicago", () => {
+    expect(formatSourceDisplayName("Smart Bar Chicago")).toBe("Smart Bar");
+    expect(formatSourceDisplayName("Spybar Chicago about page")).toBe("Spybar");
+  });
+
+  it("keeps a meaningful name when a calendar suffix would leave only one word", () => {
+    expect(formatSourceDisplayName("Venue calendar")).toBe("Venue calendar");
+    expect(formatSourceDisplayName("Fixture Warehouse calendar")).toBe("Fixture Warehouse");
+  });
+
+  it("strips a review-source prefix and names a raw url by its site", () => {
+    expect(formatSourceDisplayName("Review source: https://ra.co/events/2403087")).toBe(
+      "Resident Advisor",
+    );
+    expect(
+      formatSourceDisplayName("Review source: https://www.metrochicago.com/venue/smartbar/"),
+    ).toBe("Metro");
+    expect(formatSourceDisplayName("https://www.example.com/events/1")).toBe("example.com");
   });
 
   it("formats signal categories as their current labels", () => {

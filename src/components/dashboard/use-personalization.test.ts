@@ -448,6 +448,57 @@ describe("usePersonalization", () => {
     ]);
   });
 
+  it("keeps a stored source url only when it is http or https", () => {
+    const snapshot = {
+      title: "Night",
+      startsAt: "2026-05-24T03:00:00.000Z",
+      venueName: "Spybar",
+      neighborhood: "River North",
+    };
+    window.localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        actions: {
+          savedEventIds: ["event_js", "event_https", "event_http"],
+          dismissedEventIds: [],
+          attendedEventIds: [],
+          savedSnapshots: [
+            { ...snapshot, id: "event_js", sourceUrl: "javascript:alert(1)" },
+            { ...snapshot, id: "event_https", sourceUrl: "https://example.com/ok" },
+            { ...snapshot, id: "event_http", sourceUrl: "http://example.com/ok" },
+          ],
+        },
+      }),
+    );
+
+    const { result } = renderHook(() => usePersonalization());
+
+    expect(result.current.actions.savedEventIds).toEqual([
+      "event_js",
+      "event_https",
+      "event_http",
+    ]);
+    expect(result.current.actions.savedSnapshots?.map((item) => item.sourceUrl)).toEqual([
+      "",
+      "https://example.com/ok",
+      "http://example.com/ok",
+    ]);
+  });
+
+  it("does not store a non-http source url when an event is saved", () => {
+    const { result } = renderHook(() => usePersonalization());
+
+    act(() =>
+      result.current.toggleSaved({
+        ...storedEvent("event_bad"),
+        source: { url: "javascript:alert(1)" },
+      }),
+    );
+
+    expect(result.current.actions.savedSnapshots?.[0]?.sourceUrl).toBe("");
+    expect(result.current.actions.savedEventIds).toEqual(["event_bad"]);
+  });
+
   it("loads stored actions that hold only ids", () => {
     window.localStorage.setItem(
       storageKey,

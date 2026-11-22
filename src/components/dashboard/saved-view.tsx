@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 
-import { isUpcomingPublicStart } from "@/server/catalog/public-events";
+import { isUpcomingPublicStart } from "@/lib/public-events";
+import { compareStartsAt } from "@/lib/starts-at";
 import type { EventSnapshot } from "@/lib/recommendations";
 
 import { Button } from "./button";
@@ -48,14 +49,16 @@ export function SavedView() {
   const now = new Date();
   const upcoming = snapshots
     .filter((snapshot) => isUpcomingPublicStart(snapshot.startsAt, now, chicago))
-    .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt));
+    .toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt));
   const past = snapshots
     .filter((snapshot) => !isUpcomingPublicStart(snapshot.startsAt, now, chicago))
-    .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt));
+    .toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt));
   const snapshotIds = new Set(snapshots.map((snapshot) => snapshot.id));
-  const unavailableIds = eventActions.actions.savedEventIds.filter(
+  const idsWithoutSnapshots = eventActions.actions.savedEventIds.filter(
     (id) => !snapshotIds.has(id),
   );
+  const feedReady = feed.status !== "loading";
+  const unavailableIds = feedReady ? idsWithoutSnapshots : [];
   const dismissed =
     feed.status === "ready"
       ? feed.events
@@ -64,13 +67,16 @@ export function SavedView() {
               eventActions.actions.dismissedEventIds.includes(event.id) &&
               isUpcomingPublicStart(event.startsAt, now, chicago),
           )
-          .toSorted((a, b) => a.startsAt.localeCompare(b.startsAt))
+          .toSorted((a, b) => compareStartsAt(a.startsAt, b.startsAt))
       : [];
 
   return (
     <section id="saved" aria-labelledby="saved-heading" className="min-w-0 scroll-mt-6">
       <SectionMark id="saved-heading" title="Saved" index="Kept / 05" />
-      {upcoming.length === 0 && past.length === 0 && unavailableIds.length === 0 ? (
+      {upcoming.length === 0 &&
+      past.length === 0 &&
+      unavailableIds.length === 0 &&
+      idsWithoutSnapshots.length === 0 ? (
         <EmptyList>Nothing saved yet.</EmptyList>
       ) : null}
       {upcoming.length > 0 ? (
@@ -79,6 +85,7 @@ export function SavedView() {
             <SavedEventRow
               key={snapshot.id}
               snapshot={snapshot}
+              attended={attendedIds.has(snapshot.id)}
               onSave={() => eventActions.save(eventFromSnapshot(snapshot))}
             />
           ))}
@@ -91,11 +98,13 @@ export function SavedView() {
               <h3 className="font-display text-2xl uppercase leading-none text-ink">
                 Event details unavailable
               </h3>
-              <p className="mt-2 text-sm text-ink-dim">
+              <p className="mt-2 text-body text-ink-dim">
                 This save has no stored details and is not in the current catalog.
               </p>
               <div className="mt-4">
-                <Button onClick={() => eventActions.removeSaved(id)}>Remove</Button>
+                <Button variant="quiet" onClick={() => eventActions.removeSaved(id)}>
+                  Remove
+                </Button>
               </div>
             </li>
           ))}
@@ -111,7 +120,9 @@ export function SavedView() {
               <SavedEventRow
                 key={snapshot.id}
                 snapshot={snapshot}
+                attended={attendedIds.has(snapshot.id)}
                 onSave={() => eventActions.save(eventFromSnapshot(snapshot))}
+                onAttend={() => eventActions.attend(eventFromSnapshot(snapshot))}
               />
             ))}
           </ol>
@@ -162,7 +173,7 @@ export function SavedView() {
 
 function EmptyList({ children }: { children: string }) {
   return (
-    <p className="border-b border-rule py-5 text-sm text-ink-dim">
+    <p className="border-b border-rule py-5 text-body text-ink-dim">
       {children}{" "}
       <Link
         href="/"
@@ -176,17 +187,23 @@ function EmptyList({ children }: { children: string }) {
 
 function SavedEventRow({
   snapshot,
+  attended = false,
   onSave,
+  onAttend,
 }: {
   snapshot: EventSnapshot;
+  attended?: boolean;
   onSave(): void;
+  onAttend?: () => void;
 }) {
   return (
     <EventRow
       event={eventFromSnapshot(snapshot)}
       variant="saved"
       saved
+      attended={attended}
       onSave={onSave}
+      onAttend={onAttend}
     />
   );
 }
