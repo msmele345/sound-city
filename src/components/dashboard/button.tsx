@@ -13,11 +13,18 @@ const variantClass = {
 export function Button({
   variant = "quiet",
   type = "button",
+  confirming = false,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: keyof typeof variantClass;
+  confirming?: boolean;
 }) {
   return (
-    <button {...props} type={type} className={variantClass[variant]} />
+    <button
+      {...props}
+      type={type}
+      data-confirm={confirming ? "true" : undefined}
+      className={`${variantClass[variant]} pressable`}
+    />
   );
 }

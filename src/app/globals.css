@@ -124,4 +124,65 @@ select {
     opacity: 1;
     animation: none;
   }
+
+  .row-dismissed {
+    opacity: 0.5;
+  }
+}
+
+/* Interaction feedback: transform and opacity only, under 200ms. */
+@media (prefers-reduced-motion: no-preference) {
+  .pressable {
+    transition:
+      transform 160ms var(--ease-expo),
+      color 150ms,
+      background-color 150ms,
+      border-color 150ms;
+  }
+
+  .pressable:active {
+    transform: translate3d(0, 1px, 0);
+  }
+
+  @keyframes save-confirm {
+    from {
+      opacity: 0.45;
+      transform: translate3d(0, 2px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+  }
+
+  .pressable[data-confirm="true"] {
+    animation: save-confirm 160ms var(--ease-expo);
+  }
+
+  @keyframes row-exit {
+    from {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      opacity: 0.5;
+      transform: translate3d(0.5rem, 0, 0);
+    }
+  }
+
+  .row-dismissed {
+    animation: row-exit 160ms var(--ease-expo) forwards;
+  }
+
+  @keyframes row-leave {
+    to {
+      opacity: 0;
+      transform: translate3d(0.75rem, 0, 0);
+    }
+  }
+
+  .row-leave {
+    animation: row-leave 160ms var(--ease-expo) forwards;
+    pointer-events: none;
+  }
 }
