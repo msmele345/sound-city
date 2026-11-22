@@ -13,7 +13,8 @@ export function SectionMark({
     <div className="flex w-full min-w-0 flex-col items-start gap-2 border-b-2 border-rule-strong pb-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
       <h2
         id={id}
-        className="font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink sm:text-3xl"
+        tabIndex={-1}
+        className="font-display text-2xl uppercase leading-none tracking-[0.01em] text-ink outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-signal sm:text-3xl"
       >
         {title}
       </h2>

@@ -164,6 +164,22 @@ function ActionStatus() {
   );
 }
 
+function viewHeadingId(pathname: string) {
+  if (pathname === "/events" || pathname.startsWith("/events/")) {
+    return "latest-heading";
+  }
+  if (pathname === "/artists" || pathname.startsWith("/artists/")) {
+    return "artists-showcase-heading";
+  }
+  if (pathname === "/venues" || pathname.startsWith("/venues/")) {
+    return "venue-heading";
+  }
+  if (pathname === "/saved" || pathname.startsWith("/saved/")) {
+    return "saved-heading";
+  }
+  return "recommended-heading";
+}
+
 function isCurrentPath(pathname: string, href: string) {
   const path = href.split("?")[0] ?? href;
   if (!path || path.startsWith("#")) {
@@ -234,11 +250,26 @@ function StyleAwareNav() {
 
 export function PublicShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const seenPath = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (seenPath.current === null) {
+      seenPath.current = pathname;
+      return;
+    }
+    if (seenPath.current === pathname) return;
+    seenPath.current = pathname;
+    const heading = document.getElementById(viewHeadingId(pathname));
+    if (heading instanceof HTMLElement) heading.focus();
+  }, [pathname]);
 
   return (
     <CatalogProvider>
       <PersonalizationProvider>
         <div className="relative z-10 mx-auto w-full max-w-[78rem] px-5 py-8 sm:px-8 lg:px-12">
+          <a href="#content" className="skip-link">
+            Skip to content
+          </a>
           {pathname === "/" ? <LargeMasthead /> : <CompactMasthead />}
 
           <Suspense fallback={<NavLinks activeStyle="all" />}>
@@ -249,7 +280,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
           <ActionStatus />
 
-          <main className="mt-10 min-w-0">
+          <main id="content" tabIndex={-1} className="mt-10 min-w-0 scroll-mt-6 outline-none">
             <Suspense
               fallback={<LoadingRows label="Loading view" variant="feed" />}
             >

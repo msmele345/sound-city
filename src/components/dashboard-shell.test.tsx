@@ -222,6 +222,45 @@ describe("public home", () => {
     expect(eventCalls).toBe(2);
   });
 
+  it("offers a skip link to the main content", () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+
+    renderHome();
+
+    expect(screen.getByRole("link", { name: /skip to content/i })).toHaveAttribute(
+      "href",
+      "#content",
+    );
+    expect(screen.getByRole("main")).toHaveAttribute("id", "content");
+  });
+
+  it("moves focus to the view heading after a route change", () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ events: [] }),
+    });
+    navigationStub.pathname = "/";
+    const { rerender } = render(
+      <PublicShell>
+        <HomeView />
+      </PublicShell>,
+    );
+
+    expect(screen.getByRole("heading", { name: /^for you$/i })).not.toHaveFocus();
+
+    navigationStub.pathname = "/events";
+    rerender(
+      <PublicShell>
+        <EventsView />
+      </PublicShell>,
+    );
+
+    expect(screen.getByRole("heading", { name: /latest events/i })).toHaveFocus();
+  });
+
   it("announces home list loading with skeleton rows", () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
 
